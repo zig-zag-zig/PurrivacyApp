@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "sdkVersion": "56.0.0",
+    "name": "Purrivacy",
+    "slug": "pgp-frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "vip.chichi.purrivacy",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "vip.chichi.purrivacy.background-notification-task"
+        ]
+      }
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F1EEE9"
+      },
+      "googleServicesFile": "./google-services.json",
+      "package": "vip.chi_chi.purrivacy",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "./scripts/android-build-variants",
+      "./scripts/patch-openpgp",
+      "./scripts/secure-storage",
+      "./scripts/android-share-intent",
+      "expo-dev-client",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "mode": "production",
+          "android": {
+            "allowWhileIdle": true
+          }
+        }
+      ],
+      [
+        "expo-task-manager",
+        {
+          "internal": {
+            "tasks": [
+              "background-notification-task"
+            ]
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon-transparent.png",
+          "imageWidth": 288,
+          "resizeMode": "contain",
+          "backgroundColor": "#121212",
+          "dark": {
+            "image": "./assets/icon-transparent.png",
+            "backgroundColor": "#121212"
+          }
+        }
+      ]
+    ],
+    "scheme": "purrivacy",
+    "extra": {
+      "eas": {
+        "projectId": "01cf8993-7ad7-4e9c-ab6e-e654cb720a50"
+      }
+    },
+    "owner": "alanomar1992"
+  }
+}

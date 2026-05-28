@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "514488248051",
+    "firebase_url": "https://pgp-frontend-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "pgp-frontend",
+    "storage_bucket": "pgp-frontend.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514488248051:android:3034fa6a0914e460627986",
+        "android_client_info": {
+          "package_name": "vip.chi_chi.purrivacy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3DlwMkG9QjUIGHT5pPUylGdBaAu_Zbjw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514488248051:android:851645acdfa5c30b627986",
+        "android_client_info": {
+          "package_name": "vip.chi_chi.purrivacy.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3DlwMkG9QjUIGHT5pPUylGdBaAu_Zbjw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

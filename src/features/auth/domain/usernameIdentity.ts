@@ -1,0 +1,75 @@
+import { User } from 'firebase/auth';
+import { ENV } from '../../../config/env';
+
+const USERNAME_RE = /^[a-z0-9_]{3,32}$/;
+const USERNAME_ALLOWED_CHARS_RE = /^[a-z0-9_]+$/;
+export const USERNAME_MAX_LENGTH = 32;
+
+export function sanitizeUsernameInput(username: string): string {
+    const beforeEmailDomain = username.split('@')[0] ?? username;
+    return beforeEmailDomain
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, USERNAME_MAX_LENGTH);
+}
+
+export function normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
+}
+
+export function validateUsername(username: string): string | null {
+    const trimmed = username.trim();
+    const normalized = normalizeUsername(username);
+    if (!trimmed) {
+        return 'Username is required';
+    }
+
+    if (trimmed.includes('@')) {
+        return 'Enter your username, not an email address';
+    }
+
+    if (normalized.length < 3) {
+        return 'Username must be at least 3 characters';
+    }
+
+    if (normalized.length > USERNAME_MAX_LENGTH) {
+        return `Username must be ${USERNAME_MAX_LENGTH} characters or fewer`;
+    }
+
+    if (!USERNAME_ALLOWED_CHARS_RE.test(normalized)) {
+        return 'Use only letters, numbers, and underscores';
+    }
+
+    if (!USERNAME_RE.test(normalized)) {
+        return 'Use 3-32 letters, numbers, or underscores';
+    }
+
+    return null;
+}
+
+export function usernameToAuthEmail(username: string): string {
+    const error = validateUsername(username);
+    if (error) {
+        throw new Error(error);
+    }
+    return `${normalizeUsername(username)}@${ENV.authEmailDomain}`;
+}
+
+function authEmailToUsername(email: string | null | undefined): string | null {
+    const normalized = email?.trim().toLowerCase();
+    if (!normalized) {
+        return null;
+    }
+
+    const suffix = `@${ENV.authEmailDomain}`;
+    if (!normalized.endsWith(suffix)) {
+        return null;
+    }
+
+    return normalized.slice(0, -suffix.length);
+}
+
+export function getUsernameFromUser(user: User | null | undefined): string | null {
+    return authEmailToUsername(user?.email);
+}

@@ -1,0 +1,27 @@
+{
+    "$schema": "https://unpkg.com/knip@latest/schema.json",
+    "entry": [
+        "App.tsx",
+        "index.js",
+        "scripts/android-local-build.cjs",
+        "scripts/configure-android-gradle.cjs",
+        "scripts/patch-openpgp.js",
+        "scripts/secure-storage.js",
+        "scripts/sync-android-version.cjs"
+    ],
+    "ignoreDependencies": [
+        "buffer",
+        "expo-updates"
+    ],
+    "ignore": [
+        "android/**",
+        "ios/**",
+        "node_modules/**",
+        "**/__tests__/**",
+        "**/*.test.{js,ts,tsx}",
+        "**/*.spec.{js,ts,tsx}",
+        "**/*.mock.{js,ts,tsx}",
+        "metro.config.js",
+        "*.config.js"
+    ]
+}
