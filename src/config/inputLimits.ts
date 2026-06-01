@@ -1,0 +1,15 @@
+export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MAX_LENGTH = 32;
+
+export const ACCOUNT_PASSWORD_MIN_LENGTH = 8;
+
+export const PASSPHRASE_MIN_LENGTH = 12;
+export const PASSPHRASE_MAX_LENGTH = 128;
+export const PASSPHRASE_GENERATOR_DEFAULT_LENGTH = 32;
+
+export const KEY_NAME_MAX_LENGTH = 80;
+export const KEY_EMAIL_MAX_LENGTH = 254;
+export const KEY_COMMENT_MAX_LENGTH = 160;
+export const KEY_ARMOR_MAX_LENGTH = 200_000;
+
+export const EXPIRY_DAYS_MAX_LENGTH = 5;

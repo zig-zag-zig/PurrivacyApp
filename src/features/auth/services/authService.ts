@@ -1,4 +1,4 @@
-import { Encryption, EncryptionBase, UserDecrypted, UserEncrypted } from '../../../types/types';
+import { Encryption, EncryptionBase, RecoveryEncrypted, UserDecrypted } from '../../../types/types';
 import { securityService } from '../../security/services/securityService';
 
 import { ApiClient } from '../../../api/client';
@@ -87,7 +87,7 @@ export class AuthService {
 
     static async resetPasswordWithSeed(
         userId: string,
-        userEncrypted: UserEncrypted,
+        userEncrypted: RecoveryEncrypted,
         newPassword: string,
         seedPhrase: string,
     ): Promise<void> {

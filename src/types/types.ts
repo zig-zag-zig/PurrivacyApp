@@ -32,6 +32,10 @@ export interface UserEncrypted extends UserBase {
     keys: EncryptionBase[];
 }
 
+export interface RecoveryEncrypted {
+    dekSeed: Encryption;
+}
+
 export interface UserCreatePayload extends UserEncrypted {
     recoveryVerifierSalt: string;
     recoveryVerifierHash: string;
@@ -117,7 +121,7 @@ export interface RecoveryChallengeResponse {
 
 export interface RecoveryTokenResponse {
     userId: string;
-    userEncrypted: UserEncrypted;
+    userEncrypted: RecoveryEncrypted;
     tempToken: string;
 }
 

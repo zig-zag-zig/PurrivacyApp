@@ -3,6 +3,13 @@
  */
 
 import { PgpAlgorithm } from "../types/types";
+import {
+    KEY_COMMENT_MAX_LENGTH,
+    KEY_EMAIL_MAX_LENGTH,
+    KEY_NAME_MAX_LENGTH,
+    PASSPHRASE_MAX_LENGTH,
+    PASSPHRASE_MIN_LENGTH,
+} from '../config/inputLimits';
 
 interface ValidationResult {
     isValid: boolean;
@@ -17,6 +24,14 @@ interface FormErrors {
  * Email validation regex
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const validateMaxLength = (value: string, fieldName: string, maxLength: number): ValidationResult => {
+    if (value.length > maxLength) {
+        return { isValid: false, error: `${fieldName} must be ${maxLength} characters or fewer` };
+    }
+
+    return { isValid: true };
+};
 
 const validateEmail = (email: string): ValidationResult => {
     if (email.trim() === '') {
@@ -44,13 +59,21 @@ const validateUserId = (name: string, email: string, comment: string): Validatio
 /**
  * Validates passphrase with minimum length requirement
  */
-const validatePassphrase = (passphrase: string, minLength: number = 12): ValidationResult => {
+export const validatePassphrase = (
+    passphrase: string,
+    minLength: number = PASSPHRASE_MIN_LENGTH,
+    maxLength: number = PASSPHRASE_MAX_LENGTH,
+): ValidationResult => {
     if (!passphrase) {
         return { isValid: true };
     }
 
     if (passphrase.length < minLength) {
         return { isValid: false, error: `Minimum ${minLength} characters` };
+    }
+
+    if (passphrase.length > maxLength) {
+        return { isValid: false, error: `Maximum ${maxLength} characters` };
     }
 
     return { isValid: true };
@@ -123,6 +146,8 @@ export const validateKeyCreationForm = (
 ): FormErrors => {
     const validations = [
         { field: 'userId', result: validateUserId(name, email, comment) },
+        { field: 'userId', result: validateMaxLength(name, 'Name', KEY_NAME_MAX_LENGTH) },
+        { field: 'userId', result: validateMaxLength(comment, 'Comment', KEY_COMMENT_MAX_LENGTH) },
         { field: 'passphrase', result: validatePassphrase(passphrase) },
         { field: 'confirmPassphrase', result: validatePasswordConfirmation(passphrase, confirmPassphrase) },
         { field: 'algorithm', result: validateRequired(type, 'Algorithm') },
@@ -130,6 +155,7 @@ export const validateKeyCreationForm = (
 
     if (email.trim().length > 0) {
         validations.push({ field: 'email', result: validateEmail(email) });
+        validations.push({ field: 'email', result: validateMaxLength(email, 'Email', KEY_EMAIL_MAX_LENGTH) });
     }
 
     // Add RSA bits validation if algorithm is RSA

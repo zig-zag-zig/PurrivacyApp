@@ -222,6 +222,7 @@ const SeedVerificationChallenge: React.FC<SeedVerificationChallengeProps> = ({
                         autoCorrect={false}
                         autoCapitalize="none"
                         editable={!isBusy}
+                        trimOnBlur
                     />
                 ))}
             </View>

@@ -1,9 +1,9 @@
 import { User } from 'firebase/auth';
 import { ENV } from '../../../config/env';
+import { USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH } from '../../../config/inputLimits';
 
-const USERNAME_RE = /^[a-z0-9_]{3,32}$/;
 const USERNAME_ALLOWED_CHARS_RE = /^[a-z0-9_]+$/;
-export const USERNAME_MAX_LENGTH = 32;
+export { USERNAME_MAX_LENGTH };
 
 export function sanitizeUsernameInput(username: string): string {
     const beforeEmailDomain = username.split('@')[0] ?? username;
@@ -29,8 +29,8 @@ export function validateUsername(username: string): string | null {
         return 'Enter your username, not an email address';
     }
 
-    if (normalized.length < 3) {
-        return 'Username must be at least 3 characters';
+    if (normalized.length < USERNAME_MIN_LENGTH) {
+        return `Username must be at least ${USERNAME_MIN_LENGTH} characters`;
     }
 
     if (normalized.length > USERNAME_MAX_LENGTH) {
@@ -39,10 +39,6 @@ export function validateUsername(username: string): string | null {
 
     if (!USERNAME_ALLOWED_CHARS_RE.test(normalized)) {
         return 'Use only letters, numbers, and underscores';
-    }
-
-    if (!USERNAME_RE.test(normalized)) {
-        return 'Use 3-32 letters, numbers, or underscores';
     }
 
     return null;

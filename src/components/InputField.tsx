@@ -35,13 +35,18 @@ interface InputFieldProps extends TextInputProps {
     enableAutofill?: boolean;
     labelTopBackgroundColor?: string;
     labelBottomBackgroundColor?: string;
+    onInputLayout?: (layout: { y: number; height: number }) => void;
+    onInputTouchStart?: () => void;
+    readOnly?: boolean;
+    trimOnBlur?: boolean;
+    normalizeOnBlur?: (text: string) => string;
 }
 
 const INPUT_BORDER_WIDTH = 2;
 const LABEL_LEFT = theme.spacing.md;
-const LABEL_GAP_PADDING = theme.spacing.xs;
-const LABEL_LINE_HEIGHT = 16;
-const LABEL_BORDER_CROSSING_Y = 8;
+const LABEL_GAP_PADDING = theme.spacing.sm;
+const LABEL_LINE_HEIGHT = 18;
+const LABEL_BORDER_CROSSING_Y = 9;
 
 export const InputField = forwardRef<TextInput, InputFieldProps>(
     (
@@ -67,6 +72,11 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             enableAutofill = false,
             labelTopBackgroundColor = theme.colors.background,
             labelBottomBackgroundColor = theme.colors.surface,
+            onInputLayout,
+            onInputTouchStart,
+            readOnly = false,
+            trimOnBlur = false,
+            normalizeOnBlur,
             onFocus: parentOnFocus,
             onBlur: parentOnBlur,
             ...props
@@ -101,8 +111,6 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             : textContentType ? undefined : autoComplete;
         const secureTextHidden = showToggleSecureText ? !isRevealed : Boolean(secureTextEntry);
         const shouldSuppressNativeAutofill = Platform.OS === 'android' && !enableAutofill;
-        const shouldUseNativeSecureTextEntry =
-            Boolean(secureTextEntry) && !(shouldSuppressNativeAutofill && Platform.OS === 'android');
 
         const assignInputRef = useCallback((node: TextInput | null) => {
             inputRef.current = node;
@@ -213,8 +221,17 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                         elevation: isFocused ? 2 : 0,
                         borderWidth: INPUT_BORDER_WIDTH,
                     },
+                    readOnly && styles.inputWrapperReadOnly,
                     displayError && styles.inputWrapperError,
-                ]}>
+                ]}
+                    onLayout={(event) => {
+                        onInputLayout?.({
+                            y: event.nativeEvent.layout.y,
+                            height: event.nativeEvent.layout.height,
+                        });
+                    }}
+                    onTouchStart={onInputTouchStart}
+                >
                     <TextInput
                         {...textInputProps}
                         ref={assignInputRef}
@@ -240,6 +257,9 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                                 paddingVertical: 0,
                                 paddingRight: (showToggleSecureText && rightIcon) ? 70 : (showToggleSecureText || rightIcon) ? 40 : 12,
                                 textAlignVertical: 'center',
+                                ...(readOnly && {
+                                    color: theme.colors.textSecondary,
+                                }),
                                 ...(largeText && {
                                     height: undefined,
                                     minHeight: 140,
@@ -272,6 +292,12 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                             }
                         }}
                         onBlur={(e) => {
+                            if (!uncontrolled && typeof value === 'string' && (trimOnBlur || normalizeOnBlur)) {
+                                const normalizedValue = normalizeOnBlur ? normalizeOnBlur(value) : value.trim();
+                                if (normalizedValue !== value) {
+                                    handleChangeText(normalizedValue);
+                                }
+                            }
                             if (preserveFocusOnBlurMs > 0) {
                                 blurTimeoutRef.current = setTimeout(() => {
                                     setIsFocused(false);
@@ -285,8 +311,8 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                             }
                         }}
                         onChangeText={handleChangeText}
-                        keyboardType={numberOnly ? 'number-pad' : email && enableAutofill ? 'email-address' : 'default'}
-                        secureTextEntry={shouldUseNativeSecureTextEntry ? secureTextHidden : false}
+                        keyboardType={numberOnly ? 'number-pad' : email ? 'email-address' : 'default'}
+                        secureTextEntry={Boolean(secureTextEntry) ? secureTextHidden : false}
                         autoCapitalize={autoCapitalize}
                     />
                     {rightIcon && (
@@ -349,13 +375,14 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
 
 const styles = StyleSheet.create({
     fieldContainerWithLabel: {
-        paddingTop: 8,
+        paddingTop: 9,
     },
     floatingLabel: {
         position: 'absolute',
         top: 0,
         left: LABEL_LEFT,
-        zIndex: 3,
+        zIndex: 6,
+        elevation: 6,
         fontSize: theme.typography.caption.fontSize,
         lineHeight: LABEL_LINE_HEIGHT,
         fontWeight: '600',
@@ -365,7 +392,8 @@ const styles = StyleSheet.create({
         top: 0,
         left: LABEL_LEFT - LABEL_GAP_PADDING,
         height: LABEL_LINE_HEIGHT,
-        zIndex: 2,
+        zIndex: 5,
+        elevation: 5,
         overflow: 'hidden',
     },
     labelBackplateTop: {
@@ -382,6 +410,11 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.surface,
         overflow: 'hidden',
         shadowOffset: { width: 0, height: 0 },
+        zIndex: 1,
+    },
+    inputWrapperReadOnly: {
+        backgroundColor: theme.colors.surface,
+        opacity: 0.78,
     },
     inputWrapperError: {
         borderColor: theme.colors.error,

@@ -79,6 +79,7 @@ export const useFirebaseAuth = (
                 } else if (!currentUser && suppressLastSignedInUserPersistRef.current) {
                     setLastSignedInUser(null);
                     await securityService.clearLastSignedInUser();
+                    suppressLastSignedInUserPersistRef.current = false;
                 }
             } catch (error) {
                 logger.warn('id token change handler failed', { error });

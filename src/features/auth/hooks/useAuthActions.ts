@@ -93,8 +93,16 @@ export function useAuthActions({
     clearPendingBiometricPromptRetry();
     shouldPromptBiometricRef.current = false;
     localBiometricLockRef.current = false;
+    suppressLastSignedInUserPersistRef.current = true;
     const currentUser = getUser();
     if (!currentUser) {
+      try {
+        await securityService.clearLastSignedInUser();
+        setLastSignedInUser(null);
+      } catch (error) {
+        logger.warn('failed to clear last signed-in user while signing out', { error });
+      }
+      suppressLastSignedInUserPersistRef.current = false;
       setIsAuthLoading(false);
       return;
     }
@@ -115,8 +123,11 @@ export function useAuthActions({
       }
 
       await clearStoredSessionAndPushToken(currentUser.uid);
+      await securityService.clearLastSignedInUser();
+      setLastSignedInUser(null);
       await firebaseSignOut(auth);
     } catch (error: any) {
+      suppressLastSignedInUserPersistRef.current = false;
       setIsAuthLoading(false);
       logger.error('sign-out failed', { error });
       throw new Error(error.message || 'Logout failed');

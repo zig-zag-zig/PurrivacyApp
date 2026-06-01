@@ -1,7 +1,8 @@
 import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
+import { CustomText } from '../../../components/CustomText';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useAuth } from '../state/AuthContext';
@@ -22,13 +23,13 @@ export const SigninScreen = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-    const { isAuthLoading, authCompleted, initializeBiometricState, lastSignedInUser, setLastUsedBiometricSignIn, appStateIsBackground, signin, user, canGoDirectlyToBiometricAuth } = useAuth();
+    const { isAuthLoading, authCompleted, initializeBiometricState, lastSignedInUser, setLastUsedBiometricSignIn, appStateIsBackground, signin, signOut, user, canGoDirectlyToBiometricAuth } = useAuth();
     const [showBiometricButton, setShowBiometricButton] = useState(false);
     const navigation = useNavigation<RootNavigationProps>();
     const { showToast } = useToast();
     const [alreadyPrompted, setAlreadyPrompted] = React.useState<boolean>(false);
     const [autoBiometricSuppressed, setAutoBiometricSuppressed] = useState(false);
-    const [loadingAction, setLoadingAction] = useState<'password' | 'biometric' | null>(null);
+    const [loadingAction, setLoadingAction] = useState<'password' | 'biometric' | 'signout' | null>(null);
     const backgroundTimeRef = useRef<number | null>(null);
     const signInInFlightRef = useRef(false);
     const usernamesThatDidNotLastUseBiometrics = useRef<Set<string>>(new Set());
@@ -43,16 +44,11 @@ export const SigninScreen = () => {
     };
 
     useEffect(() => {
-        if (
-            isFocused
-            && !username
-            && !usernamePrefillHandledRef.current
-            && lastSignedInUser?.username
-        ) {
+        if (isFocused && lastSignedInUser?.username) {
             usernamePrefillHandledRef.current = true;
             setUsername(lastSignedInUser.username);
         }
-    }, [isFocused, lastSignedInUser?.username, username]);
+    }, [isFocused, lastSignedInUser?.username]);
 
     useFocusEffect(
         useCallback(() => {
@@ -176,7 +172,11 @@ export const SigninScreen = () => {
 
         let result: User | null = null;
         const errors: { [key: string]: string } = {};
-        const usernameError = validateUsername(username);
+        const submittedUsername = sanitizeUsernameInput(username);
+        if (submittedUsername !== username) {
+            setUsername(submittedUsername);
+        }
+        const usernameError = validateUsername(submittedUsername);
         if (usernameError) errors.username = usernameError;
         if (!password) errors.password = 'Password is required';
 
@@ -188,7 +188,7 @@ export const SigninScreen = () => {
         }
 
         try {
-            result = await signin(username, password, false);
+            result = await signin(submittedUsername, password, false);
 
             if (!result) {
                 showToast('Failed to sign in. Please check your credentials and try again.', 'error');
@@ -235,6 +235,25 @@ export const SigninScreen = () => {
         }
     };
 
+    const onUnlockSignOut = async () => {
+        if (isAuthLoading || signInInFlightRef.current) return;
+        signInInFlightRef.current = true;
+        setLoadingAction('signout');
+
+        try {
+            await signOut();
+            setUsername('');
+            setPassword('');
+            setFormErrors({});
+            navigation.navigate('Signin');
+        } catch (error: any) {
+            logger.warn('unlock sign-out failed', { error });
+            showToast(getUserFacingErrorMessage(error, 'Failed to sign out'), 'error');
+            signInInFlightRef.current = false;
+            setLoadingAction(null);
+        }
+    };
+
     const onUsernameChange = (text: string) => {
         usernamePrefillHandledRef.current = true;
         setUsername(sanitizeUsernameInput(text));
@@ -260,25 +279,38 @@ export const SigninScreen = () => {
 
     const signinBusy = isAuthLoading || loadingAction !== null;
     const canSubmitSignin = username.trim().length > 0 && password.length > 0;
-    const isUnlockFlow = Boolean(lastSignedInUser?.username && lastSignedInUser.username === username);
+    const isUnlockFlow = Boolean(lastSignedInUser?.username);
 
     return (
         <ScreenContainer>
             <View
                 style={{ gap: theme.spacing.md }}
             >
-                <InputField
-                    label="Username"
-                    value={username}
-                    onChangeText={onUsernameChange}
-                    autoCapitalize="none"
-                    autoComplete="username"
-                    autoCorrect={false}
-                    enableAutofill
-                    maxLength={USERNAME_MAX_LENGTH}
-                    textContentType="username"
-                    error={formErrors.username}
-                />
+                {isUnlockFlow ? (
+                    <View
+                        style={styles.unlockIdentity}
+                        accessibilityRole="text"
+                        accessibilityLabel={`Username ${username}`}
+                    >
+                        <CustomText style={styles.unlockIdentityValue} numberOfLines={1}>
+                            {username}
+                        </CustomText>
+                    </View>
+                ) : (
+                    <InputField
+                        label="Username"
+                        value={username}
+                        onChangeText={onUsernameChange}
+                        autoCapitalize="none"
+                        autoComplete="username"
+                        enableAutofill
+                        autoCorrect={false}
+                        maxLength={USERNAME_MAX_LENGTH}
+                        textContentType="username"
+                        error={formErrors.username}
+                        trimOnBlur
+                    />
+                )}
                 <InputField
                     label="Password"
                     value={password}
@@ -299,14 +331,24 @@ export const SigninScreen = () => {
                 />
 
                 <Button
-                    hidden={!showBiometricButton}
+                    hidden={!isUnlockFlow}
                     label="Unlock with biometrics"
                     onPress={onBiometricUnlock}
-                    disabled={signinBusy}
+                    disabled={signinBusy || !showBiometricButton}
                     loading={loadingAction === 'biometric'}
                 />
 
                 <Button
+                    hidden={!isUnlockFlow}
+                    label="Sign Out"
+                    onPress={onUnlockSignOut}
+                    variant="secondary"
+                    disabled={signinBusy}
+                    loading={loadingAction === 'signout'}
+                />
+
+                <Button
+                    hidden={isUnlockFlow}
                     label="Recover Account"
                     onPress={() => navigation.navigate('RecoverAccount')}
                     variant="secondary"
@@ -314,6 +356,7 @@ export const SigninScreen = () => {
                 />
 
                 <Button
+                    hidden={isUnlockFlow}
                     label="Sign Up"
                     onPress={() => navigation.navigate('Signup')}
                     variant="secondary"
@@ -323,3 +366,17 @@ export const SigninScreen = () => {
         </ScreenContainer>
     );
 }
+
+const styles = StyleSheet.create({
+    unlockIdentity: {
+        paddingBottom: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.xs,
+        paddingTop: theme.spacing.lg,
+    },
+    unlockIdentityValue: {
+        color: theme.colors.text,
+        fontSize: 24,
+        fontWeight: '700',
+        lineHeight: 30,
+    },
+});

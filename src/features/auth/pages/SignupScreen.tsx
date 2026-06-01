@@ -14,6 +14,7 @@ import { useToast } from '../../../app/state/ToastContext';
 import { sanitizeUsernameInput, USERNAME_MAX_LENGTH, validateUsername } from '../domain/usernameIdentity';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { logger } from '../../../utils/logger';
+import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
 
 export const SignupScreen = () => {
     const [username, setUsername] = useState('');
@@ -41,10 +42,14 @@ export const SignupScreen = () => {
 
     const handleSignup = () => {
         const errors: { [key: string]: string } = {};
-        const usernameError = validateUsername(username);
+        const submittedUsername = sanitizeUsernameInput(username);
+        if (submittedUsername !== username) {
+            setUsername(submittedUsername);
+        }
+        const usernameError = validateUsername(submittedUsername);
         if (usernameError) errors.username = usernameError;
         if (!password) errors.password = 'Password is required';
-        else if (password.length < 8) errors.password = 'Minimum 8 characters';
+        else if (password.length < ACCOUNT_PASSWORD_MIN_LENGTH) errors.password = `Minimum ${ACCOUNT_PASSWORD_MIN_LENGTH} characters`;
         if (!confirmPassword) errors.confirmPassword = 'Please confirm password';
         else if (password !== confirmPassword) errors.confirmPassword = 'Passwords must match';
 
@@ -69,7 +74,7 @@ export const SignupScreen = () => {
 
     const handleSeedVerified = async () => {
         try {
-            await signUp(username, password, seed);
+            await signUp(sanitizeUsernameInput(username), password, seed);
         } catch (error: any) {
             logger.warn('sign-up failed', { error });
             showToast(getUserFacingErrorMessage(error, 'Failed to sign up'), 'error');
@@ -107,11 +112,12 @@ export const SignupScreen = () => {
                     onChangeText={onUsernameChange}
                     autoCapitalize="none"
                     autoComplete="username"
-                    autoCorrect={false}
                     enableAutofill
+                    autoCorrect={false}
                     maxLength={USERNAME_MAX_LENGTH}
                     textContentType="username"
                     error={formErrors.username}
+                    trimOnBlur
                 />
                 <InputField
                     label="Password"

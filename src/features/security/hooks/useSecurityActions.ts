@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/state/AuthContext';
 import { ApiClient } from '../../../api/client';
 import { getUser } from '../../auth/domain/authUtils';
 import { logger } from '../../../utils/logger';
+import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
 
 export const useSecurityActions = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +30,7 @@ export const useSecurityActions = () => {
 
         if (type === 'password') {
             if (!newValue) errors.newValue = 'New password is required';
-            else if (newValue.length < 8) errors.newValue = 'Minimum 8 characters';
+            else if (newValue.length < ACCOUNT_PASSWORD_MIN_LENGTH) errors.newValue = `Minimum ${ACCOUNT_PASSWORD_MIN_LENGTH} characters`;
             if (!confirmValue) errors.confirmValue = 'Please confirm password';
             else if (newValue !== confirmValue) errors.confirmValue = 'Passwords must match';
             if (newValue === currentPassword) errors.newValue = 'New password must be different';
