@@ -48,6 +48,7 @@
     },
     "plugins": [
       "./scripts/android-build-variants",
+      "./scripts/android-autofill-highlight",
       "./scripts/patch-openpgp",
       "./scripts/secure-storage",
       "./scripts/android-share-intent",
