@@ -5,5 +5,6 @@ export interface SettingsUiState {
   showRegenerateCodesDialog: boolean;
   revokeSessionsLoading: boolean;
   biometricToggleLoading: boolean;
+  passphraseStorageLoading: boolean;
   logoutLoading: boolean;
 }

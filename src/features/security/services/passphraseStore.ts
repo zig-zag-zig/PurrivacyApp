@@ -4,15 +4,14 @@ import {
     deleteSecureStoreItem,
     handleSecureStorageResponse,
     PASSPHRASE_EXISTS_PREFIX,
+    PASSPHRASE_STORAGE_ENABLED_PREFIX,
+    PASSPHRASE_STORAGE_PROMPTED_PREFIX,
     PASSPHRASE_INDEX_PREFIX,
     PASSPHRASE_PREFIX,
 } from '../domain/secureStorageUtils';
 import { logger } from '../../../utils/logger';
 import {
-    biometricKeyExists,
     getNonSensitiveValue,
-    hasBiometricProtectedStorage,
-    isBiometricAuthCancelled,
     SecureStorageModule,
     setNonSensitiveValue,
 } from './biometricSecureStorage';
@@ -22,12 +21,68 @@ type StorePassphraseOptions = {
 };
 
 const passphraseCache = new Map<string, string>();
+type PassphraseStoreChange = {
+    userId: string;
+    fingerprint?: string;
+    passphrase: string | null;
+    storageEnabled?: boolean;
+};
+type PassphraseStoreListener = (change: PassphraseStoreChange) => void;
+const passphraseStoreListeners = new Set<PassphraseStoreListener>();
 
-const passphraseStorageKey = (userId: string, fingerprint: string) => `${BIOMETRIC_PASSPHRASE_PREFIX}${userId}_${fingerprint}`;
-const passphraseKeyAlias = (userId: string, fingerprint: string) => `${BIOMETRIC_PASSPHRASE_KEY_PREFIX}${userId}_${fingerprint}`;
+const passphraseStorageKey = (userId: string, fingerprint: string) => `${PASSPHRASE_PREFIX}${userId}_${fingerprint}`;
+const legacyBiometricPassphraseStorageKey = (userId: string, fingerprint: string) => `${BIOMETRIC_PASSPHRASE_PREFIX}${userId}_${fingerprint}`;
+const legacyBiometricPassphraseKeyAlias = (userId: string, fingerprint: string) => `${BIOMETRIC_PASSPHRASE_KEY_PREFIX}${userId}_${fingerprint}`;
 const passphraseExistsKey = (userId: string, fingerprint: string) => `${PASSPHRASE_EXISTS_PREFIX}${userId}_${fingerprint}`;
 const passphraseIndexKey = (userId: string) => `${PASSPHRASE_INDEX_PREFIX}${userId}`;
 const passphraseCacheKey = (userId: string, fingerprint: string) => `${userId}_${fingerprint}`;
+const passphraseStorageEnabledKey = (userId: string) => `${PASSPHRASE_STORAGE_ENABLED_PREFIX}${userId}`;
+const passphraseStoragePromptedKey = (userId: string) => `${PASSPHRASE_STORAGE_PROMPTED_PREFIX}${userId}`;
+
+const emitPassphraseStoreChange = (change: PassphraseStoreChange): void => {
+    passphraseStoreListeners.forEach(listener => listener(change));
+};
+
+export const subscribePassphraseStoreChanges = (
+    listener: PassphraseStoreListener,
+): (() => void) => {
+    passphraseStoreListeners.add(listener);
+    return () => passphraseStoreListeners.delete(listener);
+};
+
+export const isPassphraseStorageEnabled = async (userId: string): Promise<boolean> => {
+    if (userId.trim() === '') return false;
+    return await getNonSensitiveValue(passphraseStorageEnabledKey(userId)) === 'true';
+};
+
+export const hasAnsweredPassphraseStoragePrompt = async (userId: string): Promise<boolean> => {
+    if (userId.trim() === '') return false;
+    return await getNonSensitiveValue(passphraseStoragePromptedKey(userId)) === 'true';
+};
+
+export const setPassphraseStoragePrompted = async (
+    userId: string,
+    prompted: boolean,
+): Promise<void> => {
+    if (userId.trim() === '') return;
+    await setNonSensitiveValue(passphraseStoragePromptedKey(userId), String(prompted));
+};
+
+export const setPassphraseStorageEnabled = async (
+    userId: string,
+    enabled: boolean,
+): Promise<void> => {
+    if (userId.trim() === '') return;
+    await setNonSensitiveValue(passphraseStorageEnabledKey(userId), String(enabled));
+    await setPassphraseStoragePrompted(userId, true);
+
+    if (!enabled) {
+        await clearIndexedPassphrases(userId);
+        emitPassphraseStoreChange({ userId, passphrase: null, storageEnabled: false });
+    } else {
+        emitPassphraseStoreChange({ userId, passphrase: null, storageEnabled: true });
+    }
+};
 
 export const getPassphraseIndex = async (userId: string): Promise<string[]> => {
     const raw = await getNonSensitiveValue(passphraseIndexKey(userId));
@@ -57,20 +112,27 @@ const removePassphraseIndexEntry = async (userId: string, fingerprint: string): 
 
 export const hasStoredPassphrase = async (userId: string, fingerprint: string): Promise<boolean> => {
     if (userId.trim() === '' || fingerprint.trim() === '') return false;
+    if (!await isPassphraseStorageEnabled(userId)) return false;
     if (passphraseCache.has(passphraseCacheKey(userId, fingerprint))) return true;
-    return await getNonSensitiveValue(passphraseExistsKey(userId, fingerprint)) === 'true' &&
-        hasBiometricProtectedStorage() &&
-        await biometricKeyExists(passphraseKeyAlias(userId, fingerprint));
+    return await getNonSensitiveValue(passphraseExistsKey(userId, fingerprint)) === 'true';
 };
 
 export const clearPassphrase = async (userId: string, fingerprint: string): Promise<void> => {
     if (userId.trim() === '' || fingerprint.trim() === '') return;
     passphraseCache.delete(passphraseCacheKey(userId, fingerprint));
-    await deleteSecureStoreItem('sensitive', `${PASSPHRASE_PREFIX}${userId}_${fingerprint}`);
     await deleteSecureStoreItem('sensitive', passphraseStorageKey(userId, fingerprint));
-    await deleteSecureStoreItem('pgp', passphraseKeyAlias(userId, fingerprint));
+    await deleteSecureStoreItem('sensitive', legacyBiometricPassphraseStorageKey(userId, fingerprint));
+    await deleteSecureStoreItem('pgp', legacyBiometricPassphraseKeyAlias(userId, fingerprint));
     await deleteSecureStoreItem('non-sensitive', passphraseExistsKey(userId, fingerprint));
     await removePassphraseIndexEntry(userId, fingerprint);
+    emitPassphraseStoreChange({ userId, fingerprint, passphrase: null });
+};
+
+export const clearIndexedPassphrases = async (userId: string): Promise<void> => {
+    const entries = await getPassphraseIndex(userId);
+    for (const fingerprint of entries) {
+        await clearPassphrase(userId, fingerprint);
+    }
 };
 
 export const storePassphrase = async (
@@ -88,29 +150,27 @@ export const storePassphrase = async (
         return;
     }
 
+    if (!await isPassphraseStorageEnabled(userId)) return;
+
     const cached = passphraseCache.get(cacheKey);
-    if (cached === passphrase && !options.force) return;
-
-    const hasStored = await hasStoredPassphrase(userId, selectedPrivateKeyFingerprint);
-    if (hasStored && !options.force && cached === undefined) {
-        return;
-    }
-
-    if (!hasBiometricProtectedStorage()) {
-        passphraseCache.set(cacheKey, passphrase);
+    if (cached === passphrase && !options.force) {
+        emitPassphraseStoreChange({
+            userId,
+            fingerprint: selectedPrivateKeyFingerprint,
+            passphrase,
+            storageEnabled: true,
+        });
         return;
     }
 
     try {
-        const response = await SecureStorageModule.setBiometricProtectedValue!(
-            passphraseKeyAlias(userId, selectedPrivateKeyFingerprint),
+        const response = await SecureStorageModule.setSensitiveValue(
             passphraseStorageKey(userId, selectedPrivateKeyFingerprint),
             passphrase,
-            'Authenticate to save passphrase',
         );
         const error = await handleSecureStorageResponse(
             response,
-            'store biometric passphrase',
+            'store passphrase',
             undefined,
             (code, message) => ({ code, message }),
         );
@@ -119,50 +179,37 @@ export const storePassphrase = async (
         passphraseCache.set(cacheKey, passphrase);
         await setNonSensitiveValue(passphraseExistsKey(userId, selectedPrivateKeyFingerprint), 'true');
         await addPassphraseIndexEntry(userId, selectedPrivateKeyFingerprint);
-        await deleteSecureStoreItem('sensitive', `${PASSPHRASE_PREFIX}${userId}_${selectedPrivateKeyFingerprint}`);
+        emitPassphraseStoreChange({
+            userId,
+            fingerprint: selectedPrivateKeyFingerprint,
+            passphrase,
+            storageEnabled: true,
+        });
     } catch (error) {
-        logger.warn('failed to store biometric passphrase', { error });
+        logger.warn('failed to store passphrase', { error });
     }
 };
 
 export const getPassphrase = async (userId: string, fingerprint: string): Promise<string | null> => {
     if (userId.trim() === '' || fingerprint.trim() === '') return null;
+    if (!await isPassphraseStorageEnabled(userId)) return null;
     const cacheKey = passphraseCacheKey(userId, fingerprint);
     const cached = passphraseCache.get(cacheKey);
     if (cached) return cached;
 
-    if (await getNonSensitiveValue(passphraseExistsKey(userId, fingerprint)) === 'true' &&
-        hasBiometricProtectedStorage() &&
-        await biometricKeyExists(passphraseKeyAlias(userId, fingerprint))) {
+    if (await getNonSensitiveValue(passphraseExistsKey(userId, fingerprint)) === 'true') {
         try {
-            const response = await SecureStorageModule.getBiometricProtectedValue!(
-                passphraseKeyAlias(userId, fingerprint),
+            const response = await SecureStorageModule.getSensitiveValue(
                 passphraseStorageKey(userId, fingerprint),
-                'Use saved passphrase',
             );
-            const error = await handleSecureStorageResponse(
-                response,
-                'get biometric passphrase',
-                undefined,
-                (code, message) => ({ code, message }),
-            );
-            if (error) {
-                if (isBiometricAuthCancelled(error)) {
-                    throw error;
-                }
-                return null;
-            }
 
-            const result = await handleSecureStorageResponse(response, 'get biometric passphrase', value => value);
+            const result = await handleSecureStorageResponse(response, 'get passphrase', value => value);
             if (result) {
                 passphraseCache.set(cacheKey, result);
                 return result;
             }
         } catch (error: any) {
-            if (isBiometricAuthCancelled(error)) {
-                throw error;
-            }
-            logger.warn('failed to get biometric passphrase', { error });
+            logger.warn('failed to get passphrase', { error });
             return null;
         }
     }
@@ -171,10 +218,7 @@ export const getPassphrase = async (userId: string, fingerprint: string): Promis
 };
 
 export const clearIndexedBiometricPassphrases = async (userId: string): Promise<void> => {
-    const entries = await getPassphraseIndex(userId);
-    for (const fingerprint of entries) {
-        await clearPassphrase(userId, fingerprint);
-    }
+    await clearIndexedPassphrases(userId);
 };
 
 export const clearPassphraseCacheForUser = (userId: string): void => {

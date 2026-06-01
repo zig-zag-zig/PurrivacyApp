@@ -13,6 +13,7 @@ import { validateDecryptionForm } from '../../../utils/validation';
 import { getDefaultSelectedPrivateKey } from '../../keys/domain/keyUtils';
 import { validateArmor } from '../../keys/domain/pgpValidation';
 import { securityService } from '../../security/services/securityService';
+import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService.';
 import {
   getFirstSelectedKeyId,
@@ -27,6 +28,7 @@ export function useDecryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { user, isAuthLoading, userDecrypted, visibleKeys } = useAuth();
   const { showToast } = useToast();
+  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const [state, dispatch] = useReducer(decryptReducer, initialDecryptState);
   const shouldResetOnFocus = useRef(false);
   const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
@@ -114,8 +116,17 @@ export function useDecryptPage() {
     const privateKeyId = getFirstSelectedKeyId(state.selectedPrivateKey);
     const publicKeyId = getFirstSelectedKeyId(state.selectedPublicKeys);
     const publicKeyArmored = publicKeyId ? state.selectedPublicKeys[publicKeyId] : undefined;
+    const encryptedContent = state.encryptedContent.trim();
+    const detachedSignature = state.signature.trim();
 
-    const formErrors = validateDecryptionForm(state.encryptedContent, state.selectedPrivateKey);
+    if (encryptedContent !== state.encryptedContent) {
+      dispatch({ type: 'encryptedContentChanged', content: encryptedContent });
+    }
+    if (detachedSignature !== state.signature) {
+      dispatch({ type: 'signatureChanged', signature: detachedSignature });
+    }
+
+    const formErrors = validateDecryptionForm(encryptedContent, state.selectedPrivateKey);
     dispatch({ type: 'formErrorsChanged', formErrors });
     if (Object.keys(formErrors).length > 0) return;
 
@@ -135,7 +146,7 @@ export function useDecryptPage() {
       }
 
       const result = await pgpCryptoService.decryptMessage(
-        state.encryptedContent,
+        encryptedContent,
         state.selectedPrivateKey[privateKeyId || ''],
         state.passphrase,
         hasSelectedKeys(state.selectedPublicKeys) ? publicKeyArmored : undefined,
@@ -145,9 +156,9 @@ export function useDecryptPage() {
 
       if (hasSelectedKeys(state.selectedPublicKeys)) {
         if (state.useDetachedVerification) {
-          if (state.signature.trim().length > 0 && publicKeyArmored) {
+          if (detachedSignature.length > 0 && publicKeyArmored) {
             const isValid = await pgpCryptoService.verifyDetachedSignature(
-              state.signature,
+              detachedSignature,
               result.decrypted,
               publicKeyArmored,
             );
@@ -178,11 +189,13 @@ export function useDecryptPage() {
 
       if (privateKeyId) {
         try {
-          await securityService.storePassphrase(
-            user?.uid || '',
-            { [privateKeyId]: state.passphrase },
-            privateKeyId,
-          );
+          if (await ensurePassphraseStorageConsent()) {
+            await securityService.storePassphrase(
+              user?.uid || '',
+              { [privateKeyId]: state.passphrase },
+              privateKeyId,
+            );
+          }
         } catch {
           // Ignore passphrase persistence failures for decrypt flow.
         }
@@ -224,7 +237,7 @@ export function useDecryptPage() {
     canDecrypt:
       !(!hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting)
       && (!state.passphraseIsRequired || Boolean(state.passphrase))
-      && validateArmor(state.encryptedContent, 'MESSAGE'),
+      && validateArmor(state.encryptedContent.trim(), 'MESSAGE'),
     hasSelectedPublicKeys: hasSelectedKeys(state.selectedPublicKeys),
     onEncryptedContentChanged: (content: string) => {
       dispatch({ type: 'encryptedContentChanged', content });

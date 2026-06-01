@@ -18,11 +18,16 @@ import {
 } from './localSessionLockStore';
 import {
     clearIndexedBiometricPassphrases,
+    hasAnsweredPassphraseStoragePrompt,
     clearPassphrase,
+    isPassphraseStorageEnabled,
     clearPassphraseCacheForUser,
     getPassphrase,
     getPassphraseIndex,
     hasStoredPassphrase,
+    setPassphraseStorageEnabled,
+    setPassphraseStoragePrompted,
+    subscribePassphraseStoreChanges,
     storePassphrase,
 } from './passphraseStore';
 import {
@@ -38,6 +43,11 @@ import {
     isBiometricAuthCancelled,
     SecureStorageModule,
 } from './biometricSecureStorage';
+import {
+    generatePassphrase,
+    getPassphraseGeneratorSettings,
+    setPassphraseGeneratorSettings,
+} from './passphraseGeneratorSettings';
 
 export const securityService = {
     /**
@@ -49,6 +59,11 @@ export const securityService = {
 
     storePassphrase,
     hasStoredPassphrase,
+    isPassphraseStorageEnabled,
+    hasAnsweredPassphraseStoragePrompt,
+    setPassphraseStorageEnabled,
+    setPassphraseStoragePrompted,
+    subscribePassphraseStoreChanges,
     getOrSetLastSignedInUserInSecureStorage,
     setDek,
     persistCachedDekWithBiometric,
@@ -57,6 +72,9 @@ export const securityService = {
     unlockDekWithBiometric,
     getDek,
     getPassphrase,
+    getPassphraseGeneratorSettings,
+    setPassphraseGeneratorSettings,
+    generatePassphrase,
     clearPassphrase,
     hasStandaloneBiometricAuth,
     authenticateBiometric,

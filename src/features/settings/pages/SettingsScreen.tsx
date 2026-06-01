@@ -126,10 +126,20 @@ export const SettingsScreen = () => {
             onValueChange: settingsPage.onBiometricToggle,
           }}
           extraText={
-            "Use your device biometrics to unlock locally stored passphrases and the app after local lock."
+            "Use your device biometrics to unlock the app after local lock."
           }
         />
       )}
+
+      <SettingsOption
+        iconName="vpn-key"
+        text="Store Passphrases"
+        switchProps={{
+          value: settingsPage.passphraseStorageEnabled,
+          onValueChange: settingsPage.onPassphraseStorageToggle,
+        }}
+        extraText="Saved key passphrases autofill on this device without another authentication prompt."
+      />
 
       <SettingsOption
         iconName="system-update-alt"

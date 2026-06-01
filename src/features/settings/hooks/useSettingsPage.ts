@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useMfa } from '../../mfa/state/MfaContext';
@@ -10,13 +10,43 @@ import { getMfaDescription } from '../domain/settingsDomain';
 import { initialSettingsState, settingsReducer } from '../state/settingsReducer';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { logger } from '../../../utils/logger';
+import { securityService } from '../../security/services/securityService';
 
 export function useSettingsPage() {
   const navigation = useNavigation<RootNavigationProps>();
-  const { signOut, isBiometricAvailable, isBiometricEnabled, toggleBiometric, isAuthLoading } = useAuth();
+  const { signOut, isBiometricAvailable, isBiometricEnabled, toggleBiometric, isAuthLoading, user } = useAuth();
   const { mfaState, disableMfa, setSessionTrust, regenerateRecoveryCodes, getRemainingRecoveryCodes, isLoading } = useMfa();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(settingsReducer, initialSettingsState);
+  const [passphraseStorageEnabled, setPassphraseStorageEnabledState] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPassphraseStoragePreference = async () => {
+      if (!user?.uid) {
+        setPassphraseStorageEnabledState(false);
+        return;
+      }
+
+      try {
+        const enabled = await securityService.isPassphraseStorageEnabled(user.uid);
+        if (!cancelled) {
+          setPassphraseStorageEnabledState(enabled);
+        }
+      } catch (error) {
+        logger.warn('failed to load passphrase storage setting', { error });
+        if (!cancelled) {
+          setPassphraseStorageEnabledState(false);
+        }
+      }
+    };
+
+    void loadPassphraseStoragePreference();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   const navigateToSecurity = (type: 'password' | 'delete') => {
     dispatch({ type: 'deleteDialogChanged', visible: false });
@@ -109,6 +139,25 @@ export function useSettingsPage() {
     }
   };
 
+  const handlePassphraseStorageToggle = async (value: boolean) => {
+    if (!user?.uid) return;
+    dispatch({ type: 'passphraseStorageLoadingChanged', loading: true });
+
+    try {
+      await securityService.setPassphraseStorageEnabled(user.uid, value);
+      setPassphraseStorageEnabledState(value);
+      showToast(
+        value ? 'Passphrase storage enabled' : 'Stored passphrases cleared',
+        'success',
+      );
+    } catch (error) {
+      logger.warn('failed to toggle passphrase storage', { error });
+      showToast(getUserFacingErrorMessage(error, 'Failed to update passphrase storage'), 'error');
+    } finally {
+      dispatch({ type: 'passphraseStorageLoadingChanged', loading: false });
+    }
+  };
+
   const handleLogout = async () => {
     dispatch({ type: 'logoutLoadingChanged', loading: true });
 
@@ -127,7 +176,8 @@ export function useSettingsPage() {
     mfaDescription: getMfaDescription(mfaState.mfaEnabled),
     isBiometricAvailable,
     isBiometricEnabled,
-    isPageLoading: isAuthLoading || state.biometricToggleLoading || isLoading || state.logoutLoading,
+    passphraseStorageEnabled,
+    isPageLoading: isAuthLoading || state.biometricToggleLoading || state.passphraseStorageLoading || isLoading || state.logoutLoading,
     onDeleteDialogChanged: (visible: boolean) => {
       dispatch({ type: 'deleteDialogChanged', visible });
     },
@@ -148,6 +198,7 @@ export function useSettingsPage() {
     onCheckRemainingRecoveryCodes: checkRemainingRecoveryCodes,
     onSessionTrustToggle: handleSessionTrustToggle,
     onBiometricToggle: handleBiometricToggle,
+    onPassphraseStorageToggle: handlePassphraseStorageToggle,
     onLogout: handleLogout,
   };
 }

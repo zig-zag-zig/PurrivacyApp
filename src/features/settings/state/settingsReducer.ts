@@ -7,6 +7,7 @@ type SettingsAction =
   | { type: 'regenerateCodesDialogChanged'; visible: boolean }
   | { type: 'revokeSessionsLoadingChanged'; loading: boolean }
   | { type: 'biometricToggleLoadingChanged'; loading: boolean }
+  | { type: 'passphraseStorageLoadingChanged'; loading: boolean }
   | { type: 'logoutLoadingChanged'; loading: boolean };
 
 export const initialSettingsState: SettingsUiState = {
@@ -16,6 +17,7 @@ export const initialSettingsState: SettingsUiState = {
   showRegenerateCodesDialog: false,
   revokeSessionsLoading: false,
   biometricToggleLoading: false,
+  passphraseStorageLoading: false,
   logoutLoading: false,
 };
 
@@ -33,6 +35,8 @@ export function settingsReducer(state: SettingsUiState, action: SettingsAction):
       return { ...state, revokeSessionsLoading: action.loading };
     case 'biometricToggleLoadingChanged':
       return { ...state, biometricToggleLoading: action.loading };
+    case 'passphraseStorageLoadingChanged':
+      return { ...state, passphraseStorageLoading: action.loading };
     case 'logoutLoadingChanged':
       return { ...state, logoutLoading: action.loading };
     default:

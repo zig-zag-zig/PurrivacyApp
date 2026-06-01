@@ -13,6 +13,7 @@ import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateEncryptionForm } from '../../../utils/validation';
 import { getCompleteKeyPairs } from '../../keys/domain/keyUtils';
 import { securityService } from '../../security/services/securityService';
+import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService.';
 import {
   getFirstSelectedKeyId,
@@ -27,6 +28,7 @@ export function useEncryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { userDecrypted, visibleKeys, user, isAuthLoading } = useAuth();
   const { showToast } = useToast();
+  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
   const shouldResetOnFocus = useRef(false);
   const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
@@ -184,11 +186,13 @@ export function useEncryptPage() {
 
       if (needsPassphrase && privateKeyId) {
         try {
-          await securityService.storePassphrase(
-            user?.uid || '',
-            { [privateKeyId]: state.passphrase },
-            privateKeyId,
-          );
+          if (await ensurePassphraseStorageConsent()) {
+            await securityService.storePassphrase(
+              user?.uid || '',
+              { [privateKeyId]: state.passphrase },
+              privateKeyId,
+            );
+          }
         } catch {
           // Ignore passphrase persistence failures for encrypt flow.
         }
