@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, View, ScrollViewProps, StyleSheet } from 'react-native';
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
+import { requestPassphraseBannerDismiss } from '../services/passphraseBannerEvents';
 
 interface ScreenContainerProps extends ScrollViewProps {
     children: React.ReactNode;
@@ -9,7 +10,19 @@ interface ScreenContainerProps extends ScrollViewProps {
 }
 
 export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps>(
-    ({ children, style, contentContainerStyle, keyboardShouldPersistTaps, ...props }, ref) => {
+    ({
+        children,
+        style,
+        contentContainerStyle,
+        keyboardShouldPersistTaps,
+        onTouchStart,
+        onTouchMove,
+        onTouchEnd,
+        ...props
+    }, ref) => {
+        const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+        const touchMovedRef = React.useRef(false);
+
         return (
             <View style={commonStyles.container}>
                 <View style={commonStyles.flex}>
@@ -23,7 +36,34 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
                             contentContainerStyle,
                         ]}
                         keyboardShouldPersistTaps={keyboardShouldPersistTaps ?? 'handled'}
-                        keyboardDismissMode="on-drag"
+                        keyboardDismissMode={props.keyboardDismissMode ?? 'none'}
+                        onTouchStart={(event) => {
+                            touchMovedRef.current = false;
+                            touchStartRef.current = {
+                                x: event.nativeEvent.pageX,
+                                y: event.nativeEvent.pageY,
+                            };
+                            onTouchStart?.(event);
+                        }}
+                        onTouchMove={(event) => {
+                            const start = touchStartRef.current;
+                            if (start) {
+                                const deltaX = Math.abs(event.nativeEvent.pageX - start.x);
+                                const deltaY = Math.abs(event.nativeEvent.pageY - start.y);
+                                if (deltaX > 8 || deltaY > 8) {
+                                    touchMovedRef.current = true;
+                                }
+                            }
+                            onTouchMove?.(event);
+                        }}
+                        onTouchEnd={(event) => {
+                            if (!touchMovedRef.current) {
+                                requestPassphraseBannerDismiss();
+                            }
+                            touchStartRef.current = null;
+                            touchMovedRef.current = false;
+                            onTouchEnd?.(event);
+                        }}
                     >
                         {children}
                     </ScrollView>

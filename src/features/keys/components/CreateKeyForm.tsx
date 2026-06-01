@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Keyboard, View, TouchableOpacity, StyleSheet, Switch, Pressable } from "react-native";
+import { Keyboard, View, TouchableOpacity, StyleSheet, Switch } from "react-native";
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { Button } from '../../../components/Button';
 import { InputField } from '../../../components/InputField';
@@ -11,12 +11,12 @@ import { validateKeyCreationForm } from '../../../utils/validation';
 import { ALGORITHM_OPTIONS, RSA_BITS_OPTIONS } from '../../../utils/formUtils';
 import { KeyGenerationOptions, PgpAlgorithm } from '../../../types/types';
 import { suppressNativeAutofillTree } from '../../../native/textInputAutofill';
-
-const AUTOFILL_EXCLUDED_INPUT_PROPS = {
-    autoComplete: 'off',
-    importantForAutofill: 'noExcludeDescendants',
-    textContentType: 'none',
-} as const;
+import { PassphraseField } from './PassphraseField';
+import {
+    KEY_COMMENT_MAX_LENGTH,
+    KEY_EMAIL_MAX_LENGTH,
+    KEY_NAME_MAX_LENGTH,
+} from '../../../config/inputLimits';
 
 export const CreateKeyForm = ({
     onCreate,
@@ -55,12 +55,39 @@ export const CreateKeyForm = ({
     }, []);
 
     const handleSubmit = () => {
-        const errors = validateKeyCreationForm(name, email, comment, passphrase, confirmPassphrase, algorithm, bitStrength);
+        const trimmedName = name.trim();
+        const trimmedEmail = email.trim().toLowerCase();
+        const trimmedComment = comment.trim();
+        if (trimmedName !== name) setName(trimmedName);
+        if (trimmedEmail !== email) setEmail(trimmedEmail);
+        if (trimmedComment !== comment) setComment(trimmedComment);
+
+        const errors = validateKeyCreationForm(
+            trimmedName,
+            trimmedEmail,
+            trimmedComment,
+            passphrase,
+            confirmPassphrase,
+            algorithm,
+            bitStrength,
+        );
         setFormErrors(errors);
 
         if (Object.keys(errors).length > 0) return;
 
-        onCreate({ name, email, passphrase, comment, algorithm, bitStrength }, setAsDefault);
+        onCreate({
+            name: trimmedName,
+            email: trimmedEmail,
+            passphrase,
+            comment: trimmedComment,
+            algorithm,
+            bitStrength,
+        }, setAsDefault);
+    };
+
+    const setGeneratedPassphrase = (generatedPassphrase: string) => {
+        setPassphrase(generatedPassphrase);
+        setConfirmPassphrase(generatedPassphrase);
     };
 
     const closeDropdowns = () => {
@@ -75,64 +102,63 @@ export const CreateKeyForm = ({
             )}
             <View style={{ marginBottom: theme.spacing.md }}>
                 <InputField
-                    {...AUTOFILL_EXCLUDED_INPUT_PROPS}
                     label="Name"
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
+                    maxLength={KEY_NAME_MAX_LENGTH}
                     error={formErrors.userId}
                     onFocus={closeDropdowns}
+                    trimOnBlur
                 />
             </View>
 
             <View style={{ marginBottom: theme.spacing.md }}>
                 <InputField
-                    {...AUTOFILL_EXCLUDED_INPUT_PROPS}
                     label="Email"
                     value={email}
                     onChangeText={setEmail}
+                    maxLength={KEY_EMAIL_MAX_LENGTH}
                     error={formErrors.email || formErrors.userId}
                     onFocus={closeDropdowns}
+                    normalizeOnBlur={(text) => text.trim().toLowerCase()}
                 />
             </View>
 
             <View style={{ marginBottom: theme.spacing.md }}>
                 <InputField
-                    {...AUTOFILL_EXCLUDED_INPUT_PROPS}
                     label="Comment"
                     value={comment}
                     onChangeText={setComment}
                     autoCapitalize="sentences"
+                    maxLength={KEY_COMMENT_MAX_LENGTH}
                     error={formErrors.userId}
                     onFocus={closeDropdowns}
+                    trimOnBlur
                 />
             </View>
 
             <View style={{ marginBottom: theme.spacing.md }}>
-                <InputField
-                    {...AUTOFILL_EXCLUDED_INPUT_PROPS}
+                <PassphraseField
                     label="Passphrase"
                     value={passphrase}
-                    onChangeText={setPassphrase}
-                    secureTextEntry
-                    showToggleSecureText
+                    onPassphraseChange={setPassphrase}
+                    onGeneratedPassphrase={setGeneratedPassphrase}
+                    bannerMode="generate"
                     error={formErrors.passphrase}
-                    onFocus={closeDropdowns}
                 />
             </View>
 
             {passphrase && (
                 <View style={{ marginBottom: theme.spacing.md }}>
-                    <InputField
-                        {...AUTOFILL_EXCLUDED_INPUT_PROPS}
+                    <PassphraseField
                         label="Confirm Passphrase"
                         value={confirmPassphrase}
-                        onChangeText={setConfirmPassphrase}
-                        secureTextEntry
-                        showToggleSecureText
+                        onPassphraseChange={setConfirmPassphrase}
+                        onGeneratedPassphrase={setGeneratedPassphrase}
+                        bannerMode="generate"
                         error={formErrors.confirmPassphrase}
                         hidden={!passphrase}
-                        onFocus={closeDropdowns}
                     />
                 </View>
             )}

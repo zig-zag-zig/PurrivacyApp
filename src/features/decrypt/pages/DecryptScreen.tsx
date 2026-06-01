@@ -45,6 +45,7 @@ export const DecryptScreen = () => {
         onChangeText={decryptPage.onEncryptedContentChanged}
         multiline
         largeText
+        trimOnBlur
         error={decryptPage.state.formErrors.encryptedContent}
         rightIcon={
           <FilePickerIcon
@@ -99,6 +100,7 @@ export const DecryptScreen = () => {
               onChangeText={decryptPage.onSignatureChanged}
               multiline
               largeText
+              trimOnBlur
               rightIcon={
                 <FilePickerIcon
                   onPress={decryptPage.onPickSignatureFile}

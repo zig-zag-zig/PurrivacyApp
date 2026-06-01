@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -9,7 +9,6 @@ import { theme } from '../../../styles/theme';
 import { KeyPair } from '../../../types/types';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
-import { AccountAutofillContext } from '../../../components/AccountAutofillContext';
 import { ConfirmationDialog } from '../../settings/components/ConfirmationDialog';
 import { useToast } from '../../../app/state/ToastContext';
 import { getKeyTypeDescription, isCompletePair } from '../domain/keyUtils';
@@ -17,9 +16,8 @@ import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { PassphraseField } from './PassphraseField';
 import { useAuth } from '../../auth/state/AuthContext';
 import { securityService } from '../../security/services/securityService';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
 import { KeyMetadataPills } from './KeyMetadataPills';
-import { getUsernameFromUser } from '../../auth/domain/usernameIdentity';
+import { EXPIRY_DAYS_MAX_LENGTH } from '../../../config/inputLimits';
 
 type KeyItemProps = {
     pgpKey: KeyPair;
@@ -32,7 +30,7 @@ type KeyItemProps = {
     onChangeExpiry?: (fingerprint: string, passphrase: string, newExpiryDays: string) => Promise<void>;
 };
 
-type PrivateKeyRevealLoading = 'account' | 'biometric' | 'key' | null;
+type PrivateKeyRevealLoading = 'account' | 'biometric' | null;
 
 const SURFACE_LABEL_BACKPLATE_PROPS = {
     labelTopBackgroundColor: theme.colors.surface,
@@ -49,7 +47,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const [changingDate, setChangingDate] = useState(false);
     const [privateKeyVisible, setPrivateKeyVisible] = useState(false);
     const [privateKeyAccountPassword, setPrivateKeyAccountPassword] = useState('');
-    const [privateKeyPassphrase, setPrivateKeyPassphrase] = useState('');
     const [privateKeyRevealError, setPrivateKeyRevealError] = useState('');
     const [privateKeyRevealLoading, setPrivateKeyRevealLoading] = useState<PrivateKeyRevealLoading>(null);
     const [publicKeyCopied, setPublicKeyCopied] = useState(false);
@@ -59,12 +56,10 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const { showToast } = useToast();
     const {
         user,
-        lastSignedInUser,
         isBiometricAvailable,
         isBiometricEnabled,
         setLoginWithReauthenticateWithCredential,
     } = useAuth();
-    const accountUsername = getUsernameFromUser(user) ?? lastSignedInUser?.username ?? null;
 
     useEffect(() => {
         if (!newPass) setNewPassConfirm('');
@@ -79,7 +74,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         }
     }, []);
 
-    const keyType = getKeyTypeDescription(pgpKey);
     const canManageKey = !readOnly;
     const hasPrivateKey = Boolean(pgpKey.privateKey);
     const isPrivateKeyProtected = pgpKey.privateKeyIsUnlocked === false;
@@ -90,7 +84,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const clearPrivateKeyReveal = () => {
         setPrivateKeyVisible(false);
         setPrivateKeyAccountPassword('');
-        setPrivateKeyPassphrase('');
         setPrivateKeyRevealError('');
         setPrivateKeyRevealLoading(null);
     };
@@ -129,7 +122,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         setPrivateKeyVisible(true);
         setPrivateKeyRevealError('');
         setPrivateKeyAccountPassword('');
-        setPrivateKeyPassphrase('');
     };
 
     const handleRevealWithAccountPassword = async () => {
@@ -185,35 +177,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         }
     };
 
-    const handleRevealWithKeyPassphrase = async () => {
-        if (!pgpKey.privateKey || !isPrivateKeyProtected) return;
-        if (!privateKeyPassphrase) {
-            setPrivateKeyRevealError('Key passphrase is required');
-            return;
-        }
-
-        setPrivateKeyRevealError('');
-        setPrivateKeyRevealLoading('key');
-
-        try {
-            const valid = await pgpCryptoService.validatePrivateKeyPassphrase(
-                pgpKey.privateKey,
-                privateKeyPassphrase,
-            );
-
-            if (!valid) {
-                setPrivateKeyRevealError('Incorrect key passphrase');
-                return;
-            }
-
-            handlePrivateKeyRevealSuccess();
-        } catch {
-            setPrivateKeyRevealError('Could not verify key passphrase');
-        } finally {
-            setPrivateKeyRevealLoading(null);
-        }
-    };
-
     const handleCopyPrivateKey = () => {
         if (!privateKeyVisible || !pgpKey.privateKey) return;
         Keyboard.dismiss();
@@ -227,6 +190,11 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
             privateKeyCopyTimeoutRef.current = null;
         }, 1600);
         showToast('Private key copied', 'success');
+    };
+
+    const setGeneratedNewPassphrase = (generatedPassphrase: string) => {
+        setNewPass(generatedPassphrase);
+        setNewPassConfirm(generatedPassphrase);
     };
 
     return (
@@ -354,25 +322,16 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                 </>
                             ) : (
                                 <View style={styles.revealPanel}>
-                                    {isPrivateKeyProtected && (
-                                        <InputField
-                                            {...SURFACE_LABEL_BACKPLATE_PROPS}
-                                            label="Key passphrase"
-                                            value={privateKeyPassphrase}
-                                            onChangeText={setPrivateKeyPassphrase}
-                                            secureTextEntry
-                                            showToggleSecureText
-                                            error={undefined}
-                                        />
-                                    )}
-
                                     <InputField
                                         {...SURFACE_LABEL_BACKPLATE_PROPS}
                                         label="Account password"
                                         value={privateKeyAccountPassword}
                                         onChangeText={setPrivateKeyAccountPassword}
+                                        autoComplete="current-password"
+                                        enableAutofill
                                         secureTextEntry
                                         showToggleSecureText
+                                        textContentType="password"
                                         error={undefined}
                                     />
 
@@ -381,18 +340,6 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                             {privateKeyRevealError}
                                         </CustomText>
                                     ) : null}
-
-                                    {isPrivateKeyProtected && (
-                                        <Button
-                                            label="Unlock with key passphrase"
-                                            onPress={handleRevealWithKeyPassphrase}
-                                            loading={privateKeyRevealLoading === 'key'}
-                                            disabled={privateKeyRevealBusy || !privateKeyPassphrase}
-                                            variant="secondary"
-                                            size="compact"
-                                            style={styles.revealButton}
-                                        />
-                                    )}
 
                                     <Button
                                         label="Unlock with account password"
@@ -440,8 +387,9 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                         label="New passphrase"
                                         fingerprint={pgpKey.fingerprint}
                                         onPassphraseChange={setNewPass}
+                                        onGeneratedPassphrase={setGeneratedNewPassphrase}
                                         value={newPass}
-                                        doNotUseAutofill={true}
+                                        bannerMode="generate"
                                         helperText={pgpKey.privateKeyIsUnlocked ? undefined : 'Leave blank to remove the passphrase.'}
                                     />
 
@@ -450,8 +398,9 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                         label="Confirm new passphrase"
                                         fingerprint={pgpKey.fingerprint}
                                         onPassphraseChange={setNewPassConfirm}
+                                        onGeneratedPassphrase={setGeneratedNewPassphrase}
                                         value={newPassConfirm}
-                                        doNotUseAutofill={true}
+                                        bannerMode="generate"
                                         hidden={!newPass}
                                     />
                                 </View>
@@ -488,6 +437,8 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                     value={expiryDays}
                                     onChangeText={setExpiryDays}
                                     keyboardType="number-pad"
+                                    numberOnly
+                                    maxDigits={EXPIRY_DAYS_MAX_LENGTH}
                                     helperText="Leave blank, or enter below 1, for no expiry."
                                 />
                                 <View style={styles.actionRow}>

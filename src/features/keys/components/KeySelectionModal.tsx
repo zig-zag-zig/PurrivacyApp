@@ -70,7 +70,7 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
     // Filter keys by search query (search in userId)
     const filteredKeys = useMemo(() => {
         if (!searchQuery.trim()) return keys;
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.trim().toLowerCase();
         return keys.filter(key => key.userId.toLowerCase().includes(query));
     }, [keys, searchQuery]);
 
@@ -182,6 +182,7 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                             placeholder="Search keys"
                             value={searchQuery}
                             onChangeText={setSearchQuery}
+                            onBlur={() => setSearchQuery(query => query.trim())}
                             placeholderTextColor={theme.colors.textSecondary}
                             autoCapitalize="none"
                             autoCorrect={false}

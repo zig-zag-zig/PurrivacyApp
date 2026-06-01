@@ -2,6 +2,7 @@ import type { Dispatch } from 'react';
 import type { User } from 'firebase/auth';
 
 import { useFilePicker } from '../../../hooks/useFilePicker';
+import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService.';
 import type { KeyGenerationOptions, KeyPair, UserDecrypted } from '../../../types/types';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, executeWithLoading } from '../../../utils/errorHandling';
@@ -42,8 +43,25 @@ export function useKeyOperations({
   showToast,
 }: KeyOperationsParams) {
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'key');
+  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const refreshUserKeys = () => EventService.addEvent('user');
   const refreshDevTempKeys = () => EventService.addEvent('devTempKeys');
+
+  const maybeStorePassphrase = async (
+    fingerprint: string,
+    passphrase: string,
+    options?: { force?: boolean },
+  ) => {
+    if (!user) return;
+    if (passphrase && !await ensurePassphraseStorageConsent()) return;
+
+    await securityService.storePassphrase(
+      user.uid,
+      { [fingerprint]: passphrase },
+      fingerprint,
+      options,
+    );
+  };
 
   const onCreateKey = async (
     keyGenerationOptions: KeyGenerationOptions,
@@ -60,11 +78,7 @@ export function useKeyOperations({
     );
 
     if (key) {
-      await securityService.storePassphrase(
-        user.uid,
-        { [key.fingerprint]: keyGenerationOptions.passphrase },
-        key.fingerprint,
-      );
+      await maybeStorePassphrase(key.fingerprint, keyGenerationOptions.passphrase);
       refreshUserKeys();
       dispatch({ type: 'keyActionChanged', keyAction: 'view' });
       dispatch({ type: 'formResetIncremented' });
@@ -137,11 +151,7 @@ export function useKeyOperations({
       );
 
       if (importedKey && state.importPassphrase) {
-        await securityService.storePassphrase(
-          user.uid,
-          { [importedKey.fingerprint]: state.importPassphrase },
-          importedKey.fingerprint,
-        );
+        await maybeStorePassphrase(importedKey.fingerprint, state.importPassphrase);
       }
 
       if (importedKey) {
@@ -238,12 +248,7 @@ export function useKeyOperations({
           newPassphrase,
           newPassphraseConfirm,
         );
-        await securityService.storePassphrase(
-          user.uid,
-          { [fingerprint]: newPassphrase },
-          fingerprint,
-          { force: true },
-        );
+        await maybeStorePassphrase(fingerprint, newPassphrase, { force: true });
         refreshDevTempKeys();
         showToast('Passphrase updated', 'success');
         return;
@@ -256,12 +261,7 @@ export function useKeyOperations({
         newPassphrase,
         newPassphraseConfirm,
       );
-      await securityService.storePassphrase(
-        user.uid,
-        { [fingerprint]: newPassphrase },
-        fingerprint,
-        { force: true },
-      );
+      await maybeStorePassphrase(fingerprint, newPassphrase, { force: true });
       refreshUserKeys();
       showToast('Passphrase updated', 'success');
     } catch (error: any) {
@@ -282,14 +282,14 @@ export function useKeyOperations({
     try {
       if (isDevTempKeyFingerprint(fingerprint)) {
         await changeDevTempKeyExpiration(fingerprint, passphrase, days);
-        await securityService.storePassphrase(user.uid, { [fingerprint]: passphrase }, fingerprint);
+        await maybeStorePassphrase(fingerprint, passphrase);
         refreshDevTempKeys();
         showToast('Expiration updated', 'success');
         return;
       }
 
       await PgPKeyService.changeExpiration(user.uid, fingerprint, passphrase, days);
-      await securityService.storePassphrase(user.uid, { [fingerprint]: passphrase }, fingerprint);
+      await maybeStorePassphrase(fingerprint, passphrase);
       refreshUserKeys();
       showToast('Expiration updated', 'success');
     } catch (error: any) {

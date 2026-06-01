@@ -1,5 +1,6 @@
 import type { KeyGenerationOptions, KeyPair, UserDecrypted } from '../../../types/types';
 import { logger } from '../../../utils/logger';
+import { validatePassphrase } from '../../../utils/validation';
 import { pgpCryptoService } from '../../../services/pgpCryptoService.';
 import { identifyKeyType } from '../domain/pgpValidation';
 import { getUserDecrypted, updateEncryptedKeys } from './keyRepository';
@@ -132,6 +133,8 @@ export async function changePassphrase(
   try {
     if (userId.trim() === '') throw new Error('userId cannot be empty');
     if (newPassphrase !== newPassphraseConfirm) throw new Error('The password confirmation failed');
+    const passphraseValidation = validatePassphrase(newPassphrase);
+    if (!passphraseValidation.isValid) throw new Error(passphraseValidation.error);
     if (newPassphrase === oldPassphrase) {
       throw new Error('The current and new passwords must be different');
     }

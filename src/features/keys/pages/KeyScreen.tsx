@@ -14,6 +14,7 @@ import { KeyItem } from '../components/KeyItem';
 import { PassphraseField } from '../components/PassphraseField';
 import { useKeyScreen } from '../hooks/useKeyScreen';
 import type { KeyAction } from '../model/types';
+import { KEY_ARMOR_MAX_LENGTH } from '../../../config/inputLimits';
 
 type MaterialIconName = ComponentProps<typeof Icon>['name'];
 
@@ -150,6 +151,8 @@ export const KeyScreen = () => {
             onChangeText={keyScreen.onImportKeyChanged}
             multiline
             largeText
+            maxLength={KEY_ARMOR_MAX_LENGTH}
+            trimOnBlur
             rightIcon={
               <FilePickerIcon
                 onPress={keyScreen.onPickImportFile}
