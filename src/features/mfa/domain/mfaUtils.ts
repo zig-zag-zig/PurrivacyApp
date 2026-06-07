@@ -3,6 +3,7 @@ import { securityService } from '../../security/services/securityService';
 import { getUserId } from '../../auth/domain/authUtils';
 import { RequestOptions } from '../../../api/requestHelpers';
 import { EventService } from '../../../services/eventService';
+import { AuthFlowError } from '../../../api/auth/authFlowError';
 // Track if we're already in an MFA handler to prevent recursive calls
 let isInMfaHandler = false;
 const MFA_SUBMISSION_TIMEOUT_MS = 30_000;
@@ -11,10 +12,9 @@ const withMfaSubmissionTimeout = async <T>(submission: Promise<T>): Promise<T> =
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const timeout = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
-            reject({
+            reject(new AuthFlowError('MFA verification timed out. Please try again.', {
                 mfaTimedOut: true,
-                message: 'MFA verification timed out. Please try again.',
-            });
+            }));
         }, MFA_SUBMISSION_TIMEOUT_MS);
     });
 
@@ -57,7 +57,7 @@ export class MfaUtils {
         try {
             const handler = getMfaModalHandler();
             if (!handler) {
-                throw { status: 401, message: 'MFA modal handler not available' };
+                throw new AuthFlowError('MFA modal handler not available', { status: 401 });
             }
 
             while (true) {
@@ -68,11 +68,13 @@ export class MfaUtils {
                     });
 
                     if (!result?.code) {
-                        throw { mfaCancelled: true };
+                        throw new AuthFlowError('MFA verification was cancelled', { mfaCancelled: true });
                     }
 
                     const response = await withMfaSubmissionTimeout(params.onMfaCode(result.code));
-                    EventService.addEvent('closeMfaModal');
+                    if (!params.isLoginFlow) {
+                        EventService.addEvent('closeMfaModal');
+                    }
                     return response;
                 } catch (error: any) {
                     if (error?.wrongMfaCode) {
@@ -80,7 +82,7 @@ export class MfaUtils {
                         continue;
                     }
 
-                    EventService.addEvent('closeMfaModal');
+                    EventService.addEvent('closeMfaModal', { force: true });
 
                     if (params.onError) {
                         params.onError(error);

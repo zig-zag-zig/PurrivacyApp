@@ -1,5 +1,5 @@
 import { AuthService } from './authService';
-import { PgPKeyService } from '../../keys/services/pgpKeyService';
+import { PgpKeyService } from '../../keys/services/pgpKeyService';
 import { UserCreatePayload } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 
@@ -26,7 +26,7 @@ export class UserRegistrationService {
                 recoveryVerifierHash,
             };
 
-            await PgPKeyService.encryptAndCreate(userId, user, dek);
+            await PgpKeyService.encryptAndCreate(userId, user, dek);
         } catch (error) {
             logger.warn('registration failed', { error });
             throw new Error('Failed to register user');

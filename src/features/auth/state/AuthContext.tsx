@@ -16,6 +16,7 @@ import { useAuthSessionLifecycle } from '../hooks/useAuthSessionLifecycle';
 import { appendDevTempKeys, loadDevTempKeys } from '../../keys/domain/tempKeyFixtures';
 import { EventService } from '../../../services/eventService';
 import { logger } from '../../../utils/logger';
+import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -135,6 +136,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     promptBiometricWhenDekIsReady,
   } = useBiometricSetupPrompt(promptBiometric);
 
+  const authRefs: AuthRuntimeRefs = {
+    forceNewSessionOnNextAuthRef,
+    isGettingSessionRef,
+    legitCustomTokenSignInRef,
+    localBiometricLockRef,
+    loginWithReauthenticateWithCredentialRef,
+    pendingPasswordRef,
+    registrationInProgressRef,
+    runLoadUserRef,
+    shouldPromptBiometricRef,
+    suppressLastSignedInUserPersistRef,
+    userInitAuthRef,
+    userRef,
+  };
+
+  const authStateSetters: AuthStateSetters = {
+    setAuthCompleted,
+    setFbUser,
+    setIsAuthLoading,
+    setIsBiometricAvailable,
+    setIsBiometricEnabled,
+    setIsCheckingInactivity,
+    setIsLocalSessionLocked,
+    setLastSignedInUser,
+    setLastUsedBiometricSignIn,
+    setPendingPassword,
+    setSessionAuthenticated,
+    setUser,
+    setUserDecrypted,
+  };
+
   const {
     signOut,
     lock,
@@ -148,31 +180,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signin,
   } = useAuthActions({
     userDecrypted,
-    localBiometricLockRef,
-    pendingPasswordRef,
-    runLoadUserRef,
-    userInitAuthRef,
-    forceNewSessionOnNextAuthRef,
-    loginWithReauthenticateWithCredentialRef,
-    suppressLastSignedInUserPersistRef,
-    legitCustomTokenSignInRef,
-    registrationInProgressRef,
-    userRef,
-    shouldPromptBiometricRef,
-    isGettingSessionRef,
-    clearPendingBiometricPromptRetry,
-    initializeBiometricState,
-    setPendingPassword,
-    setUserDecrypted,
-    setLastSignedInUser,
-    setSessionAuthenticated,
-    setIsLocalSessionLocked,
-    setUser,
-    setFbUser,
-    setIsCheckingInactivity,
-    setIsAuthLoading,
-    setAuthCompleted,
-    setLastUsedBiometricSignIn,
+    refs: authRefs,
+    services: {
+      clearPendingBiometricPromptRetry,
+      initializeBiometricState,
+    },
+    setters: authStateSetters,
   });
 
   useAppInactivityLock({
@@ -183,26 +196,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   // Firebase auth listener
-  useFirebaseAuth(
-    userRef,
-    setFbUser,
-    setLastSignedInUser,
-    userInitAuthRef,
-    loginWithReauthenticateWithCredentialRef,
-    suppressLastSignedInUserPersistRef,
-    legitCustomTokenSignInRef,
-    registrationInProgressRef,
+  useFirebaseAuth({
     lock,
-    setAuthCompleted,
-    setSessionAuthenticated,
-    setIsLocalSessionLocked,
-    setIsCheckingInactivity,
-    setUser,
-    setIsAuthLoading,
-    runLoadUserRef,
-    localBiometricLockRef,
-    forceNewSessionOnNextAuthRef
-  );
+    refs: authRefs,
+    setters: authStateSetters,
+  });
 
   // Event handling
   useAuthEvents(user, signOut, () => loadUser().then(() => { }));
@@ -213,22 +211,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     userDecrypted,
     isAuthLoading,
-    shouldPromptBiometricRef,
-    runLoadUserRef,
-    pendingPasswordRef,
-    lock,
-    loadUser,
-    promptBiometricWhenDekIsReady,
-    initializeBiometricState,
-    createSession,
-    setUser,
-    setIsLocalSessionLocked,
-    setIsBiometricAvailable,
-    setIsBiometricEnabled,
-    setIsAuthLoading,
-    setIsCheckingInactivity,
-    setAuthCompleted,
-    setLastUsedBiometricSignIn,
+    refs: authRefs,
+    services: {
+      createSession,
+      initializeBiometricState,
+      loadUser,
+      lock,
+      promptBiometricWhenDekIsReady,
+    },
+    setters: authStateSetters,
   });
 
   return (

@@ -11,7 +11,7 @@ import { initialSettingsState, settingsReducer } from '../state/settingsReducer'
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { logger } from '../../../utils/logger';
 import { securityService } from '../../security/services/securityService';
-import { PgPKeyService } from '../../keys/services/pgpKeyService';
+import { PgpKeyService } from '../../keys/services/pgpKeyService';
 import { EventService } from '../../../services/eventService';
 
 export function useSettingsPage() {
@@ -149,7 +149,7 @@ export function useSettingsPage() {
       if (value) {
         await securityService.setPassphraseStorageEnabled(user.uid, true);
       } else {
-        await PgPKeyService.forgetStoredPassphrases(user.uid);
+        await PgpKeyService.forgetStoredPassphrases(user.uid);
         EventService.addEvent('user');
       }
       setPassphraseStorageEnabledState(value);

@@ -1,4 +1,3 @@
-import type { RefObject } from 'react';
 import type { User, UserCredential } from 'firebase/auth';
 import { deleteUser as deleteFirebaseUser, signOut as firebaseSignOut } from 'firebase/auth';
 
@@ -27,40 +26,25 @@ import {
 } from '../services/signInFlow';
 import { createBackendAuthSession } from '../services/sessionAuthenticationFlow';
 import { UserAuthService } from '../services/userAuthService';
-
-type Setter<T> = (value: T) => void;
+import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
 
 type UseAuthActionsParams = {
   userDecrypted: UserDecrypted | null;
-  localBiometricLockRef: RefObject<boolean>;
-  pendingPasswordRef: RefObject<string | null>;
-  runLoadUserRef: RefObject<boolean>;
-  userInitAuthRef: RefObject<boolean>;
-  forceNewSessionOnNextAuthRef: RefObject<boolean>;
-  loginWithReauthenticateWithCredentialRef: RefObject<boolean>;
-  suppressLastSignedInUserPersistRef: RefObject<boolean>;
-  legitCustomTokenSignInRef: RefObject<boolean>;
-  registrationInProgressRef: RefObject<boolean>;
-  userRef: RefObject<User | null>;
-  shouldPromptBiometricRef: RefObject<boolean>;
-  isGettingSessionRef: RefObject<boolean>;
-  clearPendingBiometricPromptRetry: () => void;
-  initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
-  setPendingPassword: Setter<string | null>;
-  setUserDecrypted: Setter<UserDecrypted | null>;
-  setLastSignedInUser: Setter<LastSignedInUser | null>;
-  setSessionAuthenticated: Setter<boolean>;
-  setIsLocalSessionLocked: Setter<boolean>;
-  setUser: Setter<User | null>;
-  setFbUser: Setter<User | null>;
-  setIsCheckingInactivity: Setter<boolean>;
-  setIsAuthLoading: Setter<boolean>;
-  setAuthCompleted: Setter<boolean>;
-  setLastUsedBiometricSignIn: Setter<boolean>;
+  refs: AuthRuntimeRefs;
+  services: {
+    clearPendingBiometricPromptRetry: () => void;
+    initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
+  };
+  setters: AuthStateSetters;
 };
 
 export function useAuthActions({
   userDecrypted,
+  refs,
+  services,
+  setters,
+}: UseAuthActionsParams) {
+  const {
   localBiometricLockRef,
   pendingPasswordRef,
   runLoadUserRef,
@@ -73,8 +57,12 @@ export function useAuthActions({
   userRef,
   shouldPromptBiometricRef,
   isGettingSessionRef,
+  } = refs;
+  const {
   clearPendingBiometricPromptRetry,
   initializeBiometricState,
+  } = services;
+  const {
   setPendingPassword,
   setUserDecrypted,
   setLastSignedInUser,
@@ -86,7 +74,7 @@ export function useAuthActions({
   setIsAuthLoading,
   setAuthCompleted,
   setLastUsedBiometricSignIn,
-}: UseAuthActionsParams) {
+  } = setters;
   const { showToast } = useToast();
 
   const rememberLastSignedInUser = async (firebaseUser: User): Promise<void> => {
@@ -336,7 +324,7 @@ export function useAuthActions({
       forceNewSessionOnNextAuthRef.current = false;
       shouldPromptBiometricRef.current = false;
       setIsAuthLoading(false);
-      throw new Error(error.message || 'Registration failed');
+      throw error;
     }
   };
 

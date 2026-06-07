@@ -159,7 +159,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children = false }
             return message.trim();
         }
         if (message instanceof Error) {
-            return message.message.trim();
+            return 'An unexpected error occurred';
         }
         if (typeof message === 'number' || typeof message === 'boolean') {
             return String(message).trim();

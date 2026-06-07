@@ -54,7 +54,7 @@ export const SeedVerification: React.FC<SeedVerificationProps> = ({
 
     useEffect(() => {
         if (!validateMnemonic(seed)) {
-            showToast('System Error: Please contact support. Error code: INVALID_SEED', 'error');
+            showToast('Recovery phrase could not be verified. Please restart signup.', 'error');
             navigation.navigate('Signup');
         }
     }, [seed, navigation, showToast]);

@@ -12,7 +12,7 @@ import { AuthService } from '../services/authService';
 import { theme } from '../../../styles/theme';
 import { useToast } from '../../../app/state/ToastContext';
 import { sanitizeUsernameInput, USERNAME_MAX_LENGTH, validateUsername } from '../domain/usernameIdentity';
-import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
+import { ERROR_MESSAGES, getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { logger } from '../../../utils/logger';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
 
@@ -77,7 +77,7 @@ export const SignupScreen = () => {
             await signUp(sanitizeUsernameInput(username), password, seed);
         } catch (error: any) {
             logger.warn('sign-up failed', { error });
-            showToast(getUserFacingErrorMessage(error, 'Failed to sign up'), 'error');
+            showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.SIGN_UP_FAILED), 'error');
             setStep('form');
         }
     };

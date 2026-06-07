@@ -46,7 +46,7 @@ export const RecoverAccountScreen = () => {
         const usernameError = validateUsername(submittedUsername);
         if (usernameError) errors.username = usernameError;
         if (!normalizedSeedPhrase) errors.seedPhrase = 'Please enter your recovery seed phrase';
-        else if (!validateMnemonic(normalizedSeedPhrase)) errors.seedPhrase = 'Invalid seed phrase format - must be 12/24 valid words';
+        else if (!validateMnemonic(normalizedSeedPhrase)) errors.seedPhrase = 'Enter a valid 12- or 24-word recovery seed phrase.';
         if (!newPassword) errors.newPassword = 'Password is required';
         else if (newPassword.length < ACCOUNT_PASSWORD_MIN_LENGTH) errors.newPassword = `Minimum ${ACCOUNT_PASSWORD_MIN_LENGTH} characters`;
         if (!confirmPassword) errors.confirmPassword = 'Please confirm password';

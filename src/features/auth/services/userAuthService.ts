@@ -2,7 +2,7 @@ import { User, UserCredential } from 'firebase/auth';
 import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../../../config/firebase';
 import { AuthService } from './authService';
-import { PgPKeyService } from '../../keys/services/pgpKeyService';
+import { PgpKeyService } from '../../keys/services/pgpKeyService';
 import { UserRegistrationService } from './userRegistrationService';
 import { securityService } from '../../security/services/securityService';
 import { UserDecrypted, UserEncrypted } from '../../../types/types';
@@ -31,7 +31,7 @@ export class UserAuthService {
 
             return result;
         } catch (error: any) {
-            throw new Error(error.message || 'Registration failed');
+            throw error;
         }
     }
 
@@ -88,7 +88,7 @@ export class UserAuthService {
                 return null;
             }
 
-            return await PgPKeyService.getUserEncrypted();
+            return await PgpKeyService.getUserEncrypted();
         } catch (error) {
             logger.warn('failed to load encrypted user data', { error });
             return null;
@@ -104,7 +104,7 @@ export class UserAuthService {
             if (!user) {
                 return null;
             }
-            decryptedUser = await PgPKeyService.getUserDecrypted(user.uid);
+            decryptedUser = await PgpKeyService.getUserDecrypted(user.uid);
             return decryptedUser;
         } catch (error) {
             logger.warn('failed to load decrypted user data', { error });

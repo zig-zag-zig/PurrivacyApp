@@ -10,6 +10,7 @@ import {
     setRecoveryCodesModalHandler,
 } from '../../api/modalHandler';
 import { EventService } from '../../services/eventService';
+import { shouldCloseMfaModal } from '../../features/mfa/domain/mfaModalClose';
 
 export type MfaModalResult = {
     code: string | null;
@@ -37,6 +38,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
     const [currentModal, setCurrentModal] = useState<ModalType>(null);
     const [modalProps, setModalProps] = useState<any>(null);
     const currentModalRef = useRef<ModalType>(null);
+    const modalPropsRef = useRef<any>(null);
     const resolveMfaPromiseRef = useRef<((value: string | null) => void) | null>(null);
     const resolveRecoveryCodesPromiseRef = useRef<(() => void) | null>(null);
     const resolvePassphraseStorageConsentPromiseRef = useRef<((enabled: boolean) => void) | null>(null);
@@ -51,12 +53,10 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
         }
     }, []);
 
-    useEffect(() => {
-        currentModalRef.current = currentModal;
-    }, [currentModal]);
-
     const hideModal = useCallback(() => {
         clearScheduledMfaClose();
+        currentModalRef.current = null;
+        modalPropsRef.current = null;
         setCurrentModal(null);
         setModalProps(null);
         if (resolveMfaPromiseRef.current) {
@@ -111,6 +111,10 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
                     return;
                 }
 
+                if (!shouldCloseMfaModal(Boolean(modalPropsRef.current?.isLoginFlow), payload)) {
+                    return;
+                }
+
                 const delayMs = Number(payload?.delayMs ?? 0);
 
                 if (Number.isFinite(delayMs) && delayMs > 0) {
@@ -134,6 +138,8 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showMfaModal = useCallback((options: MfaModalOptions): Promise<MfaModalResult> => {
         return new Promise((resolve) => {
+            currentModalRef.current = 'mfa';
+            modalPropsRef.current = options;
             setCurrentModal('mfa');
             setModalProps(options);
             resolveMfaPromiseRef.current = (code: string | null) => {
@@ -146,6 +152,8 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showRecoveryCodesModal = useCallback((options: RecoveryCodesModalOptions): Promise<void> => {
         return new Promise((resolve) => {
+            currentModalRef.current = 'recoveryCodes';
+            modalPropsRef.current = options;
             setCurrentModal('recoveryCodes');
             setModalProps(options);
             resolveRecoveryCodesPromiseRef.current = () => {
@@ -156,6 +164,8 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showPassphraseStorageConsentModal = useCallback((): Promise<boolean> => {
         return new Promise((resolve) => {
+            currentModalRef.current = 'passphraseStorageConsent';
+            modalPropsRef.current = null;
             setCurrentModal('passphraseStorageConsent');
             setModalProps(null);
             resolvePassphraseStorageConsentPromiseRef.current = resolve;

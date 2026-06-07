@@ -2,6 +2,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { validateArmor } from '../features/keys/domain/pgpValidation';
 
+const isUserFacingFilePickerError = (message: string): boolean => (
+    /^Only .+ files are allowed$/.test(message) ||
+    /^Invalid PGP (key|message) format\./.test(message)
+);
+
 export const useFilePicker = (
     allowedExtensions: string[] = ['.txt', '.asc', '.pgp', '.gpg'],
     validatePGP?: 'key' | 'message'
@@ -44,7 +49,10 @@ export const useFilePicker = (
 
             onFilePicked(fileContent);
         } catch (error: any) {
-            onError?.(error.message || 'Failed to pick file');
+            const message = typeof error?.message === 'string' && isUserFacingFilePickerError(error.message)
+                ? error.message
+                : 'Failed to pick file';
+            onError?.(message);
         }
     };
 

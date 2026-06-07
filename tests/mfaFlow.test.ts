@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe('MFA retry flow', () => {
-  it('closes the modal after a successful MFA submission', async () => {
+  it('keeps login MFA open until the authenticated UI handoff', async () => {
     const events: Array<{ name: string; payload: unknown; }> = [];
     const unsubscribe = EventService.addListener((name, payload) => {
       events.push({ name, payload });
@@ -56,6 +56,31 @@ describe('MFA retry flow', () => {
 
     expect(modalHandler).toHaveBeenCalledTimes(1);
     expect(onMfaCode).toHaveBeenCalledWith('123456');
+    expect(events).not.toContainEqual({
+      name: 'closeMfaModal',
+      payload: undefined,
+    });
+  });
+
+  it('closes non-login MFA after a successful submission', async () => {
+    const events: Array<{ name: string; payload: unknown; }> = [];
+    const unsubscribe = EventService.addListener((name, payload) => {
+      events.push({ name, payload });
+    });
+    const modalHandler = vi.fn().mockResolvedValueOnce({ code: '123456' });
+
+    setMfaModalHandler(modalHandler);
+
+    try {
+      await MfaUtils.executeMfaFlow({
+        isSensitive: true,
+        isLoginFlow: false,
+        onMfaCode: async code => `accepted:${code}`,
+      });
+    } finally {
+      unsubscribe();
+    }
+
     expect(events).toContainEqual({
       name: 'closeMfaModal',
       payload: undefined,

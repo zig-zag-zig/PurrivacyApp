@@ -1,9 +1,10 @@
-import { RefObject, useEffect } from 'react';
+import { useEffect } from 'react';
 import type { User } from 'firebase/auth';
 
 import { useRegisterForPushNotifications } from '../../../hooks/useRegisterForPushNotifications';
 import type { UserDecrypted } from '../../../types/types';
 import { logger } from '../../../utils/logger';
+import { EventService } from '../../../services/eventService';
 import { BiometricAuthService } from '../../security/services/biometricAuthService';
 import { getUser } from '../domain/authUtils';
 import { getUsernameFromUser } from '../domain/usernameIdentity';
@@ -11,8 +12,28 @@ import {
   completeAuthenticatedUi,
   finishAuthenticatedSession,
 } from '../services/sessionAuthenticationFlow';
+import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
 
-type Setter<T> = (value: T) => void;
+const AUTH_MFA_HOME_HANDOFF_DELAY_MS = 75;
+
+type AuthSessionLifecycleRefs = Pick<
+  AuthRuntimeRefs,
+  | 'pendingPasswordRef'
+  | 'runLoadUserRef'
+  | 'shouldPromptBiometricRef'
+>;
+
+type AuthSessionLifecycleSetters = Pick<
+  AuthStateSetters,
+  | 'setAuthCompleted'
+  | 'setIsAuthLoading'
+  | 'setIsBiometricAvailable'
+  | 'setIsBiometricEnabled'
+  | 'setIsCheckingInactivity'
+  | 'setIsLocalSessionLocked'
+  | 'setLastUsedBiometricSignIn'
+  | 'setUser'
+>;
 
 type UseAuthSessionLifecycleParams = {
   sessionAuthenticated: boolean;
@@ -20,22 +41,15 @@ type UseAuthSessionLifecycleParams = {
   user: User | null;
   userDecrypted: UserDecrypted | null;
   isAuthLoading: boolean;
-  shouldPromptBiometricRef: RefObject<boolean>;
-  runLoadUserRef: RefObject<boolean>;
-  pendingPasswordRef: RefObject<string | null>;
-  lock: () => Promise<void>;
-  loadUser: () => Promise<UserDecrypted | null>;
-  promptBiometricWhenDekIsReady: (currentUser: User) => Promise<void>;
-  initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
-  createSession: () => Promise<void>;
-  setUser: Setter<User | null>;
-  setIsLocalSessionLocked: Setter<boolean>;
-  setIsBiometricAvailable: Setter<boolean>;
-  setIsBiometricEnabled: Setter<boolean>;
-  setIsAuthLoading: Setter<boolean>;
-  setIsCheckingInactivity: Setter<boolean>;
-  setAuthCompleted: Setter<boolean>;
-  setLastUsedBiometricSignIn: Setter<boolean>;
+  refs: AuthSessionLifecycleRefs;
+  services: {
+    createSession: () => Promise<void>;
+    initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
+    loadUser: () => Promise<UserDecrypted | null>;
+    lock: () => Promise<void>;
+    promptBiometricWhenDekIsReady: (currentUser: User) => Promise<void>;
+  };
+  setters: AuthSessionLifecycleSetters;
 };
 
 export function useAuthSessionLifecycle({
@@ -44,14 +58,23 @@ export function useAuthSessionLifecycle({
   user,
   userDecrypted,
   isAuthLoading,
+  refs,
+  services,
+  setters,
+}: UseAuthSessionLifecycleParams): void {
+  const {
   shouldPromptBiometricRef,
   runLoadUserRef,
   pendingPasswordRef,
+  } = refs;
+  const {
   lock,
   loadUser,
   promptBiometricWhenDekIsReady,
   initializeBiometricState,
   createSession,
+  } = services;
+  const {
   setUser,
   setIsLocalSessionLocked,
   setIsBiometricAvailable,
@@ -60,7 +83,7 @@ export function useAuthSessionLifecycle({
   setIsCheckingInactivity,
   setAuthCompleted,
   setLastUsedBiometricSignIn,
-}: UseAuthSessionLifecycleParams): void {
+  } = setters;
   const { registerForPushNotificationsAsync } = useRegisterForPushNotifications();
 
   useEffect(() => {
@@ -69,6 +92,7 @@ export function useAuthSessionLifecycle({
 
       setIsLocalSessionLocked(false);
       setUser(fbUser);
+      EventService.addEvent('closeMfaModal', { delayMs: AUTH_MFA_HOME_HANDOFF_DELAY_MS });
       finishAuthenticatedSession({
         currentUser: fbUser,
         shouldPromptBiometric,

@@ -3,9 +3,9 @@ import { User, onIdTokenChanged } from 'firebase/auth';
 import { auth } from '../../../config/firebase';
 import { securityService } from '../../security/services/securityService';
 import { inactiveTooLong } from '../../security/services/activityService';
-import { LastSignedInUser } from '../../../types/types';
 import { getUsernameFromUser } from '../domain/usernameIdentity';
 import { logger } from '../../../utils/logger';
+import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
 
 const AUTH_STATE_READY_TIMEOUT_MS = 5000;
 
@@ -26,26 +26,64 @@ const waitWithTimeout = async (promise: Promise<void>, timeoutMs: number): Promi
     }
 };
 
-export const useFirebaseAuth = (
-    userRef: React.RefObject<User | null>,
-    setFbUser: (user: User | null) => void,
-    setLastSignedInUser: (user: LastSignedInUser | null) => void,
-    userInitAuthRef: React.RefObject<boolean>,
-    loginWithReauthenticateWithCredentialRef: React.RefObject<boolean>,
-    suppressLastSignedInUserPersistRef: React.RefObject<boolean>,
-    legitCustomTokenSignInRef: React.RefObject<boolean>,
-    registrationInProgressRef: React.RefObject<boolean>,
-    lock: () => Promise<void>,
-    setAuthCompleted: (completed: boolean) => void,
-    setSessionAuthenticated: (authenticated: boolean) => void,
-    setIsLocalSessionLocked: (locked: boolean) => void,
-    setIsCheckingInactivity: (isCheckingInactivity: boolean) => void,
-    setUser: (user: User | null) => void,
-    setIsAuthLoading: (isLoading: boolean) => void,
-    runLoadUserRef: React.RefObject<boolean>,
-    localBiometricLockRef: React.RefObject<boolean>,
-    forceNewSessionOnNextAuthRef: React.RefObject<boolean>
-) => {
+type FirebaseAuthRefs = Pick<
+    AuthRuntimeRefs,
+    | 'forceNewSessionOnNextAuthRef'
+    | 'legitCustomTokenSignInRef'
+    | 'localBiometricLockRef'
+    | 'loginWithReauthenticateWithCredentialRef'
+    | 'registrationInProgressRef'
+    | 'runLoadUserRef'
+    | 'suppressLastSignedInUserPersistRef'
+    | 'userInitAuthRef'
+    | 'userRef'
+>;
+
+type FirebaseAuthSetters = Pick<
+    AuthStateSetters,
+    | 'setAuthCompleted'
+    | 'setFbUser'
+    | 'setIsAuthLoading'
+    | 'setIsCheckingInactivity'
+    | 'setIsLocalSessionLocked'
+    | 'setLastSignedInUser'
+    | 'setSessionAuthenticated'
+    | 'setUser'
+>;
+
+type UseFirebaseAuthParams = {
+    lock: () => Promise<void>;
+    refs: FirebaseAuthRefs;
+    setters: FirebaseAuthSetters;
+};
+
+export const useFirebaseAuth = ({
+    lock,
+    refs,
+    setters,
+}: UseFirebaseAuthParams) => {
+    const {
+        forceNewSessionOnNextAuthRef,
+        legitCustomTokenSignInRef,
+        localBiometricLockRef,
+        loginWithReauthenticateWithCredentialRef,
+        registrationInProgressRef,
+        runLoadUserRef,
+        suppressLastSignedInUserPersistRef,
+        userInitAuthRef,
+        userRef,
+    } = refs;
+    const {
+        setAuthCompleted,
+        setFbUser,
+        setIsAuthLoading,
+        setIsCheckingInactivity,
+        setIsLocalSessionLocked,
+        setLastSignedInUser,
+        setSessionAuthenticated,
+        setUser,
+    } = setters;
+
     useEffect(() => {
         let customToken = false;
         let cancelled = false;
