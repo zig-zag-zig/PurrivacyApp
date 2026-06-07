@@ -33,9 +33,11 @@ const variants = {
   debug: 'Debug',
   release: 'Release',
 };
+const supportedAndroidArchitectures = new Set(['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64']);
 
 function printUsage() {
   console.error('[android-build] Usage: node scripts/android-local-build.cjs debug|release [--clean] [--install] [--dry-run] [--bump-patch|--bump-minor|--bump-major]');
+  console.error('[android-build] Set ANDROID_BUILD_ARCHITECTURES or REACT_NATIVE_ARCHITECTURES to override the default ABI list.');
 }
 
 for (const arg of args) {
@@ -83,6 +85,41 @@ function formatCommand(command, commandArgs) {
 function fail(message) {
   console.error(`[android-build] ${message}`);
   process.exit(1);
+}
+
+function normalizeAndroidArchitectures(value, source) {
+  const architectures = value
+    .split(',')
+    .map(architecture => architecture.trim())
+    .filter(Boolean);
+
+  const invalidArchitectures = architectures
+    .filter(architecture => !supportedAndroidArchitectures.has(architecture));
+
+  if (architectures.length === 0 || invalidArchitectures.length > 0) {
+    fail(`${source} must be a comma-separated list of: ${Array.from(supportedAndroidArchitectures).join(', ')}`);
+  }
+
+  return architectures.join(',');
+}
+
+function resolveReactNativeArchitectures() {
+  const explicitArchitectures = env.ANDROID_BUILD_ARCHITECTURES?.trim()
+    || env.REACT_NATIVE_ARCHITECTURES?.trim();
+
+  if (explicitArchitectures) {
+    return normalizeAndroidArchitectures(explicitArchitectures, 'Android architectures override');
+  }
+
+  if (env.APP_ENV === 'e2e-test') {
+    return 'x86_64';
+  }
+
+  if (variant === 'debug') {
+    return 'arm64-v8a';
+  }
+
+  return null;
 }
 
 function readJsonFile(filePath) {
@@ -376,9 +413,16 @@ if (clean) {
 }
 
 const gradleTask = `:app:assemble${variants[variant]}`;
-const gradleArgs = clean
+const gradleArgs = [];
+const reactNativeArchitectures = resolveReactNativeArchitectures();
+
+if (reactNativeArchitectures) {
+  gradleArgs.push(`-PreactNativeArchitectures=${reactNativeArchitectures}`);
+}
+
+gradleArgs.push(...(clean
   ? ['clean', gradleTask]
-  : [gradleTask];
+  : [gradleTask]));
 
 bumpVersionIfRequested();
 run('npx', prebuildArgs);
