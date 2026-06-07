@@ -1,5 +1,6 @@
 import { EventService } from '../../services/eventService';
 import { AuthErrorResponse } from '../../types/types';
+import { AuthFlowError } from '../auth/authFlowError';
 
 const getSessionError = (error: any): AuthErrorResponse | undefined => {
     return error?.sessionError ?? error;
@@ -45,12 +46,12 @@ export const markRequiresSignOut = (error: any): any => {
     return { error, requiresSignOut: true };
 };
 
-export const missingStoredSessionError = (): any => {
-    return {
-        sessionError: { refreshTokenMissing: true },
+export const missingStoredSessionError = (): AuthFlowError => {
+    return new AuthFlowError('Stored session is missing a refresh token', {
         status: 401,
         requiresSignOut: true,
-    };
+        sessionError: { refreshTokenMissing: true },
+    });
 };
 
 export const throwStoredSessionAuthFailure = (error: any, emitSignOut: boolean): never => {

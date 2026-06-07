@@ -21,7 +21,7 @@ import {
     getUserEncrypted,
 } from './keyRepository';
 
-export class PgPKeyService {
+export class PgpKeyService {
     static async createKey(
         userId: string,
         keyGenerationOptions: KeyGenerationOptions,

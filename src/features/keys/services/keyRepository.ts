@@ -9,7 +9,7 @@ import {
   UserEncrypted,
 } from '../../../types/types';
 import type { KeyMetadata } from '../../../types/types';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
 

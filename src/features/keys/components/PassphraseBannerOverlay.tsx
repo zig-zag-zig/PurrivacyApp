@@ -27,7 +27,7 @@ type PassphraseBannerAnchor = {
     ) => void;
 };
 
-export type PassphraseBannerRequest = {
+type PassphraseBannerRequest = {
     anchorRef: React.RefObject<PassphraseBannerAnchor | null>;
     generatedPassphrase?: string;
     id: string;

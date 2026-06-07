@@ -1,6 +1,8 @@
+import type { KeySelectionMap } from '../../keys/model/keySelectionTypes';
+
 export type SignatureStatus = 'valid' | 'invalid' | 'unknown';
 
-export type KeySelectionMap = Record<string, string>;
+export type { KeySelectionMap };
 
 type DecryptFormErrors = Record<string, string>;
 

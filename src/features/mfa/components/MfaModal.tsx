@@ -128,6 +128,8 @@ export const MfaModal: React.FC<MfaModalProps> = ({
         >
             <View style={styles.modalContainer}>
                 <ScreenContainer
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
                     contentContainerStyle={[
                         styles.modalContent,
                         { paddingTop: Math.max(theme.spacing.xl, insets.top + theme.spacing.lg) },

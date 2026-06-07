@@ -212,7 +212,7 @@ export const unlockLocalBiometricSession = async ({
   setSessionAuthenticated,
 }: UnlockLocalBiometricSessionParams): Promise<User> => {
   try {
-    const dek = await securityService.unlockDekWithBiometric(currentUser.uid, 'Unlock vault');
+    const dek = await securityService.unlockDekWithBiometric(currentUser.uid, 'Unlock Purrivacy');
     if (!dek) {
       throw new Error('Could not unlock local encryption key');
     }

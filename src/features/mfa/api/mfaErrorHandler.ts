@@ -4,6 +4,7 @@ import { RequestOptions } from '../../../api/requestHelpers';
 import { getUserId } from '../../auth/domain/authUtils';
 import { MfaUtils } from '../domain/mfaUtils';
 import { logger } from '../../../utils/logger';
+import { AuthFlowError } from '../../../api/auth/authFlowError';
 export class MfaErrorHandler {
     /**
      * Handle sensitive MFA errors (for sensitive endpoints)
@@ -94,9 +95,15 @@ export class MfaErrorHandler {
         } catch (sessionError: any) {
             logger.warn('failed to create session for missing headers retry', { error: sessionError });
             if (sessionError.sessionError?.mfaRequired) {
-                throw { sessionError: sessionError.sessionError, status: sessionError.status };
+                throw new AuthFlowError('MFA is required to continue', {
+                    sessionError: sessionError.sessionError,
+                    status: sessionError.status,
+                });
             }
-            throw { sessionError: errorData, status: 401 };
+            throw new AuthFlowError('Authentication headers are missing', {
+                sessionError: errorData,
+                status: 401,
+            });
         }
     }
 
@@ -114,12 +121,11 @@ export class MfaErrorHandler {
             ? `${baseMessage} Please try again in ${retryAfter} seconds.`
             : baseMessage;
 
-        throw {
+        throw new AuthFlowError(message, {
             rateLimited: true,
             retryAfter: message,
             retryAfterSeconds: retryAfter,
             status: 429,
-            message,
-        };
+        });
     }
 }

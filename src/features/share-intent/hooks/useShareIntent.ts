@@ -32,7 +32,7 @@ export function useShareIntent() {
             setSharePayloads(getIncomingSharePayloads());
             setError(null);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError : new Error('Failed to read incoming share'));
+            setError(nextError instanceof Error ? nextError : new Error('Could not open shared content'));
         }
     }, []);
 
@@ -44,7 +44,7 @@ export function useShareIntent() {
             setSharePayloads([]);
             setError(null);
         } catch (nextError) {
-            setError(nextError instanceof Error ? nextError : new Error('Failed to clear incoming share'));
+            setError(nextError instanceof Error ? nextError : new Error('Could not clear shared content'));
         }
     }, []);
 

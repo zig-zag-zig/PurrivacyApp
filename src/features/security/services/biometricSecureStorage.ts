@@ -85,8 +85,6 @@ const hasSecureStoreApi = (): boolean => Boolean(
     && typeof SecureStore.deleteItemAsync === 'function',
 );
 
-export const isSecureStorageModuleAvailable = (): boolean => hasSecureStoreApi();
-
 export const SecureStorageModule = {
     async setSensitiveValue(key: string, value: string): Promise<SecureStorageResponse> {
         const inputError = assertInput(key, value);

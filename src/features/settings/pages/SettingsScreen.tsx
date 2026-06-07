@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { Spinner } from '../../../components/Spinner';
+import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
@@ -15,6 +15,8 @@ import { useAppUpdate } from '../../updates/state/UpdateContext';
 export const SettingsScreen = () => {
   const settingsPage = useSettingsPage();
   const appUpdate = useAppUpdate();
+  useGlobalSpinner(settingsPage.isPageLoading);
+
   const updateDescription = appUpdate.status === 'available' && appUpdate.latestRelease
     ? `Version ${appUpdate.latestRelease.version} available${appUpdate.skippedReleaseTag === appUpdate.latestRelease.tagName ? ' (skipped on startup)' : ''}`
     : appUpdate.isConfigured
@@ -23,8 +25,6 @@ export const SettingsScreen = () => {
 
   return (
     <ScreenContainer testID="purrivacy.settings.screen">
-      <Spinner visible={settingsPage.isPageLoading} />
-
       <ConfirmationDialog
         visible={settingsPage.state.showDeleteDialog}
         title="Delete Account"

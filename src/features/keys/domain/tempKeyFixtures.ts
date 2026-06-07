@@ -1,5 +1,5 @@
 import { ENV } from '../../../config/env';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyPair } from '../../../types/types';
 import { storage } from '../../../utils/storage';
 import { logger } from '../../../utils/logger';

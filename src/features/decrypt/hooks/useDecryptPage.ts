@@ -12,10 +12,9 @@ import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
 import { getDefaultSelectedPrivateKey } from '../../keys/domain/keyUtils';
 import { validateArmor } from '../../keys/domain/pgpValidation';
-import { securityService } from '../../security/services/securityService';
 import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
-import { PgPKeyService } from '../../keys/services/pgpKeyService';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
+import { persistKeyPassphrase } from '../../keys/services/passphrasePersistenceService';
 import {
   getFirstSelectedKeyId,
   hasSelectedKeys,
@@ -65,7 +64,7 @@ export function useDecryptPage() {
       }
 
       setIsRedirectingToKeys(true);
-      showToast('No private keys found, please create/import a key pair first', 'info');
+      showToast('Create or import a private key before decrypting.', 'info');
       const interaction = InteractionManager.runAfterInteractions(() => {
         navigation.navigate('Home', { screen: 'Key', params: { action: 'create' } });
       });
@@ -190,18 +189,12 @@ export function useDecryptPage() {
 
       if (privateKeyId) {
         try {
-          if (await ensurePassphraseStorageConsent()) {
-            await PgPKeyService.storeSyncedPassphrase(
-              user?.uid || '',
-              privateKeyId,
-              state.passphrase,
-            );
-            await securityService.storePassphrase(
-              user?.uid || '',
-              { [privateKeyId]: state.passphrase },
-              privateKeyId,
-            );
-          }
+          await persistKeyPassphrase({
+            userId: user?.uid || '',
+            fingerprint: privateKeyId,
+            passphrase: state.passphrase,
+            ensureConsent: ensurePassphraseStorageConsent,
+          });
         } catch {
           // Ignore passphrase persistence failures for decrypt flow.
         }

@@ -6,7 +6,7 @@ import { Button } from '../../../components/Button';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { Spinner } from '../../../components/Spinner';
+import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
 import { SettingsOption } from '../../settings/components/SettingsOption';
@@ -16,6 +16,7 @@ import { useEncryptPage } from '../hooks/useEncryptPage';
 export const EncryptScreen = () => {
   const encryptPage = useEncryptPage();
   const scrollRef = useRef<ScrollView>(null);
+  useGlobalSpinner(encryptPage.shouldRedirectToKeys || encryptPage.isLoadingOverlay);
 
   useEffect(() => {
     if (!encryptPage.state.encryptedContent) return;
@@ -28,17 +29,11 @@ export const EncryptScreen = () => {
   }, [encryptPage.state.encryptedContent]);
 
   if (encryptPage.shouldRedirectToKeys) {
-    return (
-      <ScreenContainer>
-        <Spinner visible />
-      </ScreenContainer>
-    );
+    return <ScreenContainer>{null}</ScreenContainer>;
   }
 
   return (
     <ScreenContainer ref={scrollRef} testID="purrivacy.encrypt.screen">
-      <Spinner visible={encryptPage.isLoadingOverlay} />
-
       <InputField
         label="Text to Encrypt"
         testID="purrivacy.encrypt.content"

@@ -6,13 +6,14 @@ import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
-import { Spinner } from '../../../components/Spinner';
 import { useMfa } from '../state/MfaContext';
 import { useToast } from '../../../app/state/ToastContext';
 import { useModal } from '../../../app/state/ModalContext';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { RootNavigationProps } from '../../../app/navigation/types';
+import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
+import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 
 export const MfaSetupScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();
@@ -23,6 +24,7 @@ export const MfaSetupScreen = () => {
     const [setupData, setSetupData] = useState<any>(null);
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    useGlobalSpinner(!setupData);
 
     useEffect(() => () => {
         if (copyFeedbackTimeoutRef.current) {
@@ -56,7 +58,7 @@ export const MfaSetupScreen = () => {
             if (error.message?.includes('cancelled') || error.message?.includes('user cancelled')) {
                 showToast('MFA setup cancelled', 'info');
             } else {
-                showToast(error.message || 'Failed to enable MFA', 'error');
+                showToast(getUserFacingErrorMessage(error, 'Failed to enable MFA'), 'error');
             }
         }
     };
@@ -83,11 +85,7 @@ export const MfaSetupScreen = () => {
     };
 
     if (!setupData) {
-        return (
-            <ScreenContainer>
-                <Spinner visible={true} />
-            </ScreenContainer>
-        );
+        return <ScreenContainer>{null}</ScreenContainer>;
     }
 
     return (

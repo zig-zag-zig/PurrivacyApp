@@ -15,8 +15,6 @@ import {
 
 type Setter<T> = (value: T) => void;
 
-const AUTH_MFA_CLOSE_DELAY_MS = 150;
-
 type CompleteAuthenticatedUiParams = {
   setIsAuthLoading: Setter<boolean>;
   setIsCheckingInactivity: Setter<boolean>;
@@ -31,7 +29,6 @@ export const completeAuthenticatedUi = ({
   setIsAuthLoading(false);
   setIsCheckingInactivity(false);
   setAuthCompleted(true);
-  EventService.addEvent('closeMfaModal', { delayMs: AUTH_MFA_CLOSE_DELAY_MS });
 };
 
 type FinishAuthenticatedSessionParams = CompleteAuthenticatedUiParams & {
@@ -80,7 +77,7 @@ export const finishAuthenticatedSession = async ({
 
   const loadedUser = runLoadUserRef.current ? await loadUser() : null;
   if (runLoadUserRef.current && !loadedUser) {
-    EventService.addEvent('closeMfaModal');
+    EventService.addEvent('closeMfaModal', { force: true });
     await lock();
     return;
   }

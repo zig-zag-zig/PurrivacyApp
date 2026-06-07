@@ -1,3 +1,4 @@
+// Keep this first: React Navigation gesture handlers must be registered before App loads.
 import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
 

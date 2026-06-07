@@ -8,6 +8,7 @@ import type {
   UpdateDownloadProgress,
   UpdateStatus,
 } from '../model/types';
+import { UPDATE_COPY } from '../model/updateCopy';
 import { AppUpdateNoReleaseError, appUpdateService } from '../services/appUpdateService';
 
 type UpdateContextType = {
@@ -31,11 +32,19 @@ type UpdateContextType = {
 const UpdateContext = createContext<UpdateContextType | null>(null);
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+  if (error instanceof AppUpdateNoReleaseError) {
+    return UPDATE_COPY.noPublicRelease;
   }
 
-  return 'Could not check for updates.';
+  if (error instanceof Error && /allow app installs/i.test(error.message)) {
+    return 'Allow app installs for Purrivacy, then try again.';
+  }
+
+  if (error instanceof Error && /update download was cancelled/i.test(error.message)) {
+    return 'Update download was cancelled.';
+  }
+
+  return UPDATE_COPY.checkFailed;
 }
 
 export const UpdateProvider = ({ children }: { children: ReactNode }) => {
@@ -57,7 +66,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     if (checkingRef.current) return;
 
     if (!isConfigured) {
-      const message = 'Update repository is not configured';
+      const message = UPDATE_COPY.checkUnavailable;
       setStatus('error');
       setError(message);
       if (!options.silent) {

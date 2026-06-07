@@ -8,21 +8,19 @@ import {
     View,
     ScrollViewProps,
     StyleSheet,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
 import {
-    requestPassphraseBannerDismiss,
-    requestPassphraseBannerReposition,
-} from '../services/passphraseBannerEvents';
-import {
     KeyboardAwareInputNode,
     KeyboardAwareScrollContext,
 } from './KeyboardAwareScrollContext';
-import { resolveKeyboardAwareScrollY } from './keyboardAwareScroll';
+import {
+    resolveAdditionalKeyboardSpacer,
+    resolveKeyboardAwareScrollY,
+} from './keyboardAwareScroll';
+import { usePassphraseBannerScrollEvents } from './usePassphraseBannerScrollEvents';
 
 interface ScreenContainerProps extends ScrollViewProps {
     children: React.ReactNode;
@@ -44,6 +42,8 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
         style,
         contentContainerStyle,
         keyboardShouldPersistTaps,
+        onContentSizeChange,
+        onLayout,
         onScroll,
         onTouchStart,
         onTouchMove,
@@ -53,13 +53,20 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
     }, ref) => {
         const insets = useSafeAreaInsets();
         const scrollRef = React.useRef<ScrollView | null>(null);
+        const contentHeightRef = React.useRef(0);
         const focusedInputRef = React.useRef<KeyboardAwareInputNode | null>(null);
         const currentScrollYRef = React.useRef(0);
         const lastKeyboardHeightRef = React.useRef(0);
+        const scrollFrameRef = React.useRef<number | null>(null);
         const scrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-        const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
-        const touchMovedRef = React.useRef(false);
+        const viewportHeightRef = React.useRef(0);
         const [keyboardBottomSpacer, setKeyboardBottomSpacer] = React.useState(0);
+        const bannerScrollEvents = usePassphraseBannerScrollEvents({
+            onScroll,
+            onTouchEnd,
+            onTouchMove,
+            onTouchStart,
+        });
 
         const assignScrollRef = React.useCallback((node: ScrollView | null) => {
             scrollRef.current = node;
@@ -74,6 +81,10 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             if (scrollTimeoutRef.current) {
                 clearTimeout(scrollTimeoutRef.current);
                 scrollTimeoutRef.current = null;
+            }
+            if (scrollFrameRef.current !== null) {
+                cancelAnimationFrame(scrollFrameRef.current);
+                scrollFrameRef.current = null;
             }
         }, []);
 
@@ -107,22 +118,37 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             return null;
         }, []);
 
-        const syncKeyboardSpacerFromFrame = React.useCallback((frame = getKeyboardFrame()) => {
+        const syncKeyboardFrame = React.useCallback((frame = getKeyboardFrame()) => {
             if (!frame || frame.height <= 0) {
-                setKeyboardBottomSpacer(0);
                 return null;
             }
 
             lastKeyboardHeightRef.current = frame.height;
-            setKeyboardBottomSpacer(frame.height + EXTRA_KEYBOARD_GAP);
             return frame;
         }, [getKeyboardFrame]);
+
+        const scrollToY = React.useCallback((y: number, afterLayout = false) => {
+            const scroll = () => {
+                scrollFrameRef.current = null;
+                scrollRef.current?.scrollTo({ y, animated: true });
+            };
+
+            if (!afterLayout) {
+                scroll();
+                return;
+            }
+
+            if (scrollFrameRef.current !== null) {
+                cancelAnimationFrame(scrollFrameRef.current);
+            }
+            scrollFrameRef.current = requestAnimationFrame(scroll);
+        }, []);
 
         const scrollFocusedInputIntoView = React.useCallback(() => {
             const focusedInput = focusedInputRef.current;
             if (!focusedInput) return;
 
-            const frame = syncKeyboardSpacerFromFrame();
+            const frame = syncKeyboardFrame();
             const windowHeight = Dimensions.get('window').height;
             const scrollNode = scrollRef.current as KeyboardAwareInputNode | null;
 
@@ -147,10 +173,19 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
 
                     if (Math.abs(nextScrollY - currentScrollYRef.current) <= 1) return;
 
-                    scrollRef.current?.scrollTo({
-                        y: nextScrollY,
-                        animated: true,
+                    const additionalSpacer = resolveAdditionalKeyboardSpacer({
+                        contentHeight: contentHeightRef.current,
+                        targetScrollY: nextScrollY,
+                        viewportHeight: viewportHeightRef.current,
                     });
+
+                    if (additionalSpacer > 0) {
+                        setKeyboardBottomSpacer(current => current + additionalSpacer);
+                        scrollToY(nextScrollY, true);
+                        return;
+                    }
+
+                    scrollToY(nextScrollY);
                 });
             };
 
@@ -162,7 +197,7 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             }
 
             measureFocusedInput();
-        }, [insets.top, syncKeyboardSpacerFromFrame]);
+        }, [insets.top, scrollToY, syncKeyboardFrame]);
 
         const scheduleFocusedInputScroll = React.useCallback((delay: number) => {
             clearScrollTimeouts();
@@ -177,9 +212,9 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             focusedInputRef.current = node;
             if (!node) return;
 
-            syncKeyboardSpacerFromFrame();
+            syncKeyboardFrame();
             scheduleFocusedInputScroll(FOCUS_SCROLL_DELAY_MS);
-        }, [scheduleFocusedInputScroll, syncKeyboardSpacerFromFrame]);
+        }, [scheduleFocusedInputScroll, syncKeyboardFrame]);
 
         const keyboardAwareScrollContextValue = React.useMemo(() => ({
             scrollInputIntoView,
@@ -194,7 +229,6 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
 
                 const fallbackHeight = getFallbackKeyboardHeight(windowHeight);
                 lastKeyboardHeightRef.current = height || fallbackHeight;
-                setKeyboardBottomSpacer((height || fallbackHeight) + EXTRA_KEYBOARD_GAP);
                 scheduleFocusedInputScroll(KEYBOARD_FRAME_SCROLL_DELAY_MS);
             };
             const handleKeyboardHide = () => {
@@ -218,10 +252,19 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             clearScrollTimeouts();
         }, [clearScrollTimeouts]);
 
-        const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const handleScroll = (event: Parameters<typeof bannerScrollEvents.handleScroll>[0]) => {
             currentScrollYRef.current = event.nativeEvent.contentOffset.y;
-            requestPassphraseBannerReposition();
-            onScroll?.(event);
+            bannerScrollEvents.handleScroll(event);
+        };
+
+        const handleContentSizeChange = (width: number, height: number) => {
+            contentHeightRef.current = height;
+            onContentSizeChange?.(width, height);
+        };
+
+        const handleLayout: NonNullable<ScrollViewProps['onLayout']> = (event) => {
+            viewportHeightRef.current = event.nativeEvent.layout.height;
+            onLayout?.(event);
         };
 
         return (
@@ -243,34 +286,12 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
                         keyboardShouldPersistTaps={keyboardShouldPersistTaps ?? 'handled'}
                         keyboardDismissMode={props.keyboardDismissMode ?? 'none'}
                         scrollEventThrottle={scrollEventThrottle ?? 16}
+                        onContentSizeChange={handleContentSizeChange}
+                        onLayout={handleLayout}
                         onScroll={handleScroll}
-                        onTouchStart={(event) => {
-                            touchMovedRef.current = false;
-                            touchStartRef.current = {
-                                x: event.nativeEvent.pageX,
-                                y: event.nativeEvent.pageY,
-                            };
-                            onTouchStart?.(event);
-                        }}
-                        onTouchMove={(event) => {
-                            const start = touchStartRef.current;
-                            if (start) {
-                                const deltaX = Math.abs(event.nativeEvent.pageX - start.x);
-                                const deltaY = Math.abs(event.nativeEvent.pageY - start.y);
-                                if (deltaX > 8 || deltaY > 8) {
-                                    touchMovedRef.current = true;
-                                }
-                            }
-                            onTouchMove?.(event);
-                        }}
-                        onTouchEnd={(event) => {
-                            if (!touchMovedRef.current) {
-                                requestPassphraseBannerDismiss();
-                            }
-                            touchStartRef.current = null;
-                            touchMovedRef.current = false;
-                            onTouchEnd?.(event);
-                        }}
+                        onTouchStart={bannerScrollEvents.handleTouchStart}
+                        onTouchMove={bannerScrollEvents.handleTouchMove}
+                        onTouchEnd={bannerScrollEvents.handleTouchEnd}
                     >
                         {children}
                     </ScrollView>

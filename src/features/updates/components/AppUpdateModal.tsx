@@ -8,6 +8,13 @@ import { CustomText } from '../../../components/CustomText';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import type { AppRelease, UpdateDownloadProgress, UpdateStatus } from '../model/types';
+import {
+  formatBytes,
+  formatPublishedDate,
+  getProgressLabel,
+  getUpdateStatusPresentation,
+  UPDATE_COPY,
+} from '../model/updateCopy';
 
 type AppUpdateModalProps = {
   visible: boolean;
@@ -24,41 +31,6 @@ type AppUpdateModalProps = {
   onUpdate: () => void;
   onSkipVersion: () => void;
 };
-
-function formatPublishedDate(value: string | null): string | null {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatBytes(value: number | null): string | null {
-  if (!value || value <= 0) return null;
-
-  const mb = value / 1024 / 1024;
-  if (mb >= 1) return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
-
-  return `${Math.round(value / 1024)} KB`;
-}
-
-function getProgressLabel(progress: UpdateDownloadProgress | null): string {
-  switch (progress?.stage) {
-    case 'checking-permission':
-      return 'Preparing installer';
-    case 'downloading':
-      return 'Downloading update';
-    case 'opening-installer':
-      return 'Opening installer';
-    default:
-      return 'Preparing update';
-  }
-}
 
 export const AppUpdateModal = ({
   visible,
@@ -77,12 +49,10 @@ export const AppUpdateModal = ({
 }: AppUpdateModalProps) => {
   const insets = useSafeAreaInsets();
   const availableRelease = status === 'available' ? release : null;
-  const currentRelease = status === 'current' ? release : null;
   const isAvailable = Boolean(availableRelease);
-  const isCurrent = Boolean(currentRelease);
   const isNotFound = status === 'not_found';
   const isError = status === 'error';
-  const isChecking = status === 'checking';
+  const statusPresentation = getUpdateStatusPresentation(status);
   const publishedDate = formatPublishedDate(release?.publishedAt ?? null);
   const progressPercent = downloadProgress?.progress === null || downloadProgress?.progress === undefined
     ? null
@@ -109,33 +79,14 @@ export const AppUpdateModal = ({
     return null;
   }
 
-  const title = isAvailable
-    ? 'Update Available'
-    : isCurrent
-      ? 'App Is Up To Date'
-      : isNotFound
-        ? 'No Public Release Found'
-        : isChecking
-          ? 'Checking for Updates'
-          : 'Update Check Failed';
-
-  const iconName = isAvailable
-    ? 'system-update-alt'
-    : isCurrent
-      ? 'check-circle'
-      : isNotFound
-        ? 'info-outline'
-        : isChecking
-          ? 'refresh'
-          : 'error-outline';
-
-  const iconColor = isError
+  const iconColor = statusPresentation.tone === 'error'
     ? theme.colors.error
-    : isCurrent
+    : statusPresentation.tone === 'success'
       ? theme.colors.success
-      : isNotFound
+      : statusPresentation.tone === 'info'
         ? '#38bdf8'
         : theme.colors.primary;
+  const iconName = statusPresentation.iconName as React.ComponentProps<typeof Icon>['name'];
 
   return (
     <View
@@ -155,7 +106,7 @@ export const AppUpdateModal = ({
           </View>
           <View style={styles.headerText}>
             <CustomText style={styles.title} numberOfLines={2}>
-              {title}
+              {statusPresentation.title}
             </CustomText>
             <CustomText style={styles.subtitle} numberOfLines={1}>
               Current version {currentVersion}
@@ -206,8 +157,8 @@ export const AppUpdateModal = ({
             <View style={[styles.messageBox, isNotFound && styles.infoMessageBox]}>
               <CustomText style={isNotFound ? styles.infoText : styles.errorText}>
                 {error || (isNotFound
-                  ? 'No public GitHub release was found for this app.'
-                  : 'Could not check for updates.')}
+                  ? UPDATE_COPY.noPublicRelease
+                  : UPDATE_COPY.checkFailed)}
               </CustomText>
             </View>
           ) : null}
@@ -287,7 +238,7 @@ export const AppUpdateModal = ({
               style={[styles.skipButton, updating && commonStyles.disabled]}
             >
               <CustomText style={styles.skipText}>
-                Do Not Ask Again for This Version
+                {UPDATE_COPY.skipVersion}
               </CustomText>
             </TouchableOpacity>
           )}

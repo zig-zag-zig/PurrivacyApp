@@ -31,7 +31,7 @@ const toBase64 = (input: BinaryInput): string => (
 
 const fromBase64 = (value: string): Uint8Array => Uint8Array.from(Buffer.from(value, 'base64'));
 
-export const createExpoAesSealedData = ({
+const createExpoAesSealedData = ({
     ciphertextBase64,
     ivBase64,
     tagBase64,
@@ -54,7 +54,7 @@ export const createExpoAesSealedData = ({
     )),
 });
 
-export type ExpoAesSealedDataMock = ReturnType<typeof createExpoAesSealedData>;
+type ExpoAesSealedDataMock = ReturnType<typeof createExpoAesSealedData>;
 
 type ExpoAesMockConfig = {
     encryptCiphertextBase64?: string;

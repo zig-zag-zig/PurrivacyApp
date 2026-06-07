@@ -1,16 +1,16 @@
+// Keep these polyfills before modules that may touch crypto or Buffer at import time.
 import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 import { DarkTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider, useAuth } from './src/features/auth/state/AuthContext';
 import { StackNavigator } from './src/app/navigation/StackNavigator';
 import { resetSessionTimer } from './src/features/security/services/activityService';
 import { theme } from './src/styles/theme';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
-import { LoadingModal } from './src/components/LoadingModal';
 import { ToastProvider } from './src/app/state/ToastContext';
 import { MfaProvider } from './src/features/mfa/state/MfaContext';
 import { ModalProvider } from './src/app/state/ModalContext';
@@ -25,6 +25,7 @@ import { useShareIntent } from './src/features/share-intent/hooks/useShareIntent
 import { initErrorMonitoring, wrapWithErrorMonitoring } from './src/services/monitoring/sentry';
 import { logger } from './src/utils/logger';
 import { PassphraseBannerOverlayProvider } from './src/features/keys/components/PassphraseBannerOverlay';
+import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
 
 initErrorMonitoring();
 
@@ -52,6 +53,7 @@ const AppContent = () => {
     const updateStartupCheckedRef = useRef(false);
     const appUpdate = useAppUpdate();
     const showStartupLoading = !authCompleted;
+    useGlobalSpinner(showStartupLoading || (authCompleted && isCheckingInactivity));
 
     useEffect(() => {
         if (!authCompleted || updateStartupCheckedRef.current || !appUpdate.isConfigured) return;
@@ -129,11 +131,7 @@ const AppContent = () => {
     return (
         <View style={commonStyles.flex}>
             <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} translucent={false} />
-            {showStartupLoading ? (
-                <View style={styles.startupLoading}>
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                </View>
-            ) : (
+            {!showStartupLoading ? (
                 <SafeAreaView
                     edges={['top', 'left', 'right']}
                     style={{ ...commonStyles.flex, backgroundColor: theme.colors.background }}
@@ -141,13 +139,12 @@ const AppContent = () => {
                 >
                     <StackNavigator />
                 </SafeAreaView>
-            )}
+            ) : null}
             {!showStartupLoading && user ? (
                 <View pointerEvents="none" style={styles.hiddenWebViewHost}>
                     <HiddenPGPWebView ref={webViewRef} onReload={onReload} />
                 </View>
             ) : null}
-            {authCompleted && isCheckingInactivity ? <LoadingModal visible /> : null}
         </View>
     );
 };
@@ -156,21 +153,23 @@ function App() {
     return (
         <SafeAreaProvider>
             <ErrorBoundary>
-                <ToastProvider>
-                    <AuthProvider>
-                        <MfaProvider>
-                            <ModalProvider>
-                                <UpdateProvider>
-                                    <PassphraseBannerOverlayProvider>
-                                        <NavigationContainer theme={navigationTheme}>
-                                            <AppContent />
-                                        </NavigationContainer>
-                                    </PassphraseBannerOverlayProvider>
-                                </UpdateProvider>
-                            </ModalProvider>
-                        </MfaProvider>
-                    </AuthProvider>
-                </ToastProvider>
+                <GlobalSpinnerProvider>
+                    <ToastProvider>
+                        <AuthProvider>
+                            <MfaProvider>
+                                <ModalProvider>
+                                    <UpdateProvider>
+                                        <PassphraseBannerOverlayProvider>
+                                            <NavigationContainer theme={navigationTheme}>
+                                                <AppContent />
+                                            </NavigationContainer>
+                                        </PassphraseBannerOverlayProvider>
+                                    </UpdateProvider>
+                                </ModalProvider>
+                            </MfaProvider>
+                        </AuthProvider>
+                    </ToastProvider>
+                </GlobalSpinnerProvider>
             </ErrorBoundary>
         </SafeAreaProvider>
     );
@@ -179,12 +178,6 @@ function App() {
 export default wrapWithErrorMonitoring(App);
 
 const styles = StyleSheet.create({
-    startupLoading: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: theme.colors.background,
-    },
     hiddenWebViewHost: {
         position: 'absolute',
         width: 1,

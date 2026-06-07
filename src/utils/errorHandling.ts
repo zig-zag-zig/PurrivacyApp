@@ -2,7 +2,7 @@
  * Common error handling utilities
  */
 
-import { ToastType } from '../app/state/ToastContext';
+import type { ToastType } from '../app/state/ToastContext';
 import { logger } from './logger';
 
 /**
@@ -11,7 +11,7 @@ import { logger } from './logger';
 export const ERROR_MESSAGES = {
     // Authentication
     SIGN_IN_FAILED: 'Failed to sign in. Please try again.',
-    SIGN_UP_FAILED: 'Failed to sign up',
+    SIGN_UP_FAILED: 'Could not create account. Please check your details and try again.',
     SESSION_EXPIRED: 'Session expired. Please sign in again to continue.',
 
     // Key operations
@@ -42,7 +42,7 @@ export const ERROR_MESSAGES = {
     // Security
     SECURITY_ACTION_FAILED: 'Security action failed',
     RECOVERY_FAILED: 'Could not recover account. Check your username and recovery phrase.',
-    INVALID_SEED: 'System Error: Please contact support. Error code: INVALID_SEED',
+    INVALID_SEED: 'Recovery phrase could not be verified. Please restart signup.',
 
     // General
     GENERIC_ERROR: 'An unexpected error occurred',
@@ -91,12 +91,16 @@ export const executeWithLoading = async <T>(
 };
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
-    'auth/invalid-credential': 'Username or password is incorrect.',
-    'auth/user-disabled': 'This account is disabled.',
-    'auth/email-already-in-use': 'Username is already taken.',
+    'auth/invalid-credential': 'Sign in failed. Check your username and password and try again.',
+    'auth/invalid-email': 'Sign in failed. Check your username and password and try again.',
+    'auth/user-not-found': 'Sign in failed. Check your username and password and try again.',
+    'auth/wrong-password': 'Sign in failed. Check your username and password and try again.',
+    'auth/user-disabled': 'Unable to sign in. Please try again later.',
+    'auth/email-already-in-use': ERROR_MESSAGES.SIGN_UP_FAILED,
     'auth/weak-password': 'Password is too weak.',
     'auth/requires-recent-login': 'Please sign in again before continuing.',
     'auth/network-request-failed': ERROR_MESSAGES.NETWORK_ERROR,
+    'auth/too-many-requests': 'Too many attempts. Please try again later.',
 };
 
 const AUTH_ERROR_DATA_FLAGS = [
@@ -113,17 +117,38 @@ const AUTH_ERROR_DATA_FLAGS = [
     'refreshTokenReuse',
 ];
 
+const getErrorText = (error: any): string => {
+    const rawMessage = typeof error?.message === 'string' ? error.message : '';
+    const serverMessage = typeof error?.errorData?.error === 'string' ? error.errorData.error : '';
+    return rawMessage || serverMessage;
+};
+
+const getAuthErrorCode = (error: any): string | null => {
+    if (typeof error?.code === 'string') {
+        return error.code.toLowerCase();
+    }
+
+    const match = getErrorText(error).match(/\b(auth\/[a-z0-9-]+)\b/i);
+    return match?.[1]?.toLowerCase() ?? null;
+};
+
+const getRateLimitMessage = (error: any): string => {
+    const retryAfterSeconds = Number(error?.retryAfterSeconds ?? error?.errorData?.retryAfter);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+        return `Too many attempts. Please try again in ${Math.ceil(retryAfterSeconds)} seconds.`;
+    }
+
+    return 'Too many attempts. Please try again later.';
+};
+
 export const getUserFacingErrorMessage = (error: any, defaultMessage: string = ERROR_MESSAGES.GENERIC_ERROR): string => {
     if (!error) {
         return defaultMessage;
     }
 
-    if (typeof error.retryAfter === 'string') {
-        return error.retryAfter;
-    }
-
-    if (typeof error.code === 'string' && AUTH_ERROR_MESSAGES[error.code]) {
-        return AUTH_ERROR_MESSAGES[error.code];
+    const authErrorCode = getAuthErrorCode(error);
+    if (authErrorCode && AUTH_ERROR_MESSAGES[authErrorCode]) {
+        return AUTH_ERROR_MESSAGES[authErrorCode];
     }
 
     if (error.isNetworkError || error.errorData?.networkUnavailable) {
@@ -138,29 +163,39 @@ export const getUserFacingErrorMessage = (error: any, defaultMessage: string = E
         return 'The MFA code was incorrect. Please try again.';
     }
 
-    if (error.errorData?.rateLimited || error.rateLimited) {
-        return error.message || 'Too many attempts. Please try again later.';
+    if (error.errorData?.rateLimited || error.rateLimited || error.status === 429 || error.retryAfter) {
+        return getRateLimitMessage(error);
     }
 
     if (AUTH_ERROR_DATA_FLAGS.some(flag => error.errorData?.[flag] === true)) {
         return defaultMessage;
     }
 
-    const rawMessage = typeof error.message === 'string' ? error.message : '';
-    const serverMessage = typeof error.errorData?.error === 'string' ? error.errorData.error : '';
-    const message = rawMessage || serverMessage;
+    const message = getErrorText(error);
 
     if (/invalid recovery credentials/i.test(message)) {
         return ERROR_MESSAGES.RECOVERY_FAILED;
+    }
+
+    if (/mfa verification timed out/i.test(message)) {
+        return 'MFA verification timed out. Please try again.';
+    }
+
+    if (/biometrics? (is )?disabled in phone settings/i.test(message)) {
+        return 'Biometric unlock is disabled in your device settings.';
+    }
+
+    if (/biometric unlock is not set up/i.test(message)) {
+        return 'Biometric unlock is not set up on this device. Sign in with your password.';
+    }
+
+    if (/incorrect passphrase/i.test(message)) {
+        return 'Incorrect passphrase.';
     }
 
     if (/user (is )?not authenticated|user not signed in|not signed in/i.test(message)) {
         return defaultMessage;
     }
 
-    if (/internal server error|backend access token missing|bearer authentication|authorization header|jwt/i.test(message)) {
-        return defaultMessage;
-    }
-
-    return message || defaultMessage;
+    return defaultMessage;
 };
