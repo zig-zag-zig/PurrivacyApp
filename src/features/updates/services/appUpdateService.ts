@@ -1,5 +1,4 @@
 import { Linking, Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { ENV } from '../../../config/env';
@@ -9,32 +8,15 @@ import {
 } from '../../security/services/biometricSecureStorage';
 import type { AppRelease, UpdateCheckResult, UpdateDownloadProgress } from '../model/types';
 import { androidApkInstaller } from './androidApkInstaller';
+import {
+  fetchGitHubJson,
+  getGitHubApiUrl,
+  getGitHubHeaders,
+  parseRepoUrl,
+} from './githubReleaseClient';
+import type { GitHubRelease, GitHubReleaseAsset } from './githubReleaseClient';
+import { compareVersions, getCurrentVersion, normalizeVersion } from './updateVersion';
 
-type GitHubReleaseAsset = {
-  name?: string;
-  url?: string;
-  browser_download_url?: string;
-  content_type?: string;
-  size?: number;
-};
-
-type GitHubRelease = {
-  tag_name?: string;
-  name?: string | null;
-  body?: string | null;
-  published_at?: string | null;
-  html_url?: string;
-  draft?: boolean;
-  prerelease?: boolean;
-  assets?: GitHubReleaseAsset[];
-};
-
-type ParsedRepo = {
-  owner: string;
-  repo: string;
-};
-
-const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_RELEASES_NOT_FOUND_MESSAGE = 'No public GitHub release found for this app.';
 const SKIPPED_RELEASE_TAG_KEY = 'app-update-skipped-release-tag';
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
@@ -45,57 +27,6 @@ export class AppUpdateNoReleaseError extends Error {
     super(message);
     this.name = 'AppUpdateNoReleaseError';
   }
-}
-
-function parseRepoUrl(repoUrl: string | null): ParsedRepo | null {
-  if (!repoUrl) return null;
-
-  const parsed = new URL(repoUrl);
-  const [owner, rawRepo] = parsed.pathname.split('/').filter(Boolean);
-  const repo = rawRepo?.replace(/\.git$/i, '');
-
-  if (!owner || !repo) return null;
-
-  return { owner, repo };
-}
-
-function normalizeVersion(value: string): string {
-  return value.trim().replace(/^v/i, '').split('+')[0];
-}
-
-function parseVersionParts(value: string): number[] | null {
-  const normalized = normalizeVersion(value).split('-')[0];
-  const parts = normalized.split('.');
-
-  if (parts.length === 0 || parts.some(part => !/^\d+$/.test(part))) {
-    return null;
-  }
-
-  return parts.map(part => Number.parseInt(part, 10));
-}
-
-function compareVersions(a: string, b: string): number {
-  const aParts = parseVersionParts(a);
-  const bParts = parseVersionParts(b);
-
-  if (!aParts || !bParts) {
-    return normalizeVersion(a) === normalizeVersion(b) ? 0 : 1;
-  }
-
-  const length = Math.max(aParts.length, bParts.length);
-  for (let i = 0; i < length; i += 1) {
-    const left = aParts[i] ?? 0;
-    const right = bParts[i] ?? 0;
-    if (left > right) return 1;
-    if (left < right) return -1;
-  }
-
-  return 0;
-}
-
-function getCurrentVersion(): string {
-  const constants = Constants as typeof Constants & { nativeAppVersion?: string | null };
-  return constants.nativeAppVersion || Constants.expoConfig?.version || '0.0.0';
 }
 
 function getPreferredAsset(assets: GitHubReleaseAsset[] | undefined): GitHubReleaseAsset | null {
@@ -109,41 +40,6 @@ function getPreferredAsset(assets: GitHubReleaseAsset[] | undefined): GitHubRele
   return supportsInstallActions()
     ? assets.find(asset => Boolean(asset.browser_download_url)) ?? null
     : null;
-}
-
-function getGitHubHeaders(accept = 'application/vnd.github+json'): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: accept,
-    'Cache-Control': 'no-cache',
-    'X-GitHub-Api-Version': GITHUB_API_VERSION,
-  };
-
-  if (ENV.updateGithubToken) {
-    headers.Authorization = `Bearer ${ENV.updateGithubToken}`;
-  }
-
-  return headers;
-}
-
-function getGitHubApiUrl(repo: ParsedRepo, path: string): string {
-  const owner = encodeURIComponent(repo.owner);
-  const repoName = encodeURIComponent(repo.repo);
-
-  return `https://api.github.com/repos/${owner}/${repoName}${path}`;
-}
-
-async function fetchGitHubJson<T>(url: string): Promise<{ ok: true; status: number; data: T } | { ok: false; status: number }> {
-  const response = await fetch(url, { headers: getGitHubHeaders() });
-
-  if (!response.ok) {
-    return { ok: false, status: response.status };
-  }
-
-  return {
-    ok: true,
-    status: response.status,
-    data: await response.json() as T,
-  };
 }
 
 function sanitizeAssetFileName(release: AppRelease): string {
@@ -160,7 +56,7 @@ function getDownloadDirectory(): Directory {
 
 function getDownloadHeaders(release: AppRelease): Record<string, string> {
   if (release.assetDownloadUrl?.startsWith('https://api.github.com/')) {
-    return getGitHubHeaders('application/octet-stream');
+    return getGitHubHeaders(ENV.updateGithubToken, 'application/octet-stream');
   }
 
   const headers: Record<string, string> = {
@@ -226,6 +122,7 @@ async function fetchLatestRelease(): Promise<AppRelease> {
 
   const latestResponse = await fetchGitHubJson<GitHubRelease>(
     getGitHubApiUrl(repo, '/releases/latest'),
+    ENV.updateGithubToken,
   );
 
   if (latestResponse.ok) {

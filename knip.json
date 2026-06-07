@@ -3,10 +3,20 @@
     "entry": [
         "App.tsx",
         "index.js",
+        "index.ts",
+        "scripts/android-autofill-highlight.js",
+        "scripts/android-build-variants.js",
+        "scripts/android-e2e-cleartext.js",
         "scripts/android-local-build.cjs",
+        "scripts/android-system-bars.js",
+        "scripts/android-update-installer.js",
         "scripts/configure-android-gradle.cjs",
+        "scripts/native-security.js",
+        "scripts/normalize-android-gradle-warnings.cjs",
         "scripts/patch-openpgp.js",
-        "scripts/secure-storage.js",
+        "scripts/run-local-android-e2e.cjs",
+        "scripts/run-local-maestro-e2e.cjs",
+        "scripts/run-maestro.cjs",
         "scripts/sync-android-version.cjs"
     ],
     "ignoreDependencies": [
