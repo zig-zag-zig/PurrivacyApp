@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { HiddenPGPWebViewRef } from '../components/HiddenPGPWebView';
-import { pgpCryptoService } from '../services/pgpCryptoService.';
+import { pgpCryptoService } from '../services/pgpCryptoService';
 
 export const useWebViewPGP = () => {
     const webViewRef = useRef<HiddenPGPWebViewRef | null>(null);

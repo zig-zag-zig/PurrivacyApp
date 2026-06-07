@@ -1,6 +1,7 @@
 import type { KeyPair } from '../../../types/types';
+import type { KeySelectionMap } from '../../keys/model/keySelectionTypes';
 
-export type KeySelectionMap = Record<string, string>;
+export type { KeySelectionMap };
 
 export interface EncryptUiState {
   content: string;
