@@ -1,0 +1,125 @@
+{
+  "expo": {
+    "sdkVersion": "56.0.0",
+    "name": "Purrivacy",
+    "slug": "pgp-frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "vip.chichi.purrivacy",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "vip.chichi.purrivacy.background-notification-task"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F1EEE9"
+      },
+      "googleServicesFile": "./google-services.json",
+      "package": "vip.chi_chi.purrivacy",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "./scripts/android-e2e-cleartext",
+      "./scripts/android-build-variants",
+      "./scripts/android-autofill-highlight",
+      "./scripts/patch-openpgp",
+      "./scripts/native-security",
+      "./scripts/android-update-installer",
+      "expo-dev-client",
+      "expo-secure-store",
+      [
+        "expo-sharing",
+        {
+          "ios": {
+            "enabled": true,
+            "activationRule": {
+              "supportsText": true,
+              "supportsWebUrlWithMaxCount": 1
+            }
+          },
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": [
+              "text/*"
+            ],
+            "multipleShareMimeTypes": [
+              "text/*"
+            ]
+          }
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Purrivacy to use Face ID to unlock your encrypted vault."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "mode": "production",
+          "android": {
+            "allowWhileIdle": true
+          }
+        }
+      ],
+      [
+        "expo-task-manager",
+        {
+          "internal": {
+            "tasks": [
+              "background-notification-task"
+            ]
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon-transparent.png",
+          "imageWidth": 288,
+          "resizeMode": "contain",
+          "backgroundColor": "#121212",
+          "dark": {
+            "image": "./assets/icon-transparent.png",
+            "backgroundColor": "#121212"
+          }
+        }
+      ],
+      "./scripts/android-system-bars"
+    ],
+    "scheme": "purrivacy",
+    "extra": {
+      "eas": {
+        "projectId": "01cf8993-7ad7-4e9c-ab6e-e654cb720a50"
+      }
+    },
+    "owner": "alanomar1992"
+  }
+}

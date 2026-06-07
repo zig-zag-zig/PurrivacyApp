@@ -1,0 +1,14 @@
+appId: vip.chi_chi.purrivacy.dev
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- assertVisible:
+    id: "purrivacy.signin.password"
+- assertVisible:
+    id: "purrivacy.signin.submit"
+- assertVisible:
+    id: "purrivacy.signin.signup"

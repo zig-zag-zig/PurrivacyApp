@@ -1,0 +1,23 @@
+appId: vip.chi_chi.purrivacy.dev
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: "missing-user"
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: "wrong-password-123"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.submit"
+    timeout: 15000
+- assertVisible:
+    id: "purrivacy.signin.username"

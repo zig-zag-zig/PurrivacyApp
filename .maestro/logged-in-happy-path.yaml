@@ -1,0 +1,43 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}happy
+---
+- runFlow:
+    file: subflows/register-create-key.yaml
+    env:
+      TEST_USERNAME: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.tab.decrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.logout"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.logout"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000

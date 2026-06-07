@@ -1,0 +1,150 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}round
+  ROUNDTRIP_MESSAGE: maestro round trip plaintext
+---
+- runFlow:
+    file: subflows/register-create-key.yaml
+    env:
+      TEST_USERNAME: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.content"
+- setClipboard: ${ROUNDTRIP_MESSAGE}
+- pasteText
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.encrypt.recipients.item.0"
+- tapOn:
+    id: "purrivacy.encrypt.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.result.text"
+    timeout: 90000
+- copyTextFrom:
+    id: "purrivacy.encrypt.result.text"
+- evalScript: ${output.encryptedMessage = maestro.copiedText}
+- evalScript: ${output.encryptedLines = output.encryptedMessage.trim().split('\n')}
+- evalScript: ${output.encryptedHeader = output.encryptedLines[0]}
+- evalScript: ${output.encryptedBody1 = output.encryptedLines.length > 3 && output.encryptedLines[2] || ''}
+- evalScript: ${output.encryptedBody2 = output.encryptedLines.length > 4 && output.encryptedLines[3] || ''}
+- evalScript: ${output.encryptedBody3 = output.encryptedLines.length > 5 && output.encryptedLines[4] || ''}
+- evalScript: ${output.encryptedBody4 = output.encryptedLines.length > 6 && output.encryptedLines[5] || ''}
+- evalScript: ${output.encryptedBody5 = output.encryptedLines.length > 7 && output.encryptedLines[6] || ''}
+- evalScript: ${output.encryptedBody6 = output.encryptedLines.length > 8 && output.encryptedLines[7] || ''}
+- evalScript: ${output.encryptedBody7 = output.encryptedLines.length > 9 && output.encryptedLines[8] || ''}
+- evalScript: ${output.encryptedBody8 = output.encryptedLines.length > 10 && output.encryptedLines[9] || ''}
+- evalScript: ${output.encryptedBody9 = output.encryptedLines.length > 11 && output.encryptedLines[10] || ''}
+- evalScript: ${output.encryptedBody10 = output.encryptedLines.length > 12 && output.encryptedLines[11] || ''}
+- evalScript: ${output.encryptedFooter = output.encryptedLines[output.encryptedLines.length - 1]}
+- assertTrue:
+    condition: ${output.encryptedMessage.includes('BEGIN PGP MESSAGE')}
+    label: Encrypted output is a PGP message
+- tapOn:
+    id: "purrivacy.tab.decrypt"
+- tapOn:
+    id: "purrivacy.tab.decrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.encryptedContent"
+- inputText: ${output.encryptedHeader}
+- pressKey: Enter
+- pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody1)}
+    commands:
+      - inputText: ${output.encryptedBody1}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody2)}
+    commands:
+      - inputText: ${output.encryptedBody2}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody3)}
+    commands:
+      - inputText: ${output.encryptedBody3}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody4)}
+    commands:
+      - inputText: ${output.encryptedBody4}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody5)}
+    commands:
+      - inputText: ${output.encryptedBody5}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody6)}
+    commands:
+      - inputText: ${output.encryptedBody6}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody7)}
+    commands:
+      - inputText: ${output.encryptedBody7}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody8)}
+    commands:
+      - inputText: ${output.encryptedBody8}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody9)}
+    commands:
+      - inputText: ${output.encryptedBody9}
+      - pressKey: Enter
+- runFlow:
+    when:
+      true: ${Boolean(output.encryptedBody10)}
+    commands:
+      - inputText: ${output.encryptedBody10}
+      - pressKey: Enter
+- inputText: ${output.encryptedFooter}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.submit"
+    direction: DOWN
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.submit"
+      enabled: true
+    timeout: 30000
+- tapOn:
+    id: "purrivacy.decrypt.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.result.text"
+    timeout: 90000
+- copyTextFrom:
+    id: "purrivacy.decrypt.result.text"
+- evalScript: ${output.decryptedMessage = maestro.copiedText}
+- assertTrue:
+    condition: ${output.decryptedMessage === ROUNDTRIP_MESSAGE}
+    label: Decrypted output matches the original plaintext

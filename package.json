@@ -1,0 +1,81 @@
+{
+  "name": "purrivacy",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node scripts/with-env.cjs development -- npx expo start",
+    "android": "node scripts/with-env.cjs development -- expo run:android",
+    "ios": "node scripts/with-env.cjs development -- expo run:ios",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test",
+    "doctor": "node scripts/expo-maintenance-check.cjs",
+    "deps:update": "node scripts/with-env.cjs development -- npx expo install --fix && npm run doctor && npm run verify",
+    "env:check:development": "node scripts/with-env.cjs development --print",
+    "env:check:production": "node scripts/with-env.cjs production --print",
+    "env:check:e2e": "node scripts/with-local-e2e-env.cjs -- node scripts/with-env.cjs e2e-test --print",
+    "build:debug": "npm run verify && node scripts/with-env.cjs development -- node scripts/android-local-build.cjs debug",
+    "build:debug:install": "npm run verify && node scripts/with-env.cjs development -- node scripts/android-local-build.cjs debug --install",
+    "build:release": "npm run verify && npm run doctor && node scripts/with-env.cjs production -- node scripts/android-local-build.cjs release",
+    "build:release:install": "npm run verify && npm run doctor && node scripts/with-env.cjs production -- node scripts/android-local-build.cjs release --install",
+    "e2e": "npm run verify && node scripts/run-local-android-e2e.cjs",
+    "e2e:smoke": "npm run verify && node scripts/run-local-android-e2e.cjs --smoke"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "bip39",
+          "buffer"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-navigation/bottom-tabs": "^7.3.13",
+    "@react-navigation/native": "^7.1.9",
+    "@react-navigation/native-stack": "^7.16.0",
+    "@sentry/react-native": "~7.11.0",
+    "bip39": "^3.1.0",
+    "buffer": "^6.0.3",
+    "expo": "~56.0.9",
+    "expo-application": "~56.0.3",
+    "expo-clipboard": "~56.0.4",
+    "expo-constants": "~56.0.17",
+    "expo-crypto": "~56.0.4",
+    "expo-dev-client": "~56.0.19",
+    "expo-device": "~56.0.4",
+    "expo-document-picker": "~56.0.4",
+    "expo-file-system": "~56.0.7",
+    "expo-font": "~56.0.5",
+    "expo-linking": "~56.0.13",
+    "expo-local-authentication": "~56.0.4",
+    "expo-notifications": "~56.0.16",
+    "expo-secure-store": "~56.0.4",
+    "expo-sharing": "~56.0.16",
+    "expo-splash-screen": "~56.0.10",
+    "expo-sqlite": "~56.0.4",
+    "expo-system-ui": "~56.0.5",
+    "expo-task-manager": "~56.0.17",
+    "expo-updates": "~56.0.18",
+    "firebase": "^12.12.1",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-get-random-values": "~1.11.0",
+    "react-native-quick-crypto": "^0.7.17",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
+    "react-native-toast-message": "^2.3.3",
+    "react-native-webview": "13.16.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/react": "~19.2.14",
+    "dotenv": "^16.6.1",
+    "knip": "^5.73.4",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "private": true
+}
