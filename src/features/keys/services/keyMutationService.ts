@@ -6,7 +6,7 @@ import type {
 } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import { validatePassphrase } from '../../../utils/validation';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { identifyKeyType } from '../domain/pgpValidation';
 import {
   addEncryptedKeyRecord,

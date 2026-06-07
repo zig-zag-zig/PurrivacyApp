@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   setPassphraseStorageEnabled: vi.fn(),
 }));
 
-vi.mock('../../../services/pgpCryptoService.', () => ({
+vi.mock('../../../services/pgpCryptoService', () => ({
   pgpCryptoService: {
     changePassphrase: mocks.changePassphrase,
     extractKeyMetadata: mocks.extractKeyMetadata,
@@ -67,7 +67,7 @@ const user = (keys: KeyPairWithRecordId[]): UserDecrypted => ({
   keys,
 });
 
-describe('PgPKeyService key record mutations', () => {
+describe('PgpKeyService key record mutations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.changePassphrase.mockResolvedValue('private-key-reencrypted');
@@ -89,9 +89,9 @@ describe('PgPKeyService key record mutations', () => {
     });
     mocks.getUserDecrypted.mockResolvedValue(user([existingKey]));
     mocks.isPassphraseStorageEnabled.mockResolvedValue(true);
-    const { PgPKeyService } = await import('./pgpKeyService');
+    const { PgpKeyService } = await import('./pgpKeyService');
 
-    await PgPKeyService.changePassphrase(
+    await PgpKeyService.changePassphrase(
       'user-1',
       existingKey.fingerprint,
       'old-passphrase-123',
@@ -123,9 +123,9 @@ describe('PgPKeyService key record mutations', () => {
       recordId: 'record-next',
     });
     mocks.getUserDecrypted.mockResolvedValue(user([oldDefault, nextDefault]));
-    const { PgPKeyService } = await import('./pgpKeyService');
+    const { PgpKeyService } = await import('./pgpKeyService');
 
-    await PgPKeyService.setDefaultKey('user-1', nextDefault.fingerprint);
+    await PgpKeyService.setDefaultKey('user-1', nextDefault.fingerprint);
 
     expect(mocks.updateEncryptedKeyRecord).toHaveBeenCalledTimes(2);
     expect(mocks.updateEncryptedKeyRecord).toHaveBeenNthCalledWith(1, 'user-1', {
@@ -160,9 +160,9 @@ describe('PgPKeyService key record mutations', () => {
       withoutStoredPassphrase,
       publicOnly,
     ]));
-    const { PgPKeyService } = await import('./pgpKeyService');
+    const { PgpKeyService } = await import('./pgpKeyService');
 
-    await PgPKeyService.forgetStoredPassphrases('user-1');
+    await PgpKeyService.forgetStoredPassphrases('user-1');
 
     expect(mocks.updateEncryptedKeyRecord).toHaveBeenCalledTimes(1);
     expect(mocks.updateEncryptedKeyRecord).toHaveBeenCalledWith('user-1', {

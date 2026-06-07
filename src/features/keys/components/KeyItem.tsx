@@ -1,24 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { Keyboard, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../../../styles/commonStyles';
-import { InputField } from '../../../components/InputField';
 import { theme } from '../../../styles/theme';
 import { KeyPair } from '../../../types/types';
-import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { ConfirmationDialog } from '../../settings/components/ConfirmationDialog';
 import { useToast } from '../../../app/state/ToastContext';
 import { getKeyTypeDescription, isCompletePair } from '../domain/keyUtils';
-import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
-import { PassphraseField } from './PassphraseField';
-import { GeneratedPassphrasePair } from './GeneratedPassphrasePair';
+import { SUCCESS_MESSAGES, getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { useAuth } from '../../auth/state/AuthContext';
 import { securityService } from '../../security/services/securityService';
+import { useCopyFeedback } from '../../../shared/hooks/useCopyFeedback';
 import { KeyMetadataPills } from './KeyMetadataPills';
-import { EXPIRY_DAYS_MAX_LENGTH } from '../../../config/inputLimits';
+import { KeyManagementForm } from './KeyManagementForm';
+import { KeyMaterialBlock } from './KeyMaterialBlock';
+import { PrivateKeyRevealPanel } from './PrivateKeyRevealPanel';
+import type { PrivateKeyRevealLoading } from './PrivateKeyRevealPanel';
 
 type KeyItemProps = {
     pgpKey: KeyPair;
@@ -30,13 +30,6 @@ type KeyItemProps = {
     onChangePassphrase?: (fingerprint: string, oldPass: string, newPass: string, newPassConfirm: string) => Promise<void>;
     onChangeExpiry?: (fingerprint: string, passphrase: string, newExpiryDays: string) => Promise<void>;
 };
-
-type PrivateKeyRevealLoading = 'account' | 'biometric' | null;
-
-const SURFACE_LABEL_BACKPLATE_PROPS = {
-    labelTopBackgroundColor: theme.colors.surface,
-    labelBottomBackgroundColor: theme.colors.surface,
-} as const;
 
 export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, readOnly = false, onChangePassphrase, onChangeExpiry }: KeyItemProps) => {
     const [confirmVisible, setConfirmVisible] = useState(false);
@@ -50,10 +43,8 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const [privateKeyAccountPassword, setPrivateKeyAccountPassword] = useState('');
     const [privateKeyRevealError, setPrivateKeyRevealError] = useState('');
     const [privateKeyRevealLoading, setPrivateKeyRevealLoading] = useState<PrivateKeyRevealLoading>(null);
-    const [publicKeyCopied, setPublicKeyCopied] = useState(false);
-    const [privateKeyCopied, setPrivateKeyCopied] = useState(false);
-    const publicKeyCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const privateKeyCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const publicKeyCopyFeedback = useCopyFeedback();
+    const privateKeyCopyFeedback = useCopyFeedback();
     const { showToast } = useToast();
     const {
         user,
@@ -66,20 +57,10 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         if (!newPass) setNewPassConfirm('');
     }, [newPass])
 
-    useEffect(() => () => {
-        if (publicKeyCopyTimeoutRef.current) {
-            clearTimeout(publicKeyCopyTimeoutRef.current);
-        }
-        if (privateKeyCopyTimeoutRef.current) {
-            clearTimeout(privateKeyCopyTimeoutRef.current);
-        }
-    }, []);
-
     const canManageKey = !readOnly;
     const hasPrivateKey = Boolean(pgpKey.privateKey);
     const isPrivateKeyProtected = pgpKey.privateKeyIsUnlocked === false;
     const canRevealWithBiometrics = isBiometricAvailable && isBiometricEnabled && securityService.hasStandaloneBiometricAuth();
-    const privateKeyRevealBusy = privateKeyRevealLoading !== null;
     const keyTitle = pgpKey.userId.trim() || 'Unnamed key';
 
     const clearPrivateKeyReveal = () => {
@@ -108,14 +89,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const handleCopyPublicKey = () => {
         Keyboard.dismiss();
         void Clipboard.setStringAsync(pgpKey.publicKey || '');
-        setPublicKeyCopied(true);
-        if (publicKeyCopyTimeoutRef.current) {
-            clearTimeout(publicKeyCopyTimeoutRef.current);
-        }
-        publicKeyCopyTimeoutRef.current = setTimeout(() => {
-            setPublicKeyCopied(false);
-            publicKeyCopyTimeoutRef.current = null;
-        }, 1600);
+        publicKeyCopyFeedback.markCopied();
         showToast(SUCCESS_MESSAGES.PUBLIC_KEY_COPIED, 'success');
     };
 
@@ -182,15 +156,36 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         if (!privateKeyVisible || !pgpKey.privateKey) return;
         Keyboard.dismiss();
         void Clipboard.setStringAsync(pgpKey.privateKey);
-        setPrivateKeyCopied(true);
-        if (privateKeyCopyTimeoutRef.current) {
-            clearTimeout(privateKeyCopyTimeoutRef.current);
-        }
-        privateKeyCopyTimeoutRef.current = setTimeout(() => {
-            setPrivateKeyCopied(false);
-            privateKeyCopyTimeoutRef.current = null;
-        }, 1600);
+        privateKeyCopyFeedback.markCopied();
         showToast('Private key copied', 'success');
+    };
+
+    const handleChangePassphrasePress = async () => {
+        if (!onChangePassphrase) return;
+        setChangingPassword(true);
+        try {
+            await onChangePassphrase(pgpKey.fingerprint, oldPass, newPass, newPassConfirm);
+            setOldPass(newPass);
+            setNewPass('');
+            setNewPassConfirm('');
+        } catch (err: any) {
+            showToast(getUserFacingErrorMessage(err, 'Failed to change passphrase'), 'error');
+        } finally {
+            setChangingPassword(false);
+        }
+    };
+
+    const handleChangeExpiryPress = async () => {
+        if (!onChangeExpiry) return;
+        setChangingDate(true);
+        try {
+            await onChangeExpiry(pgpKey.fingerprint, oldPass, expiryDays);
+            showToast('Expiry updated', 'success');
+        } catch (err: any) {
+            showToast(getUserFacingErrorMessage(err, 'Failed to change expiry'), 'error');
+        } finally {
+            setChangingDate(false);
+        }
     };
 
     return (
@@ -213,7 +208,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                 {keyTitle}
                             </CustomText>
                             {readOnly && (
-                                <CustomText style={styles.tempLabel}>Temp</CustomText>
+                                <CustomText style={styles.tempLabel}>Temporary</CustomText>
                             )}
                         </View>
 
@@ -266,190 +261,43 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
             </TouchableOpacity>
             {expanded && (
                 <View style={styles.details}>
-                    {hasPrivateKey && canManageKey && (
-                        <View style={styles.privateKeySection}>
-                            <View style={styles.sectionHeader}>
-                                <CustomText style={styles.sectionTitle}>Private key</CustomText>
-                                {privateKeyVisible && (
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            Keyboard.dismiss();
-                                            clearPrivateKeyReveal();
-                                        }}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                        accessibilityLabel="Hide private key"
-                                    >
-                                        <Icon name="visibility-off" size={22} color={theme.colors.primary} />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {privateKeyVisible ? (
-                                <>
-                                    <View style={[styles.keyBlock, privateKeyCopied && styles.keyBlockCopied]}>
-                                        <ScrollView
-                                            nestedScrollEnabled
-                                            style={styles.keyBlockScroll}
-                                            contentContainerStyle={styles.keyBlockScrollContent}
-                                        >
-                                            <TouchableOpacity
-                                                onLongPress={handleCopyPrivateKey}
-                                                delayLongPress={500}
-                                                activeOpacity={0.7}
-                                            >
-                                                <CustomText
-                                                    style={styles.keyBlockText}
-                                                    selectable={false}
-                                                    contextMenuHidden={true}
-                                                >
-                                                    {pgpKey.privateKey}
-                                                </CustomText>
-                                            </TouchableOpacity>
-                                        </ScrollView>
-                                    </View>
-
-                                    <Button
-                                        label="Copy private key"
-                                        onPress={handleCopyPrivateKey}
-                                        variant="secondary"
-                                        size="compact"
-                                        style={styles.revealButton}
-                                    />
-                                </>
-                            ) : (
-                                <View style={styles.revealPanel}>
-                                    <InputField
-                                        {...SURFACE_LABEL_BACKPLATE_PROPS}
-                                        label="Account password"
-                                        value={privateKeyAccountPassword}
-                                        onChangeText={setPrivateKeyAccountPassword}
-                                        autoComplete="current-password"
-                                        enableAutofill
-                                        secureTextEntry
-                                        showToggleSecureText
-                                        textContentType="password"
-                                        error={undefined}
-                                    />
-
-                                    {privateKeyRevealError ? (
-                                        <CustomText style={styles.revealError}>
-                                            {privateKeyRevealError}
-                                        </CustomText>
-                                    ) : null}
-
-                                    <Button
-                                        label="Unlock with account password"
-                                        onPress={handleRevealWithAccountPassword}
-                                        loading={privateKeyRevealLoading === 'account'}
-                                        disabled={privateKeyRevealBusy || !privateKeyAccountPassword}
-                                        variant={isPrivateKeyProtected ? 'secondary' : 'primary'}
-                                        size="compact"
-                                        style={styles.revealButton}
-                                    />
-
-                                    {canRevealWithBiometrics && (
-                                        <Button
-                                            label="Unlock with biometrics"
-                                            onPress={handleRevealWithBiometric}
-                                            loading={privateKeyRevealLoading === 'biometric'}
-                                            disabled={privateKeyRevealBusy}
-                                            variant="secondary"
-                                            size="compact"
-                                            style={styles.revealButton}
-                                        />
-                                    )}
-                                </View>
-                            )}
-                        </View>
-                    )}
+                    {hasPrivateKey && canManageKey && pgpKey.privateKey ? (
+                        <PrivateKeyRevealPanel
+                            accountPassword={privateKeyAccountPassword}
+                            canRevealWithBiometrics={canRevealWithBiometrics}
+                            copied={privateKeyCopyFeedback.copied}
+                            error={privateKeyRevealError}
+                            isPrivateKeyProtected={isPrivateKeyProtected}
+                            loading={privateKeyRevealLoading}
+                            onAccountPasswordChange={setPrivateKeyAccountPassword}
+                            onCopyPrivateKey={handleCopyPrivateKey}
+                            onHidePrivateKey={() => {
+                                Keyboard.dismiss();
+                                clearPrivateKeyReveal();
+                            }}
+                            onRevealWithAccountPassword={handleRevealWithAccountPassword}
+                            onRevealWithBiometric={handleRevealWithBiometric}
+                            privateKey={pgpKey.privateKey}
+                            privateKeyVisible={privateKeyVisible}
+                        />
+                    ) : null}
 
                     {pgpKey.privateKey && canManageKey && (
-                        <View style={styles.manageKeySection}>
-                            <CustomText style={styles.sectionTitle}>Manage key</CustomText>
-
-                            <View style={styles.formGroup}>
-                                <CustomText style={styles.groupLabel}>Passphrase</CustomText>
-                                <View style={styles.fieldStack}>
-                                    <PassphraseField
-                                        {...SURFACE_LABEL_BACKPLATE_PROPS}
-                                        label="Current passphrase"
-                                        fingerprint={pgpKey.fingerprint}
-                                        onPassphraseChange={setOldPass}
-                                        hidden={pgpKey.privateKeyIsUnlocked}
-                                    />
-
-                                    <GeneratedPassphrasePair
-                                        {...SURFACE_LABEL_BACKPLATE_PROPS}
-                                        passphraseLabel="New passphrase"
-                                        confirmPassphraseLabel="Confirm new passphrase"
-                                        fingerprint={pgpKey.fingerprint}
-                                        passphrase={newPass}
-                                        confirmPassphrase={newPassConfirm}
-                                        onPassphraseChange={setNewPass}
-                                        onConfirmPassphraseChange={setNewPassConfirm}
-                                        helperText={pgpKey.privateKeyIsUnlocked ? undefined : 'Leave blank to remove the passphrase.'}
-                                    />
-                                </View>
-                                <View style={styles.actionRow}>
-                                    <Button
-                                        label="Change passphrase"
-                                        onPress={async () => {
-                                            if (!onChangePassphrase) return;
-                                            setChangingPassword(true);
-                                            try {
-                                                await onChangePassphrase(pgpKey.fingerprint, oldPass, newPass, newPassConfirm);
-                                                setOldPass(newPass);
-                                                setNewPass('');
-                                                setNewPassConfirm('');
-                                            } catch (err: any) {
-                                                showToast(err?.message || 'Failed to change passphrase', 'error');
-                                            } finally {
-                                                setChangingPassword(false);
-                                            }
-                                        }}
-                                        disabled={newPass === oldPass}
-                                        loading={changingPassword}
-                                        size="compact"
-                                        style={styles.actionButton}
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <CustomText style={styles.groupLabel}>Expiration</CustomText>
-                                <InputField
-                                    {...SURFACE_LABEL_BACKPLATE_PROPS}
-                                    label="Expiry days"
-                                    value={expiryDays}
-                                    onChangeText={setExpiryDays}
-                                    keyboardType="number-pad"
-                                    numberOnly
-                                    maxDigits={EXPIRY_DAYS_MAX_LENGTH}
-                                    helperText="Leave blank, or enter below 1, for no expiry."
-                                />
-                                <View style={styles.actionRow}>
-                                    <Button
-                                        label="Change expiry"
-                                        onPress={async () => {
-                                            if (!onChangeExpiry) return;
-                                            setChangingDate(true);
-                                            try {
-                                                await onChangeExpiry(pgpKey.fingerprint, oldPass, expiryDays);
-                                                showToast('Expiry updated', 'success');
-                                            } catch (err: any) {
-                                                showToast(err?.message || 'Failed to change expiry', 'error');
-                                            } finally {
-                                                setChangingDate(false);
-                                            }
-                                        }}
-                                        disabled={pgpKey.privateKeyIsUnlocked === false && !oldPass}
-                                        loading={changingDate}
-                                        size="compact"
-                                        style={styles.actionButton}
-                                    />
-                                </View>
-                            </View>
-                        </View>
+                        <KeyManagementForm
+                            pgpKey={pgpKey}
+                            oldPass={oldPass}
+                            newPass={newPass}
+                            newPassConfirm={newPassConfirm}
+                            expiryDays={expiryDays}
+                            changingPassword={changingPassword}
+                            changingDate={changingDate}
+                            onOldPassChange={setOldPass}
+                            onNewPassChange={setNewPass}
+                            onNewPassConfirmChange={setNewPassConfirm}
+                            onExpiryDaysChange={setExpiryDays}
+                            onChangePassphrase={handleChangePassphrasePress}
+                            onChangeExpiry={handleChangeExpiryPress}
+                        />
                     )}
 
                     <View style={styles.publicKeySection}>
@@ -463,27 +311,11 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                                 <Icon name="content-copy" size={20} color={theme.colors.primary} />
                             </TouchableOpacity>
                         </View>
-                        <View style={[styles.keyBlock, publicKeyCopied && styles.keyBlockCopied]}>
-                            <ScrollView
-                                nestedScrollEnabled
-                                style={styles.keyBlockScroll}
-                                contentContainerStyle={styles.keyBlockScrollContent}
-                            >
-                                <TouchableOpacity
-                                    onLongPress={handleCopyPublicKey}
-                                    delayLongPress={500}
-                                    activeOpacity={0.7}
-                                >
-                                    <CustomText
-                                        style={styles.keyBlockText}
-                                        selectable={false}
-                                        contextMenuHidden={true}
-                                    >
-                                        {pgpKey.publicKey || ''}
-                                    </CustomText>
-                                </TouchableOpacity>
-                            </ScrollView>
-                        </View>
+                        <KeyMaterialBlock
+                            text={pgpKey.publicKey || ''}
+                            copied={publicKeyCopyFeedback.copied}
+                            onCopy={handleCopyPublicKey}
+                        />
                     </View>
                 </View>
             )}
@@ -557,12 +389,6 @@ const styles = StyleSheet.create({
         paddingTop: theme.spacing.lg,
         paddingBottom: theme.spacing.lg,
     },
-    privateKeySection: {
-        gap: theme.spacing.md,
-    },
-    manageKeySection: {
-        gap: theme.spacing.md,
-    },
     publicKeySection: {
         gap: theme.spacing.md,
     },
@@ -575,60 +401,6 @@ const styles = StyleSheet.create({
         ...commonStyles.textBody,
         color: theme.colors.text,
         fontWeight: '700',
-    },
-    revealPanel: {
-        gap: theme.spacing.md,
-    },
-    revealButton: {
-        marginVertical: 0,
-        alignSelf: 'stretch',
-    },
-    revealError: {
-        ...commonStyles.textCaption,
-        color: theme.colors.error,
-        marginLeft: theme.spacing.md,
-    },
-    keyBlock: {
-        backgroundColor: theme.colors.background,
-        borderWidth: 1,
-        borderColor: theme.colors.divider,
-        borderRadius: theme.borderRadius.md,
-        overflow: 'hidden',
-        maxHeight: 260,
-    },
-    keyBlockCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
-    },
-    keyBlockScroll: {
-        maxHeight: 260,
-    },
-    keyBlockScrollContent: {
-        padding: theme.spacing.md,
-    },
-    keyBlockText: {
-        fontFamily: 'monospace',
-        fontSize: 12,
-        lineHeight: 16,
-        color: theme.colors.text,
-    },
-    fieldStack: {
-        gap: theme.spacing.sm,
-    },
-    formGroup: {
-        gap: theme.spacing.sm,
-    },
-    groupLabel: {
-        ...commonStyles.textCaption,
-        color: theme.colors.textSecondary,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-    },
-    actionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    actionButton: {
-        flex: 1,
     },
     tempLabel: {
         alignSelf: 'flex-start',

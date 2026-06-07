@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { Dispatch } from 'react';
 
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyPair } from '../../../types/types';
 import { hasExistingDefaultKeyPair } from '../domain/keyScreenDomain';
 import { identifyKeyType } from '../domain/pgpValidation';

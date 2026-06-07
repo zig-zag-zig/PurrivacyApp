@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Keyboard, View, TouchableOpacity, StyleSheet, Switch } from "react-native";
+import { View, StyleSheet } from "react-native";
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { AutofillDisabledView } from '../../../components/AutofillDisabledView';
 import { Button } from '../../../components/Button';
 import { InputField } from '../../../components/InputField';
-import { DropdownSelect } from '../../../components/DropdownSelect';
 import { theme } from '../../../styles/theme';
-import { commonStyles } from '../../../styles/commonStyles';
-import { CustomText } from '../../../components/CustomText';
 import { validateKeyCreationForm } from '../../../utils/validation';
 import { ALGORITHM_OPTIONS, RSA_BITS_OPTIONS } from '../../../utils/formUtils';
 import { KeyGenerationOptions, PgpAlgorithm } from '../../../types/types';
 import { GeneratedPassphrasePair } from './GeneratedPassphrasePair';
+import { FormField } from '../../../shared/ui/FormField';
+import { SelectField } from '../../../shared/ui/SelectField';
+import { SwitchRow } from '../../../shared/ui/SwitchRow';
 import {
     KEY_COMMENT_MAX_LENGTH,
     KEY_EMAIL_MAX_LENGTH,
@@ -94,7 +94,7 @@ export const CreateKeyForm = ({
             {(showAlgorithmSheet || showRsaBitsSheet) && (
                 <View style={styles.backdrop} pointerEvents="box-none" />
             )}
-            <View style={{ marginBottom: theme.spacing.md }}>
+            <FormField>
                 <InputField
                     label="Name"
                     testID="purrivacy.key.create.name"
@@ -106,9 +106,9 @@ export const CreateKeyForm = ({
                     onFocus={closeDropdowns}
                     trimOnBlur
                 />
-            </View>
+            </FormField>
 
-            <View style={{ marginBottom: theme.spacing.md }}>
+            <FormField>
                 <InputField
                     label="Email"
                     testID="purrivacy.key.create.email"
@@ -119,9 +119,9 @@ export const CreateKeyForm = ({
                     onFocus={closeDropdowns}
                     normalizeOnBlur={(text) => text.trim().toLowerCase()}
                 />
-            </View>
+            </FormField>
 
-            <View style={{ marginBottom: theme.spacing.md }}>
+            <FormField>
                 <InputField
                     label="Comment"
                     testID="purrivacy.key.create.comment"
@@ -133,168 +133,68 @@ export const CreateKeyForm = ({
                     onFocus={closeDropdowns}
                     trimOnBlur
                 />
-            </View>
+            </FormField>
 
-            <GeneratedPassphrasePair
-                passphraseLabel="Passphrase"
-                confirmPassphraseLabel="Confirm Passphrase"
-                testID="purrivacy.key.create.passphrase"
-                confirmTestID="purrivacy.key.create.confirmPassphrase"
-                passphrase={passphrase}
-                confirmPassphrase={confirmPassphrase}
-                onPassphraseChange={setPassphrase}
-                onConfirmPassphraseChange={setConfirmPassphrase}
-                passphraseError={formErrors.passphrase}
-                confirmPassphraseError={formErrors.confirmPassphrase}
-                gap={theme.spacing.md}
-                style={{ marginBottom: theme.spacing.md }}
+            <FormField>
+                <GeneratedPassphrasePair
+                    passphraseLabel="Passphrase"
+                    confirmPassphraseLabel="Confirm Passphrase"
+                    testID="purrivacy.key.create.passphrase"
+                    confirmTestID="purrivacy.key.create.confirmPassphrase"
+                    passphrase={passphrase}
+                    confirmPassphrase={confirmPassphrase}
+                    onPassphraseChange={setPassphrase}
+                    onConfirmPassphraseChange={setConfirmPassphrase}
+                    passphraseError={formErrors.passphrase}
+                    confirmPassphraseError={formErrors.confirmPassphrase}
+                    gap={theme.spacing.md}
+                />
+            </FormField>
+
+            <SelectField
+                label="Algorithm *"
+                value={algorithm}
+                visible={showAlgorithmSheet}
+                options={ALGORITHM_OPTIONS}
+                error={formErrors.algorithm}
+                onOpen={() => {
+                    setShowRsaBitsSheet(false);
+                    setShowAlgorithmSheet(prev => !prev);
+                }}
+                onClose={() => setShowAlgorithmSheet(false)}
+                onSelect={option => {
+                    setAlgorithm(option.value);
+                    setShowAlgorithmSheet(false);
+                }}
             />
 
-            <View style={{ marginBottom: theme.spacing.md }}>
-                <CustomText style={commonStyles.textLabel}>Algorithm *</CustomText>
-                <View style={styles.dropdownContainer}>
-                    <View style={[styles.inputWrapper]}>
-                        <TouchableOpacity
-                            style={[
-                                {
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    position: 'relative',
-                                    borderColor: theme.colors.divider,
-                                    borderWidth: 2,
-                                    backgroundColor: theme.colors.surface,
-                                    borderRadius: theme.borderRadius.md,
-                                    overflow: 'hidden',
-                                    paddingHorizontal: theme.spacing.md + 4,
-                                    paddingVertical: theme.spacing.sm + 2,
-                                    minHeight: 44,
-                                },
-                                commonStyles.flex,
-                            ]}
-                            onPress={() => {
-                                Keyboard.dismiss();
-                                setShowRsaBitsSheet(false);
-                                setShowAlgorithmSheet(prev => !prev);
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <CustomText
-                                style={[
-                                    commonStyles.textBody,
-                                    commonStyles.flex,
-                                    {
-                                        color: algorithm ? theme.colors.text : theme.colors.placeholder,
-                                    },
-                                ]}
-                                ellipsizeMode="tail"
-                            >
-                                {ALGORITHM_OPTIONS.find(o => o.value === algorithm)?.label || 'Select'}
-                            </CustomText>
-                            <Icon name={showAlgorithmSheet ? "expand-less" : "expand-more"} size={24} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                    </View>
-                    <DropdownSelect
-                        visible={showAlgorithmSheet}
-                        options={ALGORITHM_OPTIONS.map(o => o.label)}
-                        onSelect={idx => {
-                            setAlgorithm(ALGORITHM_OPTIONS[idx].value as typeof algorithm);
-                            setShowAlgorithmSheet(false);
-                        }}
-                        onClose={() => setShowAlgorithmSheet(false)}
-                    />
-                </View>
-                {formErrors.algorithm ? (
-                    <CustomText style={{ color: theme.colors.error, marginTop: 4, marginLeft: 4, fontSize: 13 }}>
-                        {formErrors.algorithm}
-                    </CustomText>
-                ) : null}
-            </View>
-
             {algorithm === 'RSA' && (
-                <View style={{ marginBottom: theme.spacing.md }}>
-                    <CustomText style={commonStyles.textLabel}>RSA Key Size *</CustomText>
-                    <View style={styles.dropdownContainer}>
-                        <View style={[styles.inputWrapper]}>
-                            <TouchableOpacity
-                                style={[
-                                    {
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        position: 'relative',
-                                        borderColor: theme.colors.divider,
-                                        borderWidth: 2,
-                                        backgroundColor: theme.colors.surface,
-                                        borderRadius: theme.borderRadius.md,
-                                        overflow: 'hidden',
-                                        paddingHorizontal: theme.spacing.md + 4,
-                                        paddingVertical: theme.spacing.sm + 2,
-                                        minHeight: 44,
-                                    },
-                                    commonStyles.flex,
-                                ]}
-                                onPress={() => {
-                                    Keyboard.dismiss();
-                                    setShowAlgorithmSheet(false);
-                                    setShowRsaBitsSheet(prev => !prev);
-                                }}
-                                activeOpacity={0.7}
-                            >
-                                <CustomText
-                                    style={[
-                                        commonStyles.textBody,
-                                        commonStyles.flex,
-                                        {
-                                            color: bitStrength ? theme.colors.text : theme.colors.placeholder,
-                                        },
-                                    ]}
-                                    ellipsizeMode="tail"
-                                >
-                                    {bitStrength || 'Select'}
-                                </CustomText>
-                                <Icon name={showRsaBitsSheet ? "expand-less" : "expand-more"} size={24} color={theme.colors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-                        <DropdownSelect
-                            visible={showRsaBitsSheet}
-                            options={RSA_BITS_OPTIONS.map(o => o.label)}
-                            onSelect={idx => {
-                                setBitStrength(RSA_BITS_OPTIONS[idx].value as typeof bitStrength);
-                                setShowRsaBitsSheet(false);
-                            }}
-                            onClose={() => setShowRsaBitsSheet(false)}
-                        />
-                    </View>
-                    {formErrors.bitStrength ? (
-                        <CustomText style={{ color: theme.colors.error, marginTop: 4, marginLeft: 4, fontSize: 13 }}>
-                            {formErrors.bitStrength}
-                        </CustomText>
-                    ) : null}
-                </View>
+                <SelectField
+                    label="RSA Key Size *"
+                    value={bitStrength}
+                    visible={showRsaBitsSheet}
+                    options={RSA_BITS_OPTIONS}
+                    error={formErrors.bitStrength}
+                    onOpen={() => {
+                        setShowAlgorithmSheet(false);
+                        setShowRsaBitsSheet(prev => !prev);
+                    }}
+                    onClose={() => setShowRsaBitsSheet(false)}
+                    onSelect={option => {
+                        setBitStrength(option.value);
+                        setShowRsaBitsSheet(false);
+                    }}
+                />
             )}
 
             {hasExistingKeys && (
-                <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    marginBottom: theme.spacing.md,
-                    paddingVertical: theme.spacing.sm,
-                }}>
-                    <Switch
-                        value={!!setAsDefault}
-                        onValueChange={onSetAsDefault}
-                        disabled={!!setAsDefaultDisabled}
-                        trackColor={{ false: theme.colors.divider, true: theme.colors.primary }}
-                        thumbColor={theme.colors.surface}
-                        style={{ marginRight: theme.spacing.sm }}
-                    />
-                    <CustomText style={[commonStyles.textBody, {
-                        color: setAsDefaultDisabled ? theme.colors.textSecondary : theme.colors.text
-                    }]}>
-                        Set as default key pair
-                        {setAsDefaultDisabled ? ' (required)' : ''}
-                    </CustomText>
-                </View>
+                <SwitchRow
+                    value={!!setAsDefault}
+                    onValueChange={onSetAsDefault}
+                    disabled={!!setAsDefaultDisabled}
+                    required={!!setAsDefaultDisabled}
+                    label="Set as default key pair"
+                />
             )}
 
             <Button
@@ -313,18 +213,6 @@ export const CreateKeyForm = ({
 };
 
 const styles = StyleSheet.create({
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    dropdownContainer: {
-        position: 'relative',
-        width: '100%',
-        margin: 0,
-        padding: 0,
-        marginTop: theme.spacing.sm
-    },
     backdrop: {
         position: 'absolute',
         top: 0,

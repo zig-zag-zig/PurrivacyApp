@@ -3,9 +3,14 @@ import type { User } from 'firebase/auth';
 
 import { useFilePicker } from '../../../hooks/useFilePicker';
 import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
-import { pgpCryptoService } from '../../../services/pgpCryptoService.';
+import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyGenerationOptions, KeyPair, UserDecrypted } from '../../../types/types';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, executeWithLoading } from '../../../utils/errorHandling';
+import {
+  ERROR_MESSAGES,
+  SUCCESS_MESSAGES,
+  executeWithLoading,
+  getUserFacingErrorMessage,
+} from '../../../utils/errorHandling';
 import type { ToastType } from '../../../app/state/ToastContext';
 import { securityService } from '../../security/services/securityService';
 import { EventService } from '../../../services/eventService';
@@ -20,8 +25,9 @@ import {
   setDefaultDevTempKey,
 } from '../domain/tempKeyFixtures';
 import type { KeysUiState } from '../model/types';
-import { PgPKeyService } from '../services/pgpKeyService';
+import { PgpKeyService } from '../services/pgpKeyService';
 import type { KeyScreenAction } from '../state/keyScreenReducer';
+import { persistKeyPassphrase } from '../services/passphrasePersistenceService';
 
 type ShowToast = (message: string, type: ToastType) => void;
 
@@ -53,14 +59,13 @@ export function useKeyOperations({
     options?: { force?: boolean },
   ) => {
     if (!user) return;
-    if (passphrase && !await ensurePassphraseStorageConsent()) return;
-
-    await securityService.storePassphrase(
-      user.uid,
-      { [fingerprint]: passphrase },
+    await persistKeyPassphrase({
+      userId: user.uid,
       fingerprint,
-      options,
-    );
+      passphrase,
+      force: options?.force,
+      ensureConsent: passphrase ? ensurePassphraseStorageConsent : undefined,
+    });
   };
 
   const onCreateKey = async (
@@ -73,7 +78,7 @@ export function useKeyOperations({
       keyGenerationOptions.passphrase && await ensurePassphraseStorageConsent(),
     );
     const key = await executeWithLoading(
-      () => PgPKeyService.createKey(
+      () => PgpKeyService.createKey(
         user.uid,
         keyGenerationOptions,
         setAsDefault,
@@ -152,7 +157,7 @@ export function useKeyOperations({
         state.importPassphrase && await ensurePassphraseStorageConsent(),
       );
       const importedKey = await executeWithLoading(
-        () => PgPKeyService.importKey(
+        () => PgpKeyService.importKey(
           user.uid,
           trimmedContent,
           existingKey?.publicKey,
@@ -179,7 +184,7 @@ export function useKeyOperations({
     }
 
     const importedKey = await executeWithLoading(
-      () => PgPKeyService.importKey(
+      () => PgpKeyService.importKey(
         user.uid,
         trimmedContent,
         existingKey?.privateKey,
@@ -211,12 +216,12 @@ export function useKeyOperations({
         return;
       }
 
-      await PgPKeyService.deleteKey(user.uid, key);
+      await PgpKeyService.deleteKey(user.uid, key);
       await securityService.clearPassphrase(user.uid, key.fingerprint);
       refreshUserKeys();
       showToast('Key deleted successfully', 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Failed to delete key', 'error');
+      showToast(getUserFacingErrorMessage(error, 'Failed to delete key'), 'error');
     } finally {
       dispatch({ type: 'deletingChanged', isDeleting: false });
     }
@@ -234,13 +239,13 @@ export function useKeyOperations({
         return;
       }
 
-      await PgPKeyService.setDefaultKey(user.uid, key.fingerprint);
+      await PgpKeyService.setDefaultKey(user.uid, key.fingerprint);
       await clearDevTempKeyDefault();
       refreshDevTempKeys();
       refreshUserKeys();
       showToast('Default key updated successfully', 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Failed to set default key', 'error');
+      showToast(getUserFacingErrorMessage(error, 'Failed to set default key'), 'error');
     } finally {
       dispatch({ type: 'loadingChanged', isLoading: false });
     }
@@ -269,7 +274,7 @@ export function useKeyOperations({
         return;
       }
 
-      await PgPKeyService.changePassphrase(
+      await PgpKeyService.changePassphrase(
         user.uid,
         fingerprint,
         oldPassphrase,
@@ -280,7 +285,7 @@ export function useKeyOperations({
       refreshUserKeys();
       showToast('Passphrase updated', 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Failed to update passphrase', 'error');
+      showToast(getUserFacingErrorMessage(error, 'Failed to update passphrase'), 'error');
     } finally {
       dispatch({ type: 'loadingChanged', isLoading: false });
     }
@@ -303,12 +308,12 @@ export function useKeyOperations({
         return;
       }
 
-      await PgPKeyService.changeExpiration(user.uid, fingerprint, passphrase, days);
+      await PgpKeyService.changeExpiration(user.uid, fingerprint, passphrase, days);
       await maybeStorePassphrase(fingerprint, passphrase);
       refreshUserKeys();
       showToast('Expiration updated', 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Failed to update expiration', 'error');
+      showToast(getUserFacingErrorMessage(error, 'Failed to update expiration'), 'error');
     } finally {
       dispatch({ type: 'loadingChanged', isLoading: false });
     }

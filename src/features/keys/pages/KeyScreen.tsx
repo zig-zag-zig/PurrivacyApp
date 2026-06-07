@@ -1,13 +1,12 @@
-import { Keyboard, StyleSheet, Switch, View, TouchableOpacity } from 'react-native';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import type { ComponentProps } from 'react';
 
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { Spinner } from '../../../components/Spinner';
+import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
 import { KeyItem } from '../components/KeyItem';
@@ -15,10 +14,11 @@ import { PassphraseField } from '../components/PassphraseField';
 import { useKeyScreen } from '../hooks/useKeyScreen';
 import type { KeyAction } from '../model/types';
 import { KEY_ARMOR_MAX_LENGTH } from '../../../config/inputLimits';
+import { SegmentedActionTabs } from '../../../shared/ui/SegmentedActionTabs';
+import type { SegmentedActionTab } from '../../../shared/ui/SegmentedActionTabs';
+import { SwitchRow } from '../../../shared/ui/SwitchRow';
 
-type MaterialIconName = ComponentProps<typeof Icon>['name'];
-
-const keyActionTabs: { action: KeyAction; icon: MaterialIconName; label: string }[] = [
+const keyActionTabs: Array<SegmentedActionTab<KeyAction>> = [
   { action: 'view', icon: 'list', label: 'Keys' },
   { action: 'create', icon: 'add', label: 'Generate' },
   { action: 'import', icon: 'file-upload', label: 'Import' },
@@ -26,6 +26,7 @@ const keyActionTabs: { action: KeyAction; icon: MaterialIconName; label: string 
 
 export const KeyScreen = () => {
   const keyScreen = useKeyScreen();
+  useGlobalSpinner(keyScreen.isResolvingKeys || keyScreen.isLoadingOverlay);
 
   const handleKeyActionChange = (action: KeyAction) => {
     Keyboard.dismiss();
@@ -33,11 +34,7 @@ export const KeyScreen = () => {
   };
 
   if (keyScreen.isResolvingKeys) {
-    return (
-      <ScreenContainer>
-        <Spinner visible />
-      </ScreenContainer>
-    );
+    return <ScreenContainer>{null}</ScreenContainer>;
   }
 
   return (
@@ -47,39 +44,12 @@ export const KeyScreen = () => {
       onScroll={keyScreen.onScroll}
       scrollEventThrottle={16}
     >
-      <Spinner visible={keyScreen.isLoadingOverlay} />
-
-      <View style={styles.segmentedControl}>
-        {keyActionTabs.map((tab) => {
-          const active = keyScreen.state.keyAction === tab.action;
-          const tintColor = active ? theme.colors.onPrimary : theme.colors.textSecondary;
-
-          return (
-            <TouchableOpacity
-              testID={`purrivacy.key.action.${tab.action}`}
-              key={tab.action}
-              style={[
-                styles.segment,
-                active && styles.segmentActive,
-              ]}
-              onPress={() => handleKeyActionChange(tab.action)}
-              activeOpacity={0.78}
-            >
-              <Icon name={tab.icon} size={19} color={tintColor} />
-              <CustomText
-                style={[
-                  styles.segmentText,
-                  active && styles.segmentTextActive,
-                ]}
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.1}
-              >
-                {tab.label}
-              </CustomText>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <SegmentedActionTabs
+        tabs={keyActionTabs}
+        value={keyScreen.state.keyAction}
+        onChange={handleKeyActionChange}
+        testIDPrefix="purrivacy.key.action"
+      />
 
       {keyScreen.state.keyAction === 'view' && keyScreen.user && (
         <>
@@ -176,30 +146,13 @@ export const KeyScreen = () => {
           )}
 
           {keyScreen.showImportSetDefaultToggle && (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              marginBottom: theme.spacing.md,
-              paddingVertical: theme.spacing.sm,
-            }}>
-              <Switch
-                value={keyScreen.state.setImportAsDefault}
-                onValueChange={
-                  keyScreen.hasDefaultKeyPair ? keyScreen.onImportSetAsDefaultChanged : undefined
-                }
-                disabled={!keyScreen.hasDefaultKeyPair}
-                trackColor={{ false: theme.colors.divider, true: theme.colors.primary }}
-                thumbColor={theme.colors.surface}
-                style={{ marginRight: theme.spacing.sm }}
-              />
-              <CustomText style={{
-                color: !keyScreen.hasDefaultKeyPair ? theme.colors.textSecondary : theme.colors.text,
-              }}>
-                Set as default key pair
-                {!keyScreen.hasDefaultKeyPair ? ' (required)' : ''}
-              </CustomText>
-            </View>
+            <SwitchRow
+              value={keyScreen.state.setImportAsDefault}
+              onValueChange={keyScreen.onImportSetAsDefaultChanged}
+              disabled={!keyScreen.hasDefaultKeyPair}
+              required={!keyScreen.hasDefaultKeyPair}
+              label="Set as default key pair"
+            />
           )}
 
           <Button
@@ -217,39 +170,6 @@ export const KeyScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.divider,
-    overflow: 'hidden',
-  },
-  segment: {
-    flex: 1,
-    minHeight: 48,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.xs,
-  },
-  segmentActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  segmentText: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  segmentTextActive: {
-    color: theme.colors.onPrimary,
-    fontWeight: '700',
-  },
   emptyState: {
     alignItems: 'center',
     gap: theme.spacing.md,
