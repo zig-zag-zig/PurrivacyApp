@@ -16,10 +16,6 @@ const setAndroidAutofillProps = (target: NativePropTarget | null): void => {
     target.setNativeProps(DISABLED_AUTOFILL_PROPS);
 };
 
-export function suppressNativeTextInputAutofill(textInput: TextInput | null): void {
-    setAndroidAutofillProps(textInput);
-}
-
 export function configureNativeNonAutofillTextInput(
     textInput: TextInput | null,
     _maskText: boolean,

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveKeyboardAwareScrollY } from './keyboardAwareScroll';
+import {
+    resolveAdditionalKeyboardSpacer,
+    resolveKeyboardAwareScrollY,
+} from './keyboardAwareScroll';
 
 const baseParams = {
     currentScrollY: 120,
@@ -35,5 +38,31 @@ describe('resolveKeyboardAwareScrollY', () => {
             currentScrollY: 12,
             inputTop: 20,
         })).toBe(0);
+    });
+});
+
+describe('resolveAdditionalKeyboardSpacer', () => {
+    it('adds nothing when existing content can reach the target scroll position', () => {
+        expect(resolveAdditionalKeyboardSpacer({
+            contentHeight: 900,
+            targetScrollY: 180,
+            viewportHeight: 700,
+        })).toBe(0);
+    });
+
+    it('adds only the missing scroll range when content is shorter than the viewport', () => {
+        expect(resolveAdditionalKeyboardSpacer({
+            contentHeight: 600,
+            targetScrollY: 180,
+            viewportHeight: 700,
+        })).toBe(180);
+    });
+
+    it('accounts for scroll range that already exists', () => {
+        expect(resolveAdditionalKeyboardSpacer({
+            contentHeight: 780,
+            targetScrollY: 180,
+            viewportHeight: 700,
+        })).toBe(100);
     });
 });

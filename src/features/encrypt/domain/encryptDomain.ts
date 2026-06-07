@@ -1,10 +1,8 @@
 import type { KeyPair } from '../../../types/types';
 import type { KeySelectionMap } from '../model/types';
+import { getFirstSelectedKeyId } from '../../keys/domain/keySelectionUtils';
 
-export function getFirstSelectedKeyId(keys: KeySelectionMap): string | null {
-  const keyId = Object.keys(keys)[0];
-  return keyId ?? null;
-}
+export { getFirstSelectedKeyId };
 
 export function isPassphraseRequired(
   keyPair: KeyPair | undefined,

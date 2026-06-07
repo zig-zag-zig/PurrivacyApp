@@ -8,7 +8,7 @@ import { Button } from '../../../components/Button';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { Spinner } from '../../../components/Spinner';
+import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
 import { SettingsOption } from '../../settings/components/SettingsOption';
@@ -18,6 +18,7 @@ import { useDecryptPage } from '../hooks/useDecryptPage';
 export const DecryptScreen = () => {
   const decryptPage = useDecryptPage();
   const scrollRef = useRef<ScrollView>(null);
+  useGlobalSpinner(decryptPage.shouldRedirectToKeys || decryptPage.isLoadingOverlay);
 
   useEffect(() => {
     if (!decryptPage.state.decryptedContent) return;
@@ -30,17 +31,11 @@ export const DecryptScreen = () => {
   }, [decryptPage.state.decryptedContent]);
 
   if (decryptPage.shouldRedirectToKeys) {
-    return (
-      <ScreenContainer>
-        <Spinner visible />
-      </ScreenContainer>
-    );
+    return <ScreenContainer>{null}</ScreenContainer>;
   }
 
   return (
     <ScreenContainer ref={scrollRef} testID="purrivacy.decrypt.screen">
-      <Spinner visible={decryptPage.isLoadingOverlay} />
-
       <AutofillDisabledView style={styles.autofillScope}>
         <InputField
           label="Encrypted Content"

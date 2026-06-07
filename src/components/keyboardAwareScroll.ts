@@ -1,9 +1,15 @@
-export type KeyboardAwareScrollParams = {
+type KeyboardAwareScrollParams = {
     currentScrollY: number;
     inputBottom: number;
     inputTop: number;
     visibleBottom: number;
     visibleTop: number;
+};
+
+type AdditionalKeyboardSpacerParams = {
+    contentHeight: number;
+    targetScrollY: number;
+    viewportHeight: number;
 };
 
 export const resolveKeyboardAwareScrollY = ({
@@ -22,4 +28,13 @@ export const resolveKeyboardAwareScrollY = ({
     }
 
     return Math.max(0, Math.ceil(nextScrollY));
+};
+
+export const resolveAdditionalKeyboardSpacer = ({
+    contentHeight,
+    targetScrollY,
+    viewportHeight,
+}: AdditionalKeyboardSpacerParams): number => {
+    const maxScrollY = Math.max(0, contentHeight - viewportHeight);
+    return Math.max(0, Math.ceil(targetScrollY - maxScrollY));
 };

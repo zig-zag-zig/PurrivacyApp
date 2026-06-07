@@ -1,6 +1,6 @@
 import type { SharePayload } from 'expo-sharing';
 
-export type ShareIntentPayload = {
+type ShareIntentPayload = {
     text?: string | null;
     mimeType?: string | null;
     shareType?: SharePayload['shareType'];

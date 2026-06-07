@@ -1,13 +1,14 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect } from 'react';
-import { EventPayload, EventService } from '../services/eventService';
+import { EventPayload, EventService, isAppEventName } from '../services/eventService';
+import type { AppEventPayloadMap } from '../services/eventService';
 import * as Device from 'expo-device';
 import { logger } from '../utils/logger';
 
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
-const normalizeMfaStatePayload = (payload: any): EventPayload | undefined => {
+const normalizeMfaStatePayload = (payload: any): AppEventPayloadMap['mfaState'] | undefined => {
   const mfaState = payload?.mfaState ?? payload;
   if (typeof mfaState?.mfaEnabled !== 'boolean' || typeof mfaState?.mfaTrusted !== 'boolean') {
     return undefined;
@@ -23,7 +24,7 @@ const normalizeMfaStatePayload = (payload: any): EventPayload | undefined => {
 };
 
 const emitNotificationEvent = (eventName: unknown, payload: unknown): void => {
-  if (typeof eventName !== 'string' || eventName.trim().length === 0) {
+  if (typeof eventName !== 'string' || !isAppEventName(eventName)) {
     return;
   }
 
@@ -35,7 +36,7 @@ const emitNotificationEvent = (eventName: unknown, payload: unknown): void => {
     return;
   }
 
-  EventService.addEvent(eventName, payload as EventPayload);
+  EventService.addEvent(eventName, payload as never);
 };
 
 const parseNotificationData = (data: any): any => {

@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { SecureTextDisplay } from '../../keys/components/SecureTextDisplay';
 import { CustomText } from '../../../components/CustomText';
+import { useCopyFeedback } from '../../../shared/hooks/useCopyFeedback';
+import { CopyableResultBlock } from '../../../shared/ui/CopyableResultBlock';
 
 interface DecryptionResultProps {
     decryptedContent: string;
@@ -21,46 +23,29 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
     detachedSignatureStatus,
     testIDPrefix,
 }) => {
-    const [copied, setCopied] = useState(false);
-    const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => () => {
-        if (copyFeedbackTimeoutRef.current) {
-            clearTimeout(copyFeedbackTimeoutRef.current);
-        }
-    }, []);
+    const copyFeedback = useCopyFeedback();
 
     const handleCopy = () => {
         onCopy();
-        setCopied(true);
-        if (copyFeedbackTimeoutRef.current) {
-            clearTimeout(copyFeedbackTimeoutRef.current);
-        }
-        copyFeedbackTimeoutRef.current = setTimeout(() => {
-            setCopied(false);
-            copyFeedbackTimeoutRef.current = null;
-        }, 1600);
+        copyFeedback.markCopied();
     };
 
     return (
         <View style={commonStyles.resultContainer}>
-            <View style={commonStyles.labeledResultBlock}>
-                <CustomText style={commonStyles.labeledResultLabel}>Decrypted result</CustomText>
-                <TouchableOpacity
-                    testID={testIDPrefix ? `${testIDPrefix}.copy` : undefined}
-                    onLongPress={handleCopy}
-                    delayLongPress={500}
-                    style={[commonStyles.resultContent, commonStyles.flex, copied && styles.resultContentCopied]}
-                    activeOpacity={0.7}
-                >
-                    <SecureTextDisplay
-                        testID={testIDPrefix ? `${testIDPrefix}.text` : undefined}
-                        text={decryptedContent}
-                        secure={false}
-                        style={[commonStyles.flex, copied && styles.resultContentCopied]}
-                    />
-                </TouchableOpacity>
-            </View>
+            <CopyableResultBlock
+                label="Decrypted result"
+                copied={copyFeedback.copied}
+                copyTestID={testIDPrefix ? `${testIDPrefix}.copy` : undefined}
+                onCopy={handleCopy}
+                contentStyle={commonStyles.flex}
+            >
+                <SecureTextDisplay
+                    testID={testIDPrefix ? `${testIDPrefix}.text` : undefined}
+                    text={decryptedContent}
+                    secure={false}
+                    style={commonStyles.flex}
+                />
+            </CopyableResultBlock>
 
             {embeddedSignatureStatus !== 'unknown' ? (
                 <View style={commonStyles.signatureRow}>
@@ -90,9 +75,3 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    resultContentCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
-    },
-});

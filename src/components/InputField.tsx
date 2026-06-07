@@ -1,7 +1,6 @@
-import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useRef, useState } from 'react';
 import {
     Platform,
-    LayoutChangeEvent,
     StyleSheet,
     StyleProp,
     TextInput,
@@ -14,12 +13,10 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
 import { CustomText } from './CustomText';
-import {
-    configureNativeNonAutofillTextInput,
-    suppressNativeAutofillTree,
-} from '../native/textInputAutofill';
 import { useKeyboardAwareScroll } from './KeyboardAwareScrollContext';
 import type { KeyboardAwareInputNode } from './KeyboardAwareScrollContext';
+import { FloatingInputLabel } from './inputField/FloatingInputLabel';
+import { useNativeAutofillSuppression } from './inputField/useNativeAutofillSuppression';
 
 interface InputFieldProps extends TextInputProps {
     label?: string;
@@ -49,10 +46,6 @@ interface InputFieldProps extends TextInputProps {
 }
 
 const INPUT_BORDER_WIDTH = 2;
-const LABEL_LEFT = theme.spacing.md;
-const LABEL_GAP_PADDING = theme.spacing.sm;
-const LABEL_LINE_HEIGHT = 18;
-const LABEL_BORDER_CROSSING_Y = 9;
 
 export const InputField = forwardRef<TextInput, InputFieldProps>(
     (
@@ -93,9 +86,6 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
         const [internalError, setInternalError] = useState<string | null>(null);
         const [isFocused, setIsFocused] = useState(false);
         const [isRevealed, setIsRevealed] = useState(false);
-        const [labelWidth, setLabelWidth] = useState(0);
-        const inputRef = useRef<TextInput | null>(null);
-        const inputWrapperRef = useRef<View | null>(null);
         const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         const { scrollInputIntoView } = useKeyboardAwareScroll();
         const {
@@ -120,33 +110,19 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             : textContentType ? undefined : autoComplete;
         const secureTextHidden = showToggleSecureText ? !isRevealed : Boolean(secureTextEntry);
         const shouldSuppressNativeAutofill = Platform.OS === 'android' && !enableAutofill;
-
-        const assignInputRef = useCallback((node: TextInput | null) => {
-            inputRef.current = node;
-            if (node && shouldSuppressNativeAutofill) {
-                configureNativeNonAutofillTextInput(node, Boolean(secureTextEntry) && secureTextHidden);
-            }
-            if (typeof ref === 'function') {
-                ref(node);
-            } else if (ref) {
-                ref.current = node;
-            }
-        }, [ref, secureTextEntry, secureTextHidden, shouldSuppressNativeAutofill]);
-
-        const assignInputWrapperRef = useCallback((node: View | null) => {
-            inputWrapperRef.current = node;
-            if (node && shouldSuppressNativeAutofill) {
-                suppressNativeAutofillTree(node);
-            }
-            onInputWrapperRef?.(node);
-        }, [onInputWrapperRef, shouldSuppressNativeAutofill]);
-
-        const applyNativeAutofillSuppression = useCallback(() => {
-            if (!shouldSuppressNativeAutofill) return;
-
-            configureNativeNonAutofillTextInput(inputRef.current, Boolean(secureTextEntry) && secureTextHidden);
-            suppressNativeAutofillTree(inputWrapperRef.current);
-        }, [secureTextEntry, secureTextHidden, shouldSuppressNativeAutofill]);
+        const {
+            applyNativeAutofillSuppression,
+            assignInputRef,
+            assignInputWrapperRef,
+            inputRef,
+            inputWrapperRef,
+        } = useNativeAutofillSuppression({
+            forwardedRef: ref,
+            onInputWrapperRef,
+            secureTextEntry,
+            secureTextHidden,
+            shouldSuppressNativeAutofill,
+        });
 
         useEffect(() => () => {
             if (blurTimeoutRef.current) {
@@ -187,49 +163,18 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             : isFocused
                 ? theme.colors.primary
                 : theme.colors.textSecondary;
-        const handleLabelLayout = (event: LayoutChangeEvent) => {
-            const nextWidth = Math.ceil(event.nativeEvent.layout.width);
-            setLabelWidth(previousWidth => previousWidth === nextWidth ? previousWidth : nextWidth);
-        };
 
         if (hidden) return null;
 
         return (
             <View style={[label && styles.fieldContainerWithLabel, containerStyle]}>
                 {label && (
-                    <>
-                        <View
-                            pointerEvents="none"
-                            style={[
-                                styles.labelBackplate,
-                                { width: labelWidth + LABEL_GAP_PADDING * 2 },
-                            ]}
-                        >
-                            <View
-                                style={[
-                                    styles.labelBackplateTop,
-                                    { backgroundColor: labelTopBackgroundColor },
-                                ]}
-                            />
-                            <View
-                                style={[
-                                    styles.labelBackplateBottom,
-                                    { backgroundColor: labelBottomBackgroundColor },
-                                ]}
-                            />
-                        </View>
-                        <CustomText
-                            onLayout={handleLabelLayout}
-                            pointerEvents="none"
-                            style={[
-                                styles.floatingLabel,
-                                { color: labelColor },
-                            ]}
-                            numberOfLines={1}
-                        >
-                            {label}
-                        </CustomText>
-                    </>
+                    <FloatingInputLabel
+                        label={label}
+                        color={labelColor}
+                        topBackgroundColor={labelTopBackgroundColor}
+                        bottomBackgroundColor={labelBottomBackgroundColor}
+                    />
                 )}
                 <View
                     ref={assignInputWrapperRef}
@@ -402,31 +347,6 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
 const styles = StyleSheet.create({
     fieldContainerWithLabel: {
         paddingTop: 9,
-    },
-    floatingLabel: {
-        position: 'absolute',
-        top: 0,
-        left: LABEL_LEFT,
-        zIndex: 6,
-        elevation: 6,
-        fontSize: theme.typography.caption.fontSize,
-        lineHeight: LABEL_LINE_HEIGHT,
-        fontWeight: '600',
-    },
-    labelBackplate: {
-        position: 'absolute',
-        top: 0,
-        left: LABEL_LEFT - LABEL_GAP_PADDING,
-        height: LABEL_LINE_HEIGHT,
-        zIndex: 5,
-        elevation: 5,
-        overflow: 'hidden',
-    },
-    labelBackplateTop: {
-        height: LABEL_BORDER_CROSSING_Y,
-    },
-    labelBackplateBottom: {
-        height: LABEL_LINE_HEIGHT - LABEL_BORDER_CROSSING_Y,
     },
     inputWrapper: {
         flexDirection: 'row',
