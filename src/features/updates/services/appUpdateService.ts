@@ -162,45 +162,58 @@ async function downloadAndInstallApk(
   }
 
   const downloadDirectory = getDownloadDirectory();
+  await cleanDownloadedUpdates();
   downloadDirectory.create({ intermediates: true, idempotent: true });
 
   const destinationFile = new File(downloadDirectory, sanitizeAssetFileName(release));
-  if (destinationFile.exists) {
-    destinationFile.delete();
-  }
 
-  const download = File.createDownloadTask(
-    release.assetDownloadUrl,
-    destinationFile,
-    {
-      headers: getDownloadHeaders(release),
-      onProgress: (event) => {
-        const expectedBytes = event.totalBytes > 0
-          ? event.totalBytes
-          : release.assetSizeBytes;
-        const progress = expectedBytes
-          ? Math.min(event.bytesWritten / expectedBytes, 1)
-          : null;
+  try {
+    const download = File.createDownloadTask(
+      release.assetDownloadUrl,
+      destinationFile,
+      {
+        headers: getDownloadHeaders(release),
+        onProgress: (event) => {
+          const expectedBytes = event.totalBytes > 0
+            ? event.totalBytes
+            : release.assetSizeBytes;
+          const progress = expectedBytes
+            ? Math.min(event.bytesWritten / expectedBytes, 1)
+            : null;
 
-        onProgress?.(createProgress(
-          'downloading',
-          progress,
-          event.bytesWritten,
-          expectedBytes,
-        ));
+          onProgress?.(createProgress(
+            'downloading',
+            progress,
+            event.bytesWritten,
+            expectedBytes,
+          ));
+        },
       },
-    },
-  );
+    );
 
-  onProgress?.(createProgress('downloading', 0, 0, release.assetSizeBytes));
+    onProgress?.(createProgress('downloading', 0, 0, release.assetSizeBytes));
 
-  const result = await download.downloadAsync();
-  if (!result) {
-    throw new Error('Update download was cancelled');
+    const result = await download.downloadAsync();
+    if (!result) {
+      throw new Error('Update download was cancelled');
+    }
+
+    const downloadedSize = result.size > 0 ? result.size : release.assetSizeBytes;
+    onProgress?.(createProgress('opening-installer', 1, downloadedSize, release.assetSizeBytes));
+    await androidApkInstaller.installApk(result.uri);
+  } catch (error) {
+    if (destinationFile.exists) {
+      destinationFile.delete();
+    }
+    throw error;
   }
+}
 
-  onProgress?.(createProgress('opening-installer', 1, release.assetSizeBytes, release.assetSizeBytes));
-  await androidApkInstaller.installApk(result.uri);
+async function cleanDownloadedUpdates(): Promise<void> {
+  const downloadDirectory = getDownloadDirectory();
+  if (downloadDirectory.exists) {
+    downloadDirectory.delete();
+  }
 }
 
 export const appUpdateService = {
@@ -235,4 +248,5 @@ export const appUpdateService = {
   },
 
   downloadAndInstallUpdate: downloadAndInstallApk,
+  cleanDownloadedUpdates,
 };

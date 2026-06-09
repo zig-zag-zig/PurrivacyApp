@@ -68,12 +68,14 @@ export const AppUpdateModal = ({
     }
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose();
+      if (!updating) {
+        onClose();
+      }
       return true;
     });
 
     return () => subscription.remove();
-  }, [onClose, visible]);
+  }, [onClose, updating, visible]);
 
   if (!visible) {
     return null;
@@ -212,10 +214,9 @@ export const AppUpdateModal = ({
             />
             {showUpdateAction && availableRelease ? (
               <Button
-                label={updating ? getProgressLabel(downloadProgress) : availableRelease.downloadLabel}
+                label={updating ? 'Downloading' : availableRelease.downloadLabel}
                 onPress={onUpdate}
-                loading={updating}
-                disabled={updating}
+                disabled={updating || !availableRelease.canInstallInApp}
                 style={commonStyles.flex}
                 icon={updating ? undefined : <Icon name="download" size={20} color={theme.colors.onPrimary} />}
               />

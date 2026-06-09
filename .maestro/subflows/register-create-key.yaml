@@ -331,7 +331,12 @@ env:
       - tapOn:
           id: "purrivacy.seed.challenge.word.24"
       - inputText: ${output.seedWord24}
-- hideKeyboard
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.seed.challenge.verify"
+    direction: DOWN
+    timeout: 15000
 - tapOn:
     id: "purrivacy.seed.challenge.verify"
 - extendedWaitUntil:

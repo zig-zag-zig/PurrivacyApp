@@ -13,6 +13,8 @@ vi.mock('expo-constants', () => ({
 vi.mock('expo-file-system', () => {
   class Directory {
     uri: string;
+    exists = false;
+    delete = vi.fn();
 
     constructor(...parts: Array<string | { uri: string }>) {
       this.uri = parts.map(part => typeof part === 'string' ? part : part.uri).join('/');
@@ -24,6 +26,7 @@ vi.mock('expo-file-system', () => {
   class File {
     uri: string;
     exists = false;
+    size = 0;
     delete = vi.fn();
 
     constructor(...parts: Array<string | { uri: string }>) {

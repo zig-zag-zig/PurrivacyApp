@@ -1,4 +1,5 @@
-import React, { createContext, ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { useToast } from '../../../app/state/ToastContext';
 import { AppUpdateModal } from '../components/AppUpdateModal';
@@ -61,6 +62,20 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
   const installingRef = useRef(false);
   const isConfigured = appUpdateService.isConfigured();
   const canInstallUpdates = appUpdateService.isInstallSupported();
+
+  useEffect(() => {
+    void appUpdateService.cleanDownloadedUpdates().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && !installingRef.current) {
+        void appUpdateService.cleanDownloadedUpdates().catch(() => undefined);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const checkForUpdates = useCallback(async (options: UpdateCheckOptions = {}) => {
     if (checkingRef.current) return;
@@ -157,7 +172,9 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     downloadProgress,
     checkForUpdates,
     showUpdateModal: () => setModalVisible(true),
-    hideUpdateModal: () => setModalVisible(false),
+    hideUpdateModal: () => {
+      if (!downloadProgress) setModalVisible(false);
+    },
     installUpdate,
     skipLatestRelease,
   }), [
