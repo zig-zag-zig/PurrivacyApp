@@ -10,24 +10,7 @@ import type { ApiRequestFn } from '../core/apiRequestFactory';
 import { getUser } from '../../features/auth/domain/authUtils';
 import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
-
-async function parseJsonResponse(response: Response): Promise<Record<string, any>> {
-  const responseText = await response.text().catch(() => '');
-  if (!responseText) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(responseText);
-  } catch {
-    return {
-      error: response.ok
-        ? responseText
-        : responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-          || `Request failed with status ${response.status}`,
-    };
-  }
-}
+import { parseResponseBody } from '../request/parseResponseBody';
 
 async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<any> {
   const currentUser = getUser();
@@ -52,7 +35,7 @@ async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<any>
     });
   }
 
-  const data = await parseJsonResponse(response);
+  const data = await parseResponseBody(response);
   const requestId = response.headers.get('x-request-id');
   if (requestId) {
     data.requestId = data.requestId || requestId;

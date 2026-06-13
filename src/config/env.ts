@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { getFirebaseAuthEmulatorUrl } from './firebaseEmulator';
 
-function parseNumberEnv(value: string | undefined, defaultValue: number, min = 0): number {
+export function parseNumberEnv(value: string | undefined, defaultValue: number, min = 0): number {
   if (!value) {
     return defaultValue;
   }
@@ -14,7 +14,7 @@ function parseNumberEnv(value: string | undefined, defaultValue: number, min = 0
   return parsed;
 }
 
-function parseFloatEnv(value: string | undefined, defaultValue: number, min = 0, max = 1): number {
+export function parseFloatEnv(value: string | undefined, defaultValue: number, min = 0, max = 1): number {
   if (!value) {
     return defaultValue;
   }
@@ -37,7 +37,7 @@ function getRequiredEnv(name: string): string {
   return trimmed;
 }
 
-function parseBooleanEnv(value: string | undefined, defaultValue = false): boolean {
+export function parseBooleanEnv(value: string | undefined, defaultValue = false): boolean {
   if (!value) {
     return defaultValue;
   }
@@ -53,11 +53,11 @@ function parseBooleanEnv(value: string | undefined, defaultValue = false): boole
   return defaultValue;
 }
 
-function ensureTrailingSlash(value: string): string {
+export function ensureTrailingSlash(value: string): string {
   return value.endsWith('/') ? value : `${value}/`;
 }
 
-function parseApiBaseUrl(value: string): string {
+export function parseApiBaseUrl(value: string): string {
   const trimmed = value.trim();
   if (!/^https?:\/\//i.test(trimmed)) {
     throw new Error('[env] EXPO_PUBLIC_API_BASE_URL must start with http:// or https://');
@@ -66,7 +66,7 @@ function parseApiBaseUrl(value: string): string {
   return ensureTrailingSlash(trimmed);
 }
 
-function parseAuthEmailDomain(value: string): string {
+export function parseAuthEmailDomain(value: string): string {
   const trimmed = value.trim().toLowerCase();
   if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(trimmed)) {
     throw new Error('[env] EXPO_PUBLIC_AUTH_EMAIL_DOMAIN must be a valid domain');
@@ -75,7 +75,7 @@ function parseAuthEmailDomain(value: string): string {
   return trimmed;
 }
 
-function parseOptionalFirebaseProjectId(value: string | undefined, appEnv: string): string | null {
+export function parseOptionalFirebaseProjectId(value: string | undefined, appEnv: string): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
     return null;
@@ -107,7 +107,7 @@ function deriveApiVersionFromAppVersion(): string {
   return `v${major}`;
 }
 
-function parseApiVersion(value: string | undefined, defaultValue = 'v1'): string {
+export function parseApiVersion(value: string | undefined, defaultValue = 'v1'): string {
   let normalized = value?.trim() || defaultValue;
   normalized = normalized.replace(/^\/+|\/+$/g, '').toLowerCase();
 
@@ -122,7 +122,7 @@ function parseApiVersion(value: string | undefined, defaultValue = 'v1'): string
   return normalized;
 }
 
-function parseOptionalGitHubRepoUrl(value: string | undefined): string | null {
+export function parseOptionalGitHubRepoUrl(value: string | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
     return null;
@@ -148,12 +148,12 @@ function parseOptionalGitHubRepoUrl(value: string | undefined): string | null {
   return `https://github.com/${owner}/${repo}`;
 }
 
-function parseOptionalString(value: string | undefined): string | null {
+export function parseOptionalString(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed || null;
 }
 
-function parseOptionalUrl(value: string | undefined, name: string): string | null {
+export function parseOptionalUrl(value: string | undefined, name: string): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
     return null;
