@@ -7,19 +7,24 @@ const path = require('path');
 const projectRoot = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const allowedArgs = new Set(['--clean', '--dry-run', '--smoke']);
-const defaultAvdName = 'PurrivacyPawifyE2E';
+const defaultAvdName = 'PurrivacyE2E';
 
-for (const arg of args) {
-  if (!allowedArgs.has(arg)) {
-    console.error(`[e2e] Unknown option: ${arg}`);
-    console.error('[e2e] Usage: node scripts/run-local-android-e2e.cjs [--clean] [--smoke] [--dry-run]');
-    process.exit(2);
-  }
-}
-
+// Parse known flags and collect --flow <value> pairs
 const clean = args.includes('--clean');
 const dryRun = args.includes('--dry-run');
 const smoke = args.includes('--smoke');
+const flowIndex = args.indexOf('--flow');
+const flow = flowIndex !== -1 ? args[flowIndex + 1] : null;
+
+for (const arg of args) {
+  if (arg === '--flow') continue; // handled separately
+  if (flowIndex !== -1 && arg === flow) continue; // the flow value
+  if (!allowedArgs.has(arg)) {
+    console.error(`[e2e] Unknown option: ${arg}`);
+    console.error('[e2e] Usage: node scripts/run-local-android-e2e.cjs [--clean] [--smoke] [--dry-run] [--flow <path>]');
+    process.exit(2);
+  }
+}
 
 class CommandError extends Error {
   constructor(message, exitCode = 1) {
@@ -265,6 +270,9 @@ if (dryRun) {
 const maestroArgs = ['scripts/run-local-maestro-e2e.cjs'];
 if (smoke) {
   maestroArgs.push('--smoke');
+}
+if (flow) {
+  maestroArgs.push('--flow', flow);
 }
 
 let emulatorState = null;
