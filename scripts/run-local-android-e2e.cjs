@@ -61,6 +61,22 @@ function runAdbBestEffort(deviceId, commandArgs, options = {}) {
   return runBestEffort('adb', ['-s', deviceId, ...commandArgs], options);
 }
 
+function getAvdNameForDevice(deviceId) {
+  const result = runBestEffort('adb', ['-s', deviceId, 'emu', 'avd', 'name'], {
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8',
+  });
+
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+
+  return String(result.stdout ?? '')
+    .split('\n')
+    .map(line => line.replace(/\r/g, '').trim())
+    .find(line => line.length > 0 && line !== 'OK') ?? null;
+}
+
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
@@ -147,18 +163,20 @@ function resolveAvdName(emulatorBinary) {
   throw new CommandError('[e2e] No Android emulator AVDs are available.');
 }
 
-function waitForEmulatorDevice(timeoutMs = 120000) {
+function waitForEmulatorDevice(expectedAvd, timeoutMs = 120000) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const deviceId = listConnectedEmulatorIds()[0];
-    if (deviceId) {
-      return deviceId;
+    for (const deviceId of listConnectedEmulatorIds()) {
+      const avdName = getAvdNameForDevice(deviceId);
+      if (avdName === expectedAvd) {
+        return deviceId;
+      }
     }
     sleep(1000);
   }
 
-  throw new CommandError('[e2e] Timed out waiting for Android emulator to appear in adb devices.');
+  throw new CommandError(`[e2e] Timed out waiting for Android emulator (${expectedAvd}) to appear in adb devices.`);
 }
 
 function waitForEmulatorBoot(deviceId, timeoutMs = 180000) {
@@ -182,6 +200,16 @@ function waitForEmulatorBoot(deviceId, timeoutMs = 180000) {
   throw new CommandError(`[e2e] Timed out waiting for Android emulator to finish booting: ${deviceId}`);
 }
 
+function getConnectedEmulatorForAvd(expectedAvd) {
+  for (const deviceId of listConnectedEmulatorIds()) {
+    const avdName = getAvdNameForDevice(deviceId);
+    if (avdName === expectedAvd) {
+      return deviceId;
+    }
+  }
+  return null;
+}
+
 function ensureEmulatorForE2E() {
   if (dryRun) {
     return null;
@@ -197,16 +225,16 @@ function ensureEmulatorForE2E() {
     return null;
   }
 
-  const existingEmulator = listConnectedEmulatorIds()[0];
+  const emulatorBinary = getEmulatorBinary();
+  const avdName = resolveAvdName(emulatorBinary);
+
+  const existingEmulator = getConnectedEmulatorForAvd(avdName);
   if (existingEmulator) {
     process.env.ANDROID_SERIAL = existingEmulator;
     waitForEmulatorBoot(existingEmulator);
-    console.log(`[e2e] using running Android emulator ${existingEmulator}`);
+    console.log(`[e2e] using running Android emulator ${existingEmulator} (${avdName})`);
     return null;
   }
-
-  const emulatorBinary = getEmulatorBinary();
-  const avdName = resolveAvdName(emulatorBinary);
   const emulatorArgs = ['-avd', avdName, '-no-boot-anim', '-no-snapshot-save'];
   if (process.env.PURRIVACY_E2E_HEADLESS === 'true') {
     emulatorArgs.push('-no-window');
@@ -226,7 +254,7 @@ function ensureEmulatorForE2E() {
 
   let deviceId = null;
   try {
-    deviceId = waitForEmulatorDevice();
+    deviceId = waitForEmulatorDevice(avdName);
     process.env.ANDROID_SERIAL = deviceId;
     waitForEmulatorBoot(deviceId);
     console.log(`[e2e] Android emulator ready: ${deviceId}`);

@@ -91,6 +91,26 @@ npm run android
 npm run ios
 ```
 
+Run tests and type checks:
+
+```bash
+npm test              # run all Vitest tests (350+ tests across 39 files)
+npm run typecheck     # TypeScript type checking only
+npm run verify        # typecheck + test (fast local quality gate)
+```
+
+Run a specific test file:
+
+```bash
+npx vitest run src/features/auth/domain/usernameIdentity.test.ts
+```
+
+Run tests in watch mode during development:
+
+```bash
+npx vitest
+```
+
 Check environment injection without starting or building the app:
 
 ```bash
@@ -98,14 +118,6 @@ npm run env:check:development
 npm run env:check:production
 npm run env:check:e2e
 ```
-
-Run the fast local quality gate:
-
-```bash
-npm run verify
-```
-
-`verify` runs TypeScript checks and the Vitest suite. Android build scripts run this first and stop immediately if it fails.
 
 Run Expo dependency/tooling checks:
 
@@ -199,6 +211,12 @@ Run only the smoke flow:
 npm run e2e:smoke
 ```
 
+Run a single e2e flow:
+
+```bash
+npm run e2e -- --flow .maestro/logged-in-happy-path.yaml
+```
+
 Forward flags after `--`:
 
 ```bash
@@ -206,11 +224,12 @@ npm run e2e -- --clean
 npm run e2e:smoke -- --clean
 npm run e2e -- --dry-run
 npm run e2e -- --clean --dry-run
+npm run e2e -- --flow .maestro/smoke.yaml --clean
 ```
 
 `e2e` and `e2e:smoke` run `verify`, build and install the e2e APK, start the local backend/Firebase emulator stack, then run Maestro. Dry-run mode previews the e2e APK build/install path and skips Maestro.
 
-Local e2e runs always target an Android emulator because the e2e APK uses emulator-only `10.0.2.2` service addresses. The runner starts the `PurrivacyPawifyE2E` AVD when no emulator is already running and refuses connected physical devices. Set `PURRIVACY_E2E_AVD=YourAvdName` to use a different AVD, `PURRIVACY_E2E_HEADLESS=true` to start it without a window, or `PURRIVACY_E2E_KEEP_EMULATOR=true` to leave an emulator started by the runner open after tests.
+Local e2e runs always target an Android emulator because the e2e APK uses emulator-only `10.0.2.2` service addresses. The runner starts the `PurrivacyE2E` AVD when no emulator is already running and refuses connected physical devices. Set `PURRIVACY_E2E_AVD=YourAvdName` to use a different AVD, `PURRIVACY_E2E_HEADLESS=true` to start it without a window, or `PURRIVACY_E2E_KEEP_EMULATOR=true` to leave an emulator started by the runner open after tests.
 
 Normal debug and release installs may target a physical phone; only the local e2e runner is emulator-only.
 
@@ -220,12 +239,33 @@ PurrivacyApp e2e uses backend port `5000` and Firebase Auth emulator port `9099`
 
 ## Testing
 
-Run individual checks when you want a tighter loop:
+The project has 350+ unit tests across 39 test files, covering ~90% of pure functions including all security-critical paths.
+
+### Running Tests
 
 ```bash
-npm test
-npm run typecheck
+npm test                          # run all tests once
+npm run typecheck                 # TypeScript type checking only
+npm run verify                    # typecheck + test (pre-push quality gate)
+npx vitest                        # watch mode for development
+npx vitest run path/to/file.test.ts  # run a single test file
 ```
+
+### What's Tested
+
+| Area | Test Files | Coverage |
+|------|-----------|----------|
+| Auth identity & username | `usernameIdentity.test.ts`, `authErrorGuards.test.ts` | sanitize, validate, email mapping, error guards |
+| Session management | `sessionErrors.test.ts`, `accessTokenStore.test.ts`, `sessionManager.test.ts` | token expiry, session creation, sign-out, error classification |
+| API request pipeline | `httpErrorHandler.test.ts`, `parseResponseBody.test.ts`, `mfaSensitivity.test.ts`, `buildApiUrl.test.ts` | error routing, response parsing, MFA enforcement, URL building |
+| Config parsing | `env.test.ts`, `firebaseEmulator.test.ts` | 10+ env parsers, emulator URL parsing |
+| Version & updates | `updateVersion.test.ts`, `githubReleaseClient.test.ts`, `updateCopy.test.ts`, `appUpdateService.test.ts` | version comparison, GitHub API, update copy |
+| Reducers | `encryptReducer.test.ts`, `decryptReducer.test.ts`, `settingsReducer.test.ts`, `keyScreenReducer.test.ts` | all action types, state transitions |
+| Domain logic | `encryptDomain.test.ts`, `decryptDomain.test.ts`, `keyScreenDomain.test.ts`, `mfaState.test.ts`, `mfaModalClose.test.ts` | passphrase required, key selection, MFA state |
+| Key management | `displayNameUtils.test.ts`, `pgpValidation.test.ts`, `keyUtils.test.ts`, `pgpKeyService.test.ts`, `passphraseBannerPlacement.test.ts` | armor validation, key type identification, display names |
+| Security & crypto | `authCryptoAesBridge.test.ts`, `secureSessionStorage.test.ts`, `recoverySeedService.test.ts` | AES bridge, session storage lifecycle, seed verification |
+| Error handling | `errorHandling.test.ts`, `logger.test.ts` | user-facing messages, secret redaction |
+| Other | `keyboardAwareScroll.test.ts`, `mfaFlow.test.ts`, `sharePayloadNormalization.test.ts`, `appConfig.test.ts` | scroll math, MFA retry, share payloads, config |
 
 Use `npm run verify` before pushing app logic changes, and use `npm run doctor` after package or Expo SDK changes.
 
@@ -239,8 +279,10 @@ src/config/     Environment and Firebase setup
 src/features/   Feature modules
 src/hooks/      Shared React hooks
 src/services/   Cross-feature services
+src/shared/     Shared types, error classes, and reusable utilities
 src/styles/     Theme and shared styles
 scripts/        Build, environment, and native-template scripts
+tests/          Integration and cross-module test helpers
 assets/         App icons and bundled runtime assets
 ```
 

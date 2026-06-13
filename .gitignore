@@ -81,3 +81,4 @@ yarn-error.*
 
 android/*
 ios/*
+*-debug.log
