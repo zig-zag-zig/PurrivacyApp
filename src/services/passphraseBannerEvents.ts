@@ -34,3 +34,9 @@ export const requestPassphraseBannerDismiss = (): void => {
         listeners.forEach(listener => listener());
     }, DISMISS_FOCUS_SETTLE_MS);
 };
+
+export const resetForTesting = (): void => {
+    listeners.clear();
+    repositionListeners.clear();
+    suppressDismissUntil = 0;
+};

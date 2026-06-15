@@ -1,25 +1,8 @@
 import { EventService } from '../../services/eventService';
 import { logger } from '../../utils/logger';
 import { handleHttpError } from './httpErrorHandler';
+import { parseResponseBody } from './parseResponseBody';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
-
-const parseResponseBody = async (response: Response): Promise<any> => {
-    const responseText = await response.text().catch(() => '');
-    if (!responseText) {
-        return {};
-    }
-
-    try {
-        return JSON.parse(responseText);
-    } catch {
-        return {
-            error: response.ok
-                ? responseText
-                : responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() ||
-                `HTTP error! Status: ${response.status}`,
-        };
-    }
-};
 
 export async function processResponse(
     response: Response,

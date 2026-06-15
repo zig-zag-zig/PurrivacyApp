@@ -59,4 +59,9 @@ export const EventService = {
     },
 
     getPendingEvents: () => new Map(pendingEvents),
+
+    resetForTesting: () => {
+        pendingEvents.clear();
+        eventListeners.clear();
+    },
 };
