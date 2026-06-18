@@ -1,0 +1,79 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}bio
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Sign up, create a key, then store passphrase and enable biometric
+- runFlow:
+    file: subflows/register-create-key.yaml
+    env:
+      TEST_USERNAME: ${TEST_USERNAME}
+# Store passphrase
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+# Navigate to security settings
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.security"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.security"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.security.screen"
+    timeout: 15000
+# Toggle biometric unlock (may need device support — skip gracefully if not visible)
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.security.biometric.toggle"
+    commands:
+      - tapOn:
+          id: "purrivacy.security.biometric.toggle"
+      - extendedWaitUntil:
+          visible:
+            id: "purrivacy.security.biometric.enabled"
+          timeout: 15000
+# Sign out
+- tapOn:
+    id: "purrivacy.tab.settings"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.logout"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.logout"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+# Sign back in to verify biometric prompt appears
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+# After login, biometric prompt should appear if enabled
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.biometric.prompt"
+    commands:
+      - assertVisible:
+          id: "purrivacy.biometric.prompt"

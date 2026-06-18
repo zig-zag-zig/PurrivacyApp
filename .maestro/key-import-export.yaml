@@ -1,0 +1,79 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}kie
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+  IMPORT_PUBLIC_KEY: |
+    -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+    xjMEaSyuzxYJKwYBBAHaRw8BAQdAeU3U2WLZ3CvMEEvtsM9BF+jgEwHS
+    T2f1UvxPmSh5nSnNEXRlc3Qta2V5LWV4cG9ydMKSBBMWCgA+FiEEfZZD
+    /V9MtA2JxQoH7A6LxZ+H3PACngUCaSyu1wIbAwUJBaTHZgQLCQgHBRYI
+    CwEGFxMCAHkCHgEACgkQ7A6LxZ+H3PBOtQEAg4GLBmC0zQYtqPNAdMoW
+    hIOHRSBsIVv6Q5+3LJ9dDzEA/1vK6xPqVzNcY9YqKRAmDqN6iMe8BQ/h
+    ZjSMNAI3O6Ozzo4EaSyu1xIKKwYBBAGXVQEFAQEHQMZ4S6d2pBFBhzR5
+    K/H2LXHPI7EEWJY6fhKMXiMRn4hDAwEKCcJ+BBgWCgAmFiEEfZZD/V9M
+    tA2JxQoH7A6LxZ+H3PACngUCaSyu1wIbDAUJBaTHZgAKCRDsDovFn4fc
+    8M8sAP9HPLFQj/rnPIHgTVISwZHeOpXJIY+0TbHOp4XJUnWU9AD/W95a
+    KN7YpKfYeNZB6vQQK6PnYIQWp2Vm4h8hSAZMRwg=
+    =eJpr
+    -----END PGP PUBLIC KEY BLOCK-----
+  IMPORT_PRIVATE_KEY: |
+    -----BEGIN PGP PRIVATE KEY BLOCK-----
+
+    xVgEaSyu1xYJKwYBBAHaRw8BAQdAeU3U2WLZ3CvMEEvtsM9BF+jgEwHS
+    T2f1UvxPmSh5nSkAAP9GcGdLZQ40Nfn42FvsAkFjjRclQR7Ig1h5DpO4
+    KHhxMRH2zRF0ZXN0LWNhdC1leHBvcnTCkgQTFgoAPhYhBH2WQ/1fTLQN
+    icUKB+wOi8Wfh9wCnwUCaSyu1wIbAwUJBaTHZgQLCQgHBRYICwEGFxMC
+    AHkCHgEACgkQ7A6LxZ+H3PBOtQEAg4GLBmC0zQYtqPNAdMoWhIOHRSBs
+    IVv6Q5+3LJ9dDzEA/1vK6xPqVzNcY9YqKRAmDqN6iMe8BQ/hZjSMNAI3
+    O6Ozx10EaSyu1xIKKwYBBAGXVQEFAQEHQMZ4S6d2pBFBhzR5K/H2LXHP
+    I7EEWJY6fhKMXiMRn4hDAwEKCQAA/1yH2ksqX0KpbzM1VTPY6HzTMsEd
+    qQMkSXmn2FvwsRrRETDCfgQYFgoAJhYhBH2WQ/1fTLQNicUKB+wOi8Wf
+    h9wCnwUCaSyu1wIbDAUJBaTHZgAKCRDsDovFn4fc8M8sAP9HPLFQj/rn
+    PIHgTVISwZHeOpXJIY+0TbHOp4XJUnWU9AD/W95aKN7YpKfYeNZB6vQQ
+    K6PnYIQWp2Vm4h8hSAZMRwg=
+    =kfRx
+    -----END PGP PRIVATE KEY BLOCK-----
+---
+# Sign up, create a key, then import a second key
+- runFlow:
+    file: subflows/register-create-key.yaml
+    env:
+      TEST_USERNAME: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+# Switch to Import tab and paste the public key
+- tapOn:
+    id: "purrivacy.key.action.import"
+- tapOn:
+    id: "purrivacy.key.import.armoredKey"
+- inputText: ${IMPORT_PUBLIC_KEY}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.key.import.submit"
+# Verify imported key appears
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 30000
+# Switch back to import and import the linked private key
+- tapOn:
+    id: "purrivacy.key.action.import"
+- tapOn:
+    id: "purrivacy.key.import.armoredKey"
+- inputText: ${IMPORT_PRIVATE_KEY}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.key.import.submit"
+# Verify now have at least 2 key items
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 30000
+# Verify we are back on the key screen
+- assertVisible:
+    id: "purrivacy.key.screen"

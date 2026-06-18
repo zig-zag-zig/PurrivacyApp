@@ -37,8 +37,6 @@ export const createApiRequester = (createSession: CreateSessionFn): ApiRequestFn
         const url = buildApiUrl(endpoint);
 
         if (await isSensitiveAndRequiresMfa(endpoint, method) && !options?.mfaCode) {
-            await buildAuthHeaders(requiresAuth, retryOnFailure, createSession, options);
-
             return await handleHttpError(
                 403,
                 { mfaRequiredSensitive: true },

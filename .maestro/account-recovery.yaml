@@ -1,0 +1,226 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}rec
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Register and capture seed phrase for recovery
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.signup"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signup.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signup.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signup.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- tapOn:
+    id: "purrivacy.signup.confirmPassword"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signup.submit"
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.signup.submit"
+    commands:
+      - tapOn:
+          id: "purrivacy.signup.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.seed.saved"
+    timeout: 15000
+# Capture the recovery seed words
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 0
+- evalScript: ${output.rw1 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 1
+- evalScript: ${output.rw2 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 2
+- evalScript: ${output.rw3 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 3
+- evalScript: ${output.rw4 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 4
+- evalScript: ${output.rw5 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 5
+- evalScript: ${output.rw6 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 6
+- evalScript: ${output.rw7 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 7
+- evalScript: ${output.rw8 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 8
+- evalScript: ${output.rw9 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 9
+- evalScript: ${output.rw10 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 10
+- evalScript: ${output.rw11 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 11
+- evalScript: ${output.rw12 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 12
+- evalScript: ${output.rw13 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 13
+- evalScript: ${output.rw14 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 14
+- evalScript: ${output.rw15 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 15
+- evalScript: ${output.rw16 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 16
+- evalScript: ${output.rw17 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 17
+- evalScript: ${output.rw18 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 18
+- evalScript: ${output.rw19 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 19
+- evalScript: ${output.rw20 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 20
+- evalScript: ${output.rw21 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 21
+- evalScript: ${output.rw22 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 22
+- evalScript: ${output.rw23 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 23
+- evalScript: ${output.rw24 = maestro.copiedText}
+# Build the recovery phrase
+- evalScript: ${output.recoveryPhrase = output.rw1 + ' ' + output.rw2 + ' ' + output.rw3 + ' ' + output.rw4 + ' ' + output.rw5 + ' ' + output.rw6 + ' ' + output.rw7 + ' ' + output.rw8 + ' ' + output.rw9 + ' ' + output.rw10 + ' ' + output.rw11 + ' ' + output.rw12 + ' ' + output.rw13 + ' ' + output.rw14 + ' ' + output.rw15 + ' ' + output.rw16 + ' ' + output.rw17 + ' ' + output.rw18 + ' ' + output.rw19 + ' ' + output.rw20 + ' ' + output.rw21 + ' ' + output.rw22 + ' ' + output.rw23 + ' ' + output.rw24}
+- tapOn:
+    id: "purrivacy.seed.saved"
+# Complete seed verification
+- extendedWaitUntil:
+    visible: "Verify Recovery Seed"
+    timeout: 15000
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.1"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.1"
+      - inputText: ${output.rw1}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.2"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.2"
+      - inputText: ${output.rw2}
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.seed.challenge.verify"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.seed.challenge.verify"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 30000
+# Account is created — now test the recovery flow by signing out and using Recover
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.logout"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.logout"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+# Navigate to recovery screen
+- tapOn:
+    id: "purrivacy.signin.recover"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.recover.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.recover.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.recover.seed"
+- inputText: ${output.recoveryPhrase}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.recover.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.recover.newPassword"
+    timeout: 30000
+- tapOn:
+    id: "purrivacy.recover.newPassword"
+- inputText: "NewRecoveryPass-123"
+- tapOn:
+    id: "purrivacy.recover.confirmPassword"
+- inputText: "NewRecoveryPass-123"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.recover.submit"
+# After recovery, should land on the signin screen with the new password
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 30000

@@ -43,6 +43,68 @@ describe('keyScreenReducer import state', () => {
       importKeyType: 'public',
     });
   });
+
+  it('updates importPassphrase on importPassphraseChanged', () => {
+    const result = keyScreenReducer(initialKeyScreenState, {
+      type: 'importPassphraseChanged',
+      importPassphrase: 'my-passphrase',
+    });
+    expect(result.importPassphrase).toBe('my-passphrase');
+  });
+
+  it('updates importPassphraseError on importPassphraseErrorChanged', () => {
+    const result = keyScreenReducer(initialKeyScreenState, {
+      type: 'importPassphraseErrorChanged',
+      importPassphraseError: 'Incorrect passphrase',
+    });
+    expect(result.importPassphraseError).toBe('Incorrect passphrase');
+  });
+
+  it('updates metadata on metadataChanged', () => {
+    const metadata = { algorithm: 'ECDSA', expiry: '1y', fingerprint: 'fp-abc', privateKeyIsUnlocked: true, userId: 'Alice' };
+    const result = keyScreenReducer(initialKeyScreenState, {
+      type: 'metadataChanged',
+      metadata,
+    });
+    expect(result.metadata).toBe(metadata);
+  });
+
+  it('toggles loading and deleting flags', () => {
+    const loading = keyScreenReducer(initialKeyScreenState, { type: 'loadingChanged', isLoading: true });
+    expect(loading.isLoading).toBe(true);
+
+    const deleting = keyScreenReducer(initialKeyScreenState, { type: 'deletingChanged', isDeleting: true });
+    expect(deleting.isDeleting).toBe(true);
+  });
+
+  it('increments formResetKey on formResetIncremented', () => {
+    const result = keyScreenReducer(initialKeyScreenState, { type: 'formResetIncremented' });
+    expect(result.formResetKey).toBe(initialKeyScreenState.formResetKey + 1);
+  });
+
+  it('resets import form state on importFormReset', () => {
+    const dirty: KeysUiState = {
+      ...initialKeyScreenState,
+      importKey: 'key-data',
+      importKeyType: 'private',
+      importPassphrase: 'pass',
+      importPassphraseError: 'bad',
+      isValidPrivateKey: true,
+      metadata: { algorithm: 'RSA', expiry: 'never', fingerprint: 'fp', privateKeyIsUnlocked: false, userId: 'User' },
+    };
+    const result = keyScreenReducer(dirty, { type: 'importFormReset' });
+    expect(result.importKey).toBe('');
+    expect(result.importKeyType).toBe('unknown');
+    expect(result.importPassphrase).toBe('');
+    expect(result.importPassphraseError).toBe('');
+    expect(result.isValidPrivateKey).toBe(false);
+    expect(result.metadata).toBeUndefined();
+  });
+
+  it('returns unchanged state for unknown action', () => {
+    const result = keyScreenReducer(initialKeyScreenState, { type: 'unknown' } as any);
+    expect(result).toBe(initialKeyScreenState);
+  });
 });
 
 const makeTestKey = (fingerprint: string): any => ({

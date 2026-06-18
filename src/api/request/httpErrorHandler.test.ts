@@ -1,7 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.hoisted(() => { (globalThis as any).__DEV__ = true; });
-
 const eventServiceMock = vi.hoisted(() => ({
     addEvent: vi.fn(),
 }));
@@ -35,6 +33,7 @@ vi.mock('../../utils/logger', () => ({
 
 import { handleHttpError } from './httpErrorHandler';
 import { ApiRequestError } from '../apiError';
+import { AuthFlowError } from '../auth/authFlowError';
 
 const noop = async () => ({} as any);
 
@@ -57,10 +56,14 @@ describe('handleHttpError', () => {
         expect(mfaErrorHandlerMock.handleRateLimitError).toHaveBeenCalled();
     });
 
-    it('throws sessionError for refresh endpoint with refreshTokenMissing', async () => {
+    it('throws AuthFlowError for refresh endpoint with refreshTokenMissing', async () => {
         await expect(
             handleHttpError(401, { refreshTokenMissing: true }, '/auth/session/refresh', 'POST', {}, true, true, undefined, noop, noop),
-        ).rejects.toMatchObject({ sessionError: { refreshTokenMissing: true }, status: 401 });
+        ).rejects.toMatchObject({
+            name: 'AuthFlowError',
+            sessionError: { refreshTokenMissing: true },
+            status: 401,
+        });
     });
 
     it('triggers sign-out for auth-invalidating errors with retryOnFailure', async () => {
@@ -83,11 +86,16 @@ describe('handleHttpError', () => {
         ).rejects.toThrow(ApiRequestError);
     });
 
-    it('throws sessionError for session endpoint with mfaRequired', async () => {
+    it('throws AuthFlowError for session endpoint with mfaRequired', async () => {
         await expect(
             handleHttpError(403, { mfaRequired: true }, '/auth/session', 'POST', {}, true, false, undefined, noop, noop),
-        ).rejects.toMatchObject({ sessionError: { mfaRequired: true }, status: 403 });
+        ).rejects.toMatchObject({
+            name: 'AuthFlowError',
+            sessionError: { mfaRequired: true },
+            status: 403,
+        });
     });
+
     it('delegates to handleSensitiveMfaError for mfaRequiredSensitive with retry', async () => {
         mfaErrorHandlerMock.handleSensitiveMfaError.mockResolvedValueOnce({ success: true });
         const requestFn = vi.fn(async () => ({} as any));
@@ -125,24 +133,17 @@ describe('handleHttpError', () => {
         expect(requestFn).toHaveBeenCalledWith('/api/test', 'GET', {}, true, undefined, false);
     });
 
-    it('delegates to handleMissingHeadersError for accessTokenInvalid', async () => {
-        mfaErrorHandlerMock.handleMissingHeadersError.mockResolvedValueOnce({ recovered: true });
-        const requestFn = vi.fn(async () => ({} as any));
-
-        // Use accessTokenInvalid but NOT in the AUTH_INVALIDATING_ERROR_FLAGS that trigger signOut
-        // Actually accessTokenInvalid IS in that list, so signOut is called first.
-        // This path is unreachable in practice for auth-invalidating flags because signOut throws.
-        // Test that signOut is called instead:
+    it('signs out for accessTokenInvalid (in auth-invalidating list)', async () => {
         await expect(
             handleHttpError(
                 401, { accessTokenInvalid: true },
-                '/api/test', 'GET', {}, true, true, {}, requestFn, noop,
+                '/api/test', 'GET', {}, true, true, {}, vi.fn(), noop,
             ),
         ).rejects.toThrow(ApiRequestError);
         expect(eventServiceMock.addEvent).toHaveBeenCalledWith('signOut');
     });
 
-    it('throws wrongMfaCode object when MfaHandler is active', async () => {
+    it('throws AuthFlowError with wrongMfaCode when MfaHandler is active', async () => {
         mfaUtilsMock.getIsInMfaHandler.mockReturnValueOnce(true);
 
         await expect(
@@ -151,9 +152,54 @@ describe('handleHttpError', () => {
                 '/api/test', 'POST', {}, false, true, undefined, noop, noop,
             ),
         ).rejects.toMatchObject({
+            name: 'AuthFlowError',
             wrongMfaCode: true,
-            mfaRequired: true,
-            status: 400,
         });
+    });
+
+    it('throws AuthFlowError when MFA required but does not need auth (retry path)', async () => {
+        await expect(
+            handleHttpError(
+                403, { mfaRequiredSensitive: true },
+                '/api/test', 'POST', {}, false, true, undefined, noop, noop,
+            ),
+        ).rejects.toMatchObject({
+            name: 'AuthFlowError',
+            sessionError: { mfaRequiredSensitive: true },
+            status: 403,
+        });
+    });
+
+    it('triggers sign-out for non-session MFA required without retry', async () => {
+        await expect(
+            handleHttpError(
+                403, { mfaRequired: true },
+                '/api/test', 'POST', {}, true, false, undefined, noop, noop,
+            ),
+        ).rejects.toThrow(ApiRequestError);
+        expect(eventServiceMock.addEvent).toHaveBeenCalledWith('signOut');
+    });
+
+    it('throws AuthFlowError for session MFA without retry', async () => {
+        await expect(
+            handleHttpError(
+                403, { mfaRequired: true },
+                '/auth/session', 'POST', {}, true, false, undefined, noop, noop,
+            ),
+        ).rejects.toMatchObject({
+            name: 'AuthFlowError',
+            sessionError: { mfaRequired: true },
+            status: 403,
+        });
+    });
+
+    it('signs out for bearerTokenInvalid without requiresAuth', async () => {
+        await expect(
+            handleHttpError(
+                401, { bearerTokenInvalid: true },
+                '/api/test', 'GET', {}, false, false, undefined, noop, noop,
+            ),
+        ).rejects.toThrow(ApiRequestError);
+        expect(eventServiceMock.addEvent).toHaveBeenCalledWith('signOut');
     });
 });

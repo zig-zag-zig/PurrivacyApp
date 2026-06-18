@@ -4,6 +4,7 @@ import { getUserId } from '../../auth/domain/authUtils';
 import { RequestOptions } from '../../../api/requestHelpers';
 import { EventService } from '../../../services/eventService';
 import { AuthFlowError } from '../../../api/auth/authFlowError';
+import { isWrongMfaCode } from '../../../shared/errors/errorGuards';
 // Track if we're already in an MFA handler to prevent recursive calls
 let isInMfaHandler = false;
 const MFA_SUBMISSION_TIMEOUT_MS = 30_000;
@@ -77,7 +78,7 @@ export class MfaUtils {
                     }
                     return response;
                 } catch (error: any) {
-                    if (error?.wrongMfaCode) {
+                    if (isWrongMfaCode(error)) {
                         EventService.addEvent('clearMfaCode', { isWrongMfaCode: true });
                         continue;
                     }

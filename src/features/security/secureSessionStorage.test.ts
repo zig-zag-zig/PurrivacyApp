@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExpoAesMockControls } from './helpers/expoAesMock';
+import type { ExpoAesMockControls } from '../../__test_helpers__/expoAesMock';
+import { Buffer } from 'buffer';
 
 const storageMock = vi.hoisted(() => {
     const secureStoreValues = new Map<string, string>();
@@ -110,43 +111,43 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('expo-crypto/build/aes', async () => {
-    const { createExpoAesMock } = await import('./helpers/expoAesMock');
+    const { createExpoAesMock } = await import('../../__test_helpers__/expoAesMock');
     aesMockRef.current = createExpoAesMock();
 
     return aesMockRef.current.module;
 });
 
-vi.mock('../src/services/eventService', () => ({
+vi.mock('../../services/eventService', () => ({
     EventService: eventMock,
 }));
 
-vi.mock('../src/utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     logger: loggerMock,
 }));
 
-import { secureAuthStorage } from '../src/config/secureAuthStorage';
+import { secureAuthStorage } from '../../config/secureAuthStorage';
 import {
     LOCAL_LOCK_PREFIX,
     SESSION_PREFIX,
-} from '../src/features/security/domain/secureStorageUtils';
+} from './domain/secureStorageUtils';
 import {
     isLocalSessionLocked,
     setLocalSessionLocked,
-} from '../src/features/security/services/localSessionLockStore';
+} from './services/localSessionLockStore';
 import {
     hasBiometricProtectedStorage,
     hasStandaloneBiometricAuth,
     SecureStorageModule,
     toSecureStoreKey,
-} from '../src/features/security/services/biometricSecureStorage';
+} from './services/biometricSecureStorage';
 import {
     clearStoredSession,
     getStoredSession,
     storeSession,
     updateStoredSessionMfaState,
     updateStoredSessionMfaTrust,
-} from '../src/features/security/services/storedSessionService';
-import { SessionResponse, StoredSession } from '../src/types/types';
+} from './services/storedSessionService';
+import { SessionResponse, StoredSession } from '../../types/types';
 
 const userId = 'user-123';
 const sessionSecureStoreKey = (): string => toSecureStoreKey(`${SESSION_PREFIX}${userId}`);

@@ -2,6 +2,7 @@ import { MfaErrorHandler } from '../../features/mfa/api/mfaErrorHandler';
 import { MfaUtils } from '../../features/mfa/domain/mfaUtils';
 import { EventService } from '../../services/eventService';
 import { ApiRequestError } from '../apiError';
+import { AuthFlowError } from '../auth/authFlowError';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
 
 const signOut = (): never => {
@@ -53,17 +54,19 @@ export async function handleHttpError(
             errorData.refreshTokenExpired ||
             errorData.refreshTokenReuse
         ) {
-            throw { sessionError: errorData, status };
+            throw new AuthFlowError('Refresh token error', { sessionError: errorData, status: status ?? 0 });
         }
     }
 
     if (errorData.wrongMfaCode && MfaUtils.getIsInMfaHandler()) {
-        throw {
+        throw new AuthFlowError('Wrong MFA code', {
             wrongMfaCode: true,
-            mfaRequired: errorData.mfaRequired,
-            mfaRequiredSensitive: errorData.mfaRequiredSensitive,
-            status,
-        };
+            sessionError: {
+                mfaRequired: errorData.mfaRequired,
+                mfaRequiredSensitive: errorData.mfaRequiredSensitive,
+            },
+            status: status ?? 0,
+        });
     }
 
     if (status === 429) {
@@ -86,7 +89,7 @@ export async function handleHttpError(
                 );
             }
 
-            throw { sessionError: errorData, status };
+            throw new AuthFlowError('MFA required but not authenticated', { sessionError: errorData, status: status ?? 0 });
         }
 
         if (
@@ -117,7 +120,7 @@ export async function handleHttpError(
 
     if (!retryOnFailure && !errorData.wrongMfaCode) {
         if (isSession && errorData.mfaRequired) {
-            throw { sessionError: errorData, status };
+            throw new AuthFlowError('MFA required for session', { sessionError: errorData, status: status ?? 0 });
         }
 
         if (hasAuthInvalidatingError(errorData) || (errorData.mfaRequired && !isSession)) {

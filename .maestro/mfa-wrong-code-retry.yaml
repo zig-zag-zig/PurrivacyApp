@@ -1,0 +1,49 @@
+appId: vip.chi_chi.purrivacy.dev
+env:
+  TEST_USERNAME: ${E2E_USERNAME}mfa
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Sign in to an existing account that has MFA enabled
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+# MFA modal should appear
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.mfa.modal"
+    timeout: 30000
+- assertVisible:
+    id: "purrivacy.mfa.code.input"
+# Submit a wrong code first
+- tapOn:
+    id: "purrivacy.mfa.code.input"
+- inputText: "000000"
+- tapOn:
+    id: "purrivacy.mfa.submit"
+# Error should appear and code input should clear
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.mfa.error"
+    timeout: 15000
+- assertVisible:
+    id: "purrivacy.mfa.code.input"
+# Cancel the modal (can't test real TOTP in E2E)
+- tapOn:
+    id: "purrivacy.mfa.cancel"
+# Should return to signin screen
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
