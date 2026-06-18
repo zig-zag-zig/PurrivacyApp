@@ -25,6 +25,7 @@ type KeyManagementFormProps = {
     onNewPassConfirmChange: (value: string) => void;
     onOldPassChange: (value: string) => void;
     pgpKey: KeyPair;
+    storedPassphraseValue?: string | null;
 };
 
 const SURFACE_LABEL_BACKPLATE_PROPS = {
@@ -46,6 +47,7 @@ export const KeyManagementForm = ({
     onNewPassConfirmChange,
     onOldPassChange,
     pgpKey,
+    storedPassphraseValue,
 }: KeyManagementFormProps) => (
     <View style={styles.manageKeySection}>
         <CustomText style={styles.sectionTitle}>Manage key</CustomText>
@@ -59,6 +61,7 @@ export const KeyManagementForm = ({
                     fingerprint={pgpKey.fingerprint}
                     onPassphraseChange={onOldPassChange}
                     hidden={pgpKey.privateKeyIsUnlocked}
+                    storedPassphraseValue={storedPassphraseValue}
                 />
 
                 <GeneratedPassphrasePair

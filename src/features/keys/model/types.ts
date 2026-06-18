@@ -1,4 +1,4 @@
-import type { KeyMetadata } from '../../../types/types';
+import type { KeyMetadata, KeyPair } from '../../../types/types';
 import type { PgpArmorType } from '../domain/pgpValidation';
 
 export type KeyAction = 'view' | 'create' | 'import';
@@ -16,4 +16,6 @@ export interface KeysUiState {
   isDeleting: boolean;
   formResetKey: number;
   expandedKeyFingerprint: string | null;
+  optimisticKeys: KeyPair[];
+  optimisticRemovedFingerprints: string[];
 }

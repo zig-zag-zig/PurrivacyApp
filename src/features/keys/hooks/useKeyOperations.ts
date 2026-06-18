@@ -2,17 +2,15 @@ import type { Dispatch } from 'react';
 import type { User } from 'firebase/auth';
 
 import { useFilePicker } from '../../../hooks/useFilePicker';
-import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyGenerationOptions, KeyPair, UserDecrypted } from '../../../types/types';
 import {
   ERROR_MESSAGES,
   SUCCESS_MESSAGES,
-  executeWithLoading,
   getUserFacingErrorMessage,
 } from '../../../utils/errorHandling';
+import { logger } from '../../../utils/logger';
 import type { ToastType } from '../../../app/state/ToastContext';
-import { securityService } from '../../security/services/securityService';
 import { EventService } from '../../../services/eventService';
 import { identifyKeyType } from '../domain/pgpValidation';
 import {
@@ -27,7 +25,6 @@ import {
 import type { KeysUiState } from '../model/types';
 import { PgpKeyService } from '../services/pgpKeyService';
 import type { KeyScreenAction } from '../state/keyScreenReducer';
-import { persistKeyPassphrase } from '../services/passphrasePersistenceService';
 
 type ShowToast = (message: string, type: ToastType) => void;
 
@@ -49,24 +46,8 @@ export function useKeyOperations({
   showToast,
 }: KeyOperationsParams) {
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'key');
-  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const refreshUserKeys = () => EventService.addEvent('user');
   const refreshDevTempKeys = () => EventService.addEvent('devTempKeys');
-
-  const maybeStorePassphrase = async (
-    fingerprint: string,
-    passphrase: string,
-    options?: { force?: boolean },
-  ) => {
-    if (!user) return;
-    await persistKeyPassphrase({
-      userId: user.uid,
-      fingerprint,
-      passphrase,
-      force: options?.force,
-      ensureConsent: passphrase ? ensurePassphraseStorageConsent : undefined,
-    });
-  };
 
   const onCreateKey = async (
     keyGenerationOptions: KeyGenerationOptions,
@@ -74,31 +55,28 @@ export function useKeyOperations({
   ) => {
     if (!user) return;
 
-    const shouldStorePassphrase = Boolean(
-      keyGenerationOptions.passphrase && await ensurePassphraseStorageConsent(),
-    );
-    const key = await executeWithLoading(
-      () => PgpKeyService.createKey(
+    setLoading(true);
+    try {
+      const key = await PgpKeyService.createKey(
         user.uid,
         keyGenerationOptions,
         setAsDefault,
-        shouldStorePassphrase ? keyGenerationOptions.passphrase : null,
-      ),
-      setLoading,
-      showToast,
-      SUCCESS_MESSAGES.KEY_CREATED,
-      ERROR_MESSAGES.KEY_CREATE_FAILED,
-    );
+        keyGenerationOptions.passphrase || null,
+      );
 
-    if (key && shouldStorePassphrase) {
-      await maybeStorePassphrase(key.fingerprint, keyGenerationOptions.passphrase);
+      if (key) {
+        dispatch({ type: 'optimisticKeyAdded', key });
+        dispatch({ type: 'keyActionChanged', keyAction: 'view' });
+        dispatch({ type: 'formResetIncremented' });
+        refreshUserKeys();
+        showToast(SUCCESS_MESSAGES.KEY_CREATED, 'success');
+        return;
+      }
+    } catch (error: any) {
+      logger.warn('key creation failed', { error });
+      showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.KEY_CREATE_FAILED), 'error');
     }
-
-    if (key) {
-      refreshUserKeys();
-      dispatch({ type: 'keyActionChanged', keyAction: 'view' });
-      dispatch({ type: 'formResetIncremented' });
-    }
+    setLoading(false);
   };
 
   const onImportKey = async (keyContent: string) => {
@@ -153,54 +131,54 @@ export function useKeyOperations({
         setLoading(false);
       }
 
-      const shouldStorePassphrase = Boolean(
-        state.importPassphrase && await ensurePassphraseStorageConsent(),
-      );
-      const importedKey = await executeWithLoading(
-        () => PgpKeyService.importKey(
+      setLoading(true);
+      try {
+        const importedKey = await PgpKeyService.importKey(
           user.uid,
           trimmedContent,
           existingKey?.publicKey,
           state.setImportAsDefault,
-          shouldStorePassphrase ? state.importPassphrase : null,
-        ),
-        setLoading,
-        showToast,
-        SUCCESS_MESSAGES.KEY_IMPORTED,
-        ERROR_MESSAGES.KEY_IMPORT_FAILED,
-      );
+          state.importPassphrase || null,
+        );
 
-      if (importedKey && shouldStorePassphrase) {
-        await maybeStorePassphrase(importedKey.fingerprint, state.importPassphrase);
+        if (importedKey) {
+          dispatch({ type: 'optimisticKeyAdded', key: importedKey });
+          dispatch({ type: 'importFormReset' });
+          dispatch({ type: 'keyActionChanged', keyAction: 'view' });
+          refreshUserKeys();
+          showToast(SUCCESS_MESSAGES.KEY_IMPORTED, 'success');
+          return;
+        }
+      } catch (error: any) {
+        logger.warn('key import failed', { error });
+        showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.KEY_IMPORT_FAILED), 'error');
       }
-
-      if (importedKey) {
-        refreshUserKeys();
-        dispatch({ type: 'importFormReset' });
-        dispatch({ type: 'keyActionChanged', keyAction: 'view' });
-      }
-
+      setLoading(false);
       return;
     }
 
-    const importedKey = await executeWithLoading(
-      () => PgpKeyService.importKey(
+    setLoading(true);
+    try {
+      const importedKey = await PgpKeyService.importKey(
         user.uid,
         trimmedContent,
         existingKey?.privateKey,
         state.setImportAsDefault,
-      ),
-      setLoading,
-      showToast,
-      SUCCESS_MESSAGES.KEY_IMPORTED,
-      ERROR_MESSAGES.KEY_IMPORT_FAILED,
-    );
+      );
 
-    if (importedKey) {
-      refreshUserKeys();
-      dispatch({ type: 'importFormReset' });
-      dispatch({ type: 'keyActionChanged', keyAction: 'view' });
+      if (importedKey) {
+        dispatch({ type: 'optimisticKeyAdded', key: importedKey });
+        dispatch({ type: 'importFormReset' });
+        dispatch({ type: 'keyActionChanged', keyAction: 'view' });
+        refreshUserKeys();
+        showToast(SUCCESS_MESSAGES.KEY_IMPORTED, 'success');
+        return;
+      }
+    } catch (error: any) {
+      logger.warn('key import failed', { error });
+      showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.KEY_IMPORT_FAILED), 'error');
     }
+    setLoading(false);
   };
 
   const onDeleteKey = async (key: KeyPair) => {
@@ -210,14 +188,14 @@ export function useKeyOperations({
     try {
       if (isDevTempKey(key)) {
         await deleteDevTempKey(key.fingerprint);
-        await securityService.clearPassphrase(user.uid, key.fingerprint);
+        dispatch({ type: 'optimisticKeyRemoved', fingerprint: key.fingerprint });
         refreshDevTempKeys();
         showToast('Key deleted successfully', 'success');
         return;
       }
 
       await PgpKeyService.deleteKey(user.uid, key);
-      await securityService.clearPassphrase(user.uid, key.fingerprint);
+      dispatch({ type: 'optimisticKeyRemoved', fingerprint: key.fingerprint });
       refreshUserKeys();
       showToast('Key deleted successfully', 'success');
     } catch (error: any) {
@@ -268,7 +246,6 @@ export function useKeyOperations({
           newPassphrase,
           newPassphraseConfirm,
         );
-        await maybeStorePassphrase(fingerprint, newPassphrase, { force: true });
         refreshDevTempKeys();
         showToast('Passphrase updated', 'success');
         return;
@@ -281,7 +258,6 @@ export function useKeyOperations({
         newPassphrase,
         newPassphraseConfirm,
       );
-      await maybeStorePassphrase(fingerprint, newPassphrase, { force: true });
       refreshUserKeys();
       showToast('Passphrase updated', 'success');
     } catch (error: any) {
@@ -302,14 +278,12 @@ export function useKeyOperations({
     try {
       if (isDevTempKeyFingerprint(fingerprint)) {
         await changeDevTempKeyExpiration(fingerprint, passphrase, days);
-        await maybeStorePassphrase(fingerprint, passphrase);
         refreshDevTempKeys();
         showToast('Expiration updated', 'success');
         return;
       }
 
       await PgpKeyService.changeExpiration(user.uid, fingerprint, passphrase, days);
-      await maybeStorePassphrase(fingerprint, passphrase);
       refreshUserKeys();
       showToast('Expiration updated', 'success');
     } catch (error: any) {

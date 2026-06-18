@@ -133,7 +133,7 @@ export class UserAuthService {
     /**
      * Clear user data from secure storage
      */
-    static async clearUserSecureData(userId: string, username: string, keys: any[]): Promise<void> {
-        await securityService.clearSecureStorage(userId, username, keys);
+    static async clearUserSecureData(userId: string, username: string): Promise<void> {
+        await securityService.clearSecureStorage(userId, username);
     }
 }

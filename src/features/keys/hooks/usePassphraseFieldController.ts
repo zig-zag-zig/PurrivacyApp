@@ -28,6 +28,7 @@ type UsePassphraseFieldControllerParams = {
     onPassphraseChange?: (passphrase: string) => void;
     testID?: string;
     value?: string;
+    storedPassphraseValue?: string | null;
 };
 
 type UsePassphraseFieldControllerResult = {
@@ -58,6 +59,7 @@ export function usePassphraseFieldController({
     onPassphraseChange,
     testID,
     value,
+    storedPassphraseValue,
 }: UsePassphraseFieldControllerParams): UsePassphraseFieldControllerResult {
     const { user } = useAuth();
     const { hidePassphraseBanner, showPassphraseBanner } = usePassphraseBannerOverlay();
@@ -166,11 +168,15 @@ export function usePassphraseFieldController({
             setStorageEnabled(enabled);
 
             if (!enabled) {
+                if (!userEditedRef.current && storedPassphrase && currentValueRef.current === storedPassphrase) {
+                    commitPassphrase('');
+                }
                 setStoredPassphrase(null);
+                setStorageEnabled(false);
                 return;
             }
 
-            const stored = await securityService.getPassphrase(user.uid, fingerprint);
+            const stored = storedPassphraseValue ?? null;
             setStoredPassphrase(stored);
 
             if (
@@ -186,7 +192,7 @@ export function usePassphraseFieldController({
             logger.warn('passphrase autofill load failed', { error: loadError });
             setStoredPassphrase(null);
         }
-    }, [bannerMode, commitPassphrase, fingerprint, user?.uid]);
+    }, [bannerMode, commitPassphrase, fingerprint, storedPassphraseValue, user?.uid]);
 
     const regeneratePassphrase = useCallback(async (
         settings: PassphraseGeneratorSettings = generatorSettingsRef.current,
@@ -267,33 +273,25 @@ export function usePassphraseFieldController({
     }, [bannerMode, loadGeneratorSettings]);
 
     useEffect(() => {
-        if (bannerMode !== 'stored' || !fingerprint || !user?.uid) return undefined;
+        if (bannerMode !== 'stored' || !fingerprint || !user?.uid) return;
 
-        return securityService.subscribePassphraseStoreChanges(change => {
-            if (change.userId !== user.uid) return;
-            if (typeof change.storageEnabled === 'boolean') {
-                setStorageEnabled(change.storageEnabled);
-            }
-            if (!change.fingerprint) {
-                if (change.storageEnabled === false) {
-                    setStoredPassphrase(null);
-                }
-                return;
-            }
-            if (change.fingerprint !== fingerprint) return;
+        if (!storageEnabled) {
+            setStoredPassphrase(null);
+            return;
+        }
 
-            setStoredPassphrase(change.passphrase);
-            if (!change.passphrase) return;
+        const stored = storedPassphraseValue ?? null;
+        setStoredPassphrase(stored);
 
-            if (
-                !userEditedRef.current
-                && (currentValueRef.current.length === 0 || currentValueRef.current === storedPassphrase)
-            ) {
-                commitPassphrase(change.passphrase);
-                storedDefaultAppliedRef.current = true;
-            }
-        });
-    }, [bannerMode, commitPassphrase, fingerprint, storedPassphrase, user?.uid]);
+        if (
+            stored
+            && !userEditedRef.current
+            && (currentValueRef.current.length === 0 || currentValueRef.current === storedPassphrase)
+        ) {
+            commitPassphraseRef.current(stored);
+            storedDefaultAppliedRef.current = true;
+        }
+    }, [bannerMode, fingerprint, storageEnabled, storedPassphraseValue, storedPassphrase, user?.uid]);
 
     useEffect(() => {
         const shouldShowStoredBanner = bannerMode === 'stored'

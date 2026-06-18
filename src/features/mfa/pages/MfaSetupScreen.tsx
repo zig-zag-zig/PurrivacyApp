@@ -24,7 +24,7 @@ export const MfaSetupScreen = () => {
     const [setupData, setSetupData] = useState<any>(null);
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-    useGlobalSpinner(!setupData);
+    useGlobalSpinner(!setupData, { backgroundMode: 'opaque' });
 
     useEffect(() => () => {
         if (copyFeedbackTimeoutRef.current) {

@@ -1,28 +1,23 @@
-export const isRateLimitError = (error: any): boolean => {
-  return Boolean(error?.rateLimited || error?.status === 429 || error?.retryAfter);
-};
+/**
+ * Auth-specific error guards.
+ *
+ * Uses shared error guards from src/shared/errors/errorGuards.ts
+ * for the common rate-limit and refresh-token-failure checks.
+ */
+
+import {
+  isRateLimitError as _isRateLimitError,
+  hasRefreshTokenFailure,
+  isMfaRequired as _isMfaRequired,
+} from '../../../shared/errors/errorGuards';
+
+export const isRateLimitError = _isRateLimitError;
 
 export const shouldEndPartialBackendAuth = (error: any): boolean => {
-  const sessionError = error?.sessionError ?? error;
-
-  return Boolean(
-    error?.requiresSignOut ||
-    sessionError?.refreshTokenMissing ||
-    sessionError?.refreshTokenInvalid ||
-    sessionError?.refreshTokenExpired ||
-    sessionError?.refreshTokenReuse
-  );
+  return hasRefreshTokenFailure(error);
 };
 
-export const isMfaRequiredAuthError = (error: any): boolean => {
-  const sessionError = error?.sessionError ?? error;
-  return Boolean(
-    error?.mfaRequired ||
-    error?.mfaRequiredSensitive ||
-    sessionError?.mfaRequired ||
-    sessionError?.mfaRequiredSensitive
-  );
-};
+export const isMfaRequiredAuthError = _isMfaRequired;
 
 export const isRefreshTokenMissingAuthError = (error: any): boolean => {
   const sessionError = error?.sessionError ?? error?.errorData ?? error;

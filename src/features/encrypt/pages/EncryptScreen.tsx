@@ -16,7 +16,7 @@ import { useEncryptPage } from '../hooks/useEncryptPage';
 export const EncryptScreen = () => {
   const encryptPage = useEncryptPage();
   const scrollRef = useRef<ScrollView>(null);
-  useGlobalSpinner(encryptPage.shouldRedirectToKeys || encryptPage.isLoadingOverlay);
+  useGlobalSpinner(encryptPage.isLoadingOverlay, { backgroundMode: 'opaque' });
 
   useEffect(() => {
     if (!encryptPage.state.encryptedContent) return;

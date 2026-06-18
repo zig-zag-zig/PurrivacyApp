@@ -26,7 +26,7 @@ const keyActionTabs: Array<SegmentedActionTab<KeyAction>> = [
 
 export const KeyScreen = () => {
   const keyScreen = useKeyScreen();
-  useGlobalSpinner(keyScreen.isResolvingKeys || keyScreen.isLoadingOverlay);
+  useGlobalSpinner(keyScreen.isResolvingKeys, { backgroundMode: 'opaque' });
 
   const handleKeyActionChange = (action: KeyAction) => {
     Keyboard.dismiss();
@@ -72,6 +72,7 @@ export const KeyScreen = () => {
                   onSetDefault={() => keyScreen.onSetDefaultKey(key)}
                   onDelete={() => keyScreen.onDeleteKey(key)}
                   expanded={expanded}
+                  deleting={keyScreen.state.isDeleting}
                 />
               </View>
             );

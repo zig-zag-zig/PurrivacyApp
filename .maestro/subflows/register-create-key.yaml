@@ -362,8 +362,20 @@ env:
     visible:
       id: "purrivacy.key.create.passphrase.generated.text"
     timeout: 15000
+- copyTextFrom:
+    id: "purrivacy.key.create.passphrase.generated.text"
+- evalScript: ${output.generatedPassphrase = maestro.copiedText}
+- inputText: ${output.generatedPassphrase}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.key.create.confirmPassphrase"
+    direction: DOWN
+    timeout: 15000
 - tapOn:
-    id: "purrivacy.key.create.passphrase.generated.use"
+    id: "purrivacy.key.create.confirmPassphrase"
+- inputText: ${output.generatedPassphrase}
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: "purrivacy.key.create.submit"

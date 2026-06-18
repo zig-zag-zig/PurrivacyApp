@@ -12,9 +12,7 @@ import type { KeyPair } from '../../../types/types';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateEncryptionForm } from '../../../utils/validation';
 import { getCompleteKeyPairs } from '../../keys/domain/keyUtils';
-import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
-import { persistKeyPassphrase } from '../../keys/services/passphrasePersistenceService';
 import {
   getFirstSelectedKeyId,
   isPassphraseRequired,
@@ -28,7 +26,6 @@ export function useEncryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { userDecrypted, visibleKeys, user, isAuthLoading } = useAuth();
   const { showToast } = useToast();
-  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
   const shouldResetOnFocus = useRef(false);
   const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
@@ -158,9 +155,9 @@ export function useEncryptPage() {
         contentToEncrypt,
         needsPassphrase && privateKeyId
           ? {
-              privateKey: state.selectedPrivateKey[privateKeyId],
-              passphrase: state.passphrase,
-            }
+            privateKey: state.selectedPrivateKey[privateKeyId],
+            passphrase: state.passphrase,
+          }
           : undefined,
       );
 
@@ -184,18 +181,6 @@ export function useEncryptPage() {
       dispatch({ type: 'markSuccessful' });
       showToast('Encryption successful!', 'success');
 
-      if (needsPassphrase && privateKeyId) {
-        try {
-          await persistKeyPassphrase({
-            userId: user?.uid || '',
-            fingerprint: privateKeyId,
-            passphrase: state.passphrase,
-            ensureConsent: ensurePassphraseStorageConsent,
-          });
-        } catch {
-          // Ignore passphrase persistence failures for encrypt flow.
-        }
-      }
     } catch {
       showToast('Failed to encrypt the message', 'error');
     } finally {
@@ -230,7 +215,7 @@ export function useEncryptPage() {
     userDecrypted,
     keySelectionKeys,
     shouldRedirectToKeys: shouldRedirectToKeys || isRedirectingToKeys,
-    isLoadingOverlay: !userDecrypted || isAuthLoading || isRedirectingToKeys,
+    isLoadingOverlay: !userDecrypted || isAuthLoading,
     canEncrypt:
       state.content.trim() !== ''
       && selectedPublicKeyCount > 0

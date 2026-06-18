@@ -23,6 +23,7 @@ import type { PrivateKeyRevealLoading } from './PrivateKeyRevealPanel';
 type KeyItemProps = {
     pgpKey: KeyPair;
     onDelete?: () => void;
+    deleting?: boolean;
     onSetDefault?: () => void;
     onPress?: () => void;
     expanded?: boolean;
@@ -31,8 +32,9 @@ type KeyItemProps = {
     onChangeExpiry?: (fingerprint: string, passphrase: string, newExpiryDays: string) => Promise<void>;
 };
 
-export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, readOnly = false, onChangePassphrase, onChangeExpiry }: KeyItemProps) => {
+export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, readOnly = false, onChangePassphrase, onChangeExpiry, deleting = false }: KeyItemProps) => {
     const [confirmVisible, setConfirmVisible] = useState(false);
+    const [deleteRequested, setDeleteRequested] = useState(false);
     const [oldPass, setOldPass] = useState('');
     const [newPass, setNewPass] = useState('');
     const [newPassConfirm, setNewPassConfirm] = useState('');
@@ -83,6 +85,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const handleDelete = () => {
         if (!onDelete || readOnly) return;
         Keyboard.dismiss();
+        setDeleteRequested(false);
         setConfirmVisible(true);
     };
 
@@ -297,6 +300,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                             onExpiryDaysChange={setExpiryDays}
                             onChangePassphrase={handleChangePassphrasePress}
                             onChangeExpiry={handleChangeExpiryPress}
+                            storedPassphraseValue={pgpKey.privateKeyPassphrase}
                         />
                     )}
 
@@ -325,11 +329,16 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                 message={`Are you sure you want to delete this ${getKeyTypeDescription(pgpKey).toLowerCase()}? This action cannot be undone.`}
                 itemType="key"
                 itemName={pgpKey.userId.trim()}
+                loading={deleting}
                 onConfirm={() => {
-                    setConfirmVisible(false);
+                    setDeleteRequested(true);
                     onDelete?.();
                 }}
-                onCancel={() => setConfirmVisible(false)}
+                onCancel={() => {
+                    if (!deleting) {
+                        setConfirmVisible(false);
+                    }
+                }}
             />
         </View>
     );

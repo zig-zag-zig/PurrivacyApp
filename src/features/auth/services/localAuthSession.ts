@@ -4,7 +4,7 @@ import { signOut as firebaseSignOut } from 'firebase/auth';
 
 import { ApiClient } from '../../../api/client';
 import { auth } from '../../../config/firebase';
-import { LastSignedInUser, KeyPair } from '../../../types/types';
+import { LastSignedInUser } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import { storage } from '../../../utils/storage';
 import {
@@ -31,9 +31,8 @@ export const clearStoredSessionAndPushToken = async (userId: string): Promise<vo
 export const clearSecureStorageForUser = async (
   userId: string,
   username: string,
-  keys: KeyPair[],
 ): Promise<void> => {
-  await securityService.clearSecureStorage(userId, username, keys);
+  await securityService.clearSecureStorage(userId, username);
 };
 
 type ClearPartialFirebaseAuthParams = {

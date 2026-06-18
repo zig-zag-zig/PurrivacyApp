@@ -12,9 +12,7 @@ import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
 import { getDefaultSelectedPrivateKey } from '../../keys/domain/keyUtils';
 import { validateArmor } from '../../keys/domain/pgpValidation';
-import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
-import { persistKeyPassphrase } from '../../keys/services/passphrasePersistenceService';
 import {
   getFirstSelectedKeyId,
   hasSelectedKeys,
@@ -28,7 +26,6 @@ export function useDecryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { user, isAuthLoading, userDecrypted, visibleKeys } = useAuth();
   const { showToast } = useToast();
-  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const [state, dispatch] = useReducer(decryptReducer, initialDecryptState);
   const shouldResetOnFocus = useRef(false);
   const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
@@ -187,18 +184,6 @@ export function useDecryptPage() {
       dispatch({ type: 'markSuccessful' });
       showToast('Decryption successful!', 'success');
 
-      if (privateKeyId) {
-        try {
-          await persistKeyPassphrase({
-            userId: user?.uid || '',
-            fingerprint: privateKeyId,
-            passphrase: state.passphrase,
-            ensureConsent: ensurePassphraseStorageConsent,
-          });
-        } catch {
-          // Ignore passphrase persistence failures for decrypt flow.
-        }
-      }
     } catch {
       showToast('Failed to decrypt the message', 'error');
     } finally {
@@ -229,7 +214,7 @@ export function useDecryptPage() {
     state,
     userDecrypted,
     shouldRedirectToKeys: shouldRedirectToKeys || isRedirectingToKeys,
-    isLoadingOverlay: !userDecrypted || isAuthLoading || isRedirectingToKeys,
+    isLoadingOverlay: !userDecrypted || isAuthLoading,
     privateKeys,
     publicKeys: keySelectionKeys,
     isDecryptDisabled: !hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting,

@@ -16,11 +16,13 @@ import { EventService } from '../../../services/eventService';
 
 export function useSettingsPage() {
   const navigation = useNavigation<RootNavigationProps>();
-  const { signOut, isBiometricAvailable, isBiometricEnabled, toggleBiometric, isAuthLoading, user } = useAuth();
+  const { signOut, isBiometricAvailable, isBiometricEnabled, toggleBiometric, isAuthLoading, user, userDecrypted } = useAuth();
   const { mfaState, disableMfa, setSessionTrust, regenerateRecoveryCodes, getRemainingRecoveryCodes, isLoading } = useMfa();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(settingsReducer, initialSettingsState);
-  const [passphraseStorageEnabled, setPassphraseStorageEnabledState] = useState(false);
+  const [passphraseStorageEnabled, setPassphraseStorageEnabledState] = useState(
+    () => userDecrypted?.passphraseStorageEnabled ?? false,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -83,23 +85,29 @@ export function useSettingsPage() {
   };
 
   const handleDisableMfa = async () => {
-    dispatch({ type: 'disableMfaDialogChanged', visible: false });
+    dispatch({ type: 'disableMfaLoadingChanged', loading: true });
 
     try {
       await disableMfa();
+      dispatch({ type: 'disableMfaDialogChanged', visible: false });
     } catch (error: any) {
       showToast(getUserFacingErrorMessage(error, 'Failed to disable MFA'), 'error');
+    } finally {
+      dispatch({ type: 'disableMfaLoadingChanged', loading: false });
     }
   };
 
   const handleRegenerateRecoveryCodes = async () => {
-    dispatch({ type: 'regenerateCodesDialogChanged', visible: false });
+    dispatch({ type: 'regenerateCodesLoadingChanged', loading: true });
 
     try {
       await regenerateRecoveryCodes();
+      dispatch({ type: 'regenerateCodesDialogChanged', visible: false });
     } catch (error: any) {
       logger.warn('failed to regenerate recovery codes', { error });
       showToast(getUserFacingErrorMessage(error, 'Failed to regenerate recovery codes'), 'error');
+    } finally {
+      dispatch({ type: 'regenerateCodesLoadingChanged', loading: false });
     }
   };
 
@@ -184,7 +192,6 @@ export function useSettingsPage() {
     isBiometricAvailable,
     isBiometricEnabled,
     passphraseStorageEnabled,
-    isPageLoading: isAuthLoading || state.biometricToggleLoading || state.passphraseStorageLoading || isLoading || state.logoutLoading,
     onDeleteDialogChanged: (visible: boolean) => {
       dispatch({ type: 'deleteDialogChanged', visible });
     },

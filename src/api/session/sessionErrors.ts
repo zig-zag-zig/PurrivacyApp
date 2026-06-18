@@ -1,35 +1,19 @@
 import { EventService } from '../../services/eventService';
 import { AuthErrorResponse } from '../../types/types';
 import { AuthFlowError } from '../auth/authFlowError';
+import {
+    isRateLimitError as sharedIsRateLimitError,
+    hasRefreshTokenFailure,
+} from '../../shared/errors/errorGuards';
 
 const getSessionError = (error: any): AuthErrorResponse | undefined => {
     return error?.sessionError ?? error;
 };
 
-export const isRateLimitError = (error: any): boolean => {
-    return Boolean(
-        error?.rateLimited ||
-        error?.status === 429 ||
-        error?.retryAfter ||
-        error?.sessionError?.rateLimited ||
-        error?.sessionError?.status === 429
-    );
-};
+export const isRateLimitError = sharedIsRateLimitError;
 
 export const isTerminalStoredSessionError = (error: any): boolean => {
-    const sessionError = error?.sessionError;
-
-    return Boolean(
-        error?.requiresSignOut ||
-        error?.refreshTokenMissing ||
-        error?.refreshTokenInvalid ||
-        error?.refreshTokenExpired ||
-        error?.refreshTokenReuse ||
-        sessionError?.refreshTokenMissing ||
-        sessionError?.refreshTokenInvalid ||
-        sessionError?.refreshTokenExpired ||
-        sessionError?.refreshTokenReuse
-    );
+    return hasRefreshTokenFailure(error);
 };
 
 export const isStoredSessionMfaRequired = (error: any): boolean => {

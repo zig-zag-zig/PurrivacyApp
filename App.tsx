@@ -26,7 +26,7 @@ import { initErrorMonitoring, wrapWithErrorMonitoring } from './src/services/mon
 import { logger } from './src/utils/logger';
 import { PassphraseBannerOverlayProvider } from './src/features/keys/components/PassphraseBannerOverlay';
 import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
-
+import { usePassphraseStorageAutoSync } from './src/features/security/hooks/usePassphraseStorageAutoSync';
 initErrorMonitoring();
 
 const navigationTheme = {
@@ -43,7 +43,7 @@ const navigationTheme = {
 };
 
 const AppContent = () => {
-    const { lock, authCompleted, user, isCheckingInactivity } = useAuth();
+    const { lock, authCompleted, user, isCheckingInactivity, userDecrypted } = useAuth();
     const { hasShareIntent, shareIntent, resetShareIntent, error } = useShareIntent();
     const navigation = useNavigation<RootNavigationProps>();
     const { showToast } = useToast();
@@ -54,6 +54,7 @@ const AppContent = () => {
     const appUpdate = useAppUpdate();
     const showStartupLoading = !authCompleted;
     useGlobalSpinner(showStartupLoading || (authCompleted && isCheckingInactivity));
+    usePassphraseStorageAutoSync(userDecrypted);
 
     useEffect(() => {
         if (!authCompleted || updateStartupCheckedRef.current || !appUpdate.isConfigured) return;

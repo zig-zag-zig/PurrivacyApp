@@ -4,7 +4,7 @@ import { deleteUser as deleteFirebaseUser, signOut as firebaseSignOut } from 'fi
 import { ApiClient } from '../../../api/client';
 import { useToast } from '../../../app/state/ToastContext';
 import { auth } from '../../../config/firebase';
-import type { KeyPair, LastSignedInUser, UserDecrypted } from '../../../types/types';
+import type { LastSignedInUser, UserDecrypted } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import {
   clearLastActiveTime,
@@ -45,35 +45,35 @@ export function useAuthActions({
   setters,
 }: UseAuthActionsParams) {
   const {
-  localBiometricLockRef,
-  pendingPasswordRef,
-  runLoadUserRef,
-  userInitAuthRef,
-  forceNewSessionOnNextAuthRef,
-  loginWithReauthenticateWithCredentialRef,
-  suppressLastSignedInUserPersistRef,
-  legitCustomTokenSignInRef,
-  registrationInProgressRef,
-  userRef,
-  shouldPromptBiometricRef,
-  isGettingSessionRef,
+    localBiometricLockRef,
+    pendingPasswordRef,
+    runLoadUserRef,
+    userInitAuthRef,
+    forceNewSessionOnNextAuthRef,
+    loginWithReauthenticateWithCredentialRef,
+    suppressLastSignedInUserPersistRef,
+    legitCustomTokenSignInRef,
+    registrationInProgressRef,
+    userRef,
+    shouldPromptBiometricRef,
+    isGettingSessionRef,
   } = refs;
   const {
-  clearPendingBiometricPromptRetry,
-  initializeBiometricState,
+    clearPendingBiometricPromptRetry,
+    initializeBiometricState,
   } = services;
   const {
-  setPendingPassword,
-  setUserDecrypted,
-  setLastSignedInUser,
-  setSessionAuthenticated,
-  setIsLocalSessionLocked,
-  setUser,
-  setFbUser,
-  setIsCheckingInactivity,
-  setIsAuthLoading,
-  setAuthCompleted,
-  setLastUsedBiometricSignIn,
+    setPendingPassword,
+    setUserDecrypted,
+    setLastSignedInUser,
+    setSessionAuthenticated,
+    setIsLocalSessionLocked,
+    setUser,
+    setFbUser,
+    setIsCheckingInactivity,
+    setIsAuthLoading,
+    setAuthCompleted,
+    setLastUsedBiometricSignIn,
   } = setters;
   const { showToast } = useToast();
 
@@ -117,7 +117,6 @@ export function useAuthActions({
       await clearSecureStorageForUser(
         currentUser.uid,
         getUsernameFromUser(currentUser) || '',
-        userDecrypted?.keys ?? [],
       );
 
       try {
@@ -142,7 +141,6 @@ export function useAuthActions({
   const clearDeletedAccountClientState = async (
     userId: string,
     username: string,
-    keys: KeyPair[],
   ): Promise<void> => {
     const runCleanup = async (operation: string, cleanup: () => Promise<void>) => {
       try {
@@ -169,7 +167,7 @@ export function useAuthActions({
     await runCleanup('clear local session lock', () => securityService.setLocalSessionLocked(userId, false));
     await runCleanup('clear last active time', () => clearLastActiveTime(userId));
     await runCleanup('clear stored session', () => securityService.clearStoredSession(userId));
-    await runCleanup('clear secure storage', () => securityService.clearSecureStorage(userId, username, keys));
+    await runCleanup('clear secure storage', () => securityService.clearSecureStorage(userId, username));
     await runCleanup('clear last signed-in user', () => securityService.clearLastSignedInUser());
     await runCleanup('sign out from Firebase', () => firebaseSignOut(auth));
 
@@ -191,7 +189,6 @@ export function useAuthActions({
   const deleteCurrentAccount = async (currentUser: User): Promise<void> => {
     const userId = currentUser.uid;
     const username = getUsernameFromUser(currentUser) || '';
-    const keys = userDecrypted?.keys ?? [];
     let firebaseDeleteError: any = null;
 
     setIsAuthLoading(true);
@@ -204,7 +201,7 @@ export function useAuthActions({
         firebaseDeleteError = error;
       }
     } finally {
-      await clearDeletedAccountClientState(userId, username, keys);
+      await clearDeletedAccountClientState(userId, username);
     }
 
     if (firebaseDeleteError) {
@@ -295,8 +292,7 @@ export function useAuthActions({
   };
 
   const clearSecureStore = async () => {
-    const keys = userDecrypted?.keys ?? [];
-    await securityService.clearSecureStorage(getUserId(), getUsername(), keys);
+    await securityService.clearSecureStorage(getUserId(), getUsername());
   };
 
   const signUp = async (

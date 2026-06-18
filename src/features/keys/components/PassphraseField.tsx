@@ -26,6 +26,7 @@ export interface PassphraseFieldProps {
     labelTopBackgroundColor?: string;
     labelBottomBackgroundColor?: string;
     testID?: string;
+    storedPassphraseValue?: string | null;
 }
 
 export const PassphraseField: React.FC<PassphraseFieldProps> = ({
@@ -42,6 +43,7 @@ export const PassphraseField: React.FC<PassphraseFieldProps> = ({
     labelTopBackgroundColor,
     labelBottomBackgroundColor,
     testID,
+    storedPassphraseValue,
 }) => {
     const controller = usePassphraseFieldController({
         bannerMode,
@@ -51,6 +53,7 @@ export const PassphraseField: React.FC<PassphraseFieldProps> = ({
         onPassphraseChange,
         testID,
         value,
+        storedPassphraseValue,
     });
 
     if (hidden) return null;

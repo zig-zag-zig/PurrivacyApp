@@ -318,6 +318,19 @@ export async function storeSyncedPassphrase(
   }
 }
 
+export async function clearAllStoredPassphrases(
+  userId: string,
+  keys: KeyPairWithRecordId[],
+): Promise<void> {
+  for (const key of keys) {
+    if (!key.privateKey) continue;
+    await updateEncryptedKeyRecord(userId, {
+      ...key,
+      privateKeyPassphrase: null,
+    });
+  }
+}
+
 export async function forgetStoredPassphrases(userId: string): Promise<void> {
   if (userId.trim() === '') return;
 

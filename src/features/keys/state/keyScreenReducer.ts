@@ -1,4 +1,4 @@
-import type { KeyMetadata } from '../../../types/types';
+import type { KeyMetadata, KeyPair } from '../../../types/types';
 import type { KeyAction, KeysUiState } from '../model/types';
 
 export type KeyScreenAction =
@@ -14,7 +14,10 @@ export type KeyScreenAction =
   | { type: 'deletingChanged'; isDeleting: boolean }
   | { type: 'formResetIncremented' }
   | { type: 'expandedKeyFingerprintChanged'; expandedKeyFingerprint: string | null }
-  | { type: 'importFormReset' };
+  | { type: 'importFormReset' }
+  | { type: 'optimisticKeyAdded'; key: KeyPair }
+  | { type: 'optimisticKeyRemoved'; fingerprint: string }
+  | { type: 'optimisticKeysCleared' };
 
 export const initialKeyScreenState: KeysUiState = {
   importKey: '',
@@ -29,6 +32,8 @@ export const initialKeyScreenState: KeysUiState = {
   isDeleting: false,
   formResetKey: 0,
   expandedKeyFingerprint: null,
+  optimisticKeys: [],
+  optimisticRemovedFingerprints: [],
 };
 
 export function keyScreenReducer(state: KeysUiState, action: KeyScreenAction): KeysUiState {
@@ -61,6 +66,20 @@ export function keyScreenReducer(state: KeysUiState, action: KeyScreenAction): K
       return { ...state, isLoading: action.isLoading };
     case 'deletingChanged':
       return { ...state, isDeleting: action.isDeleting };
+    case 'optimisticKeyAdded':
+      return {
+        ...state,
+        optimisticKeys: [...state.optimisticKeys, action.key],
+        isLoading: false,
+      };
+    case 'optimisticKeyRemoved':
+      return {
+        ...state,
+        optimisticRemovedFingerprints: [...state.optimisticRemovedFingerprints, action.fingerprint],
+        isDeleting: false,
+      };
+    case 'optimisticKeysCleared':
+      return { ...state, optimisticKeys: [], optimisticRemovedFingerprints: [] };
     case 'formResetIncremented':
       return { ...state, formResetKey: state.formResetKey + 1 };
     case 'expandedKeyFingerprintChanged':

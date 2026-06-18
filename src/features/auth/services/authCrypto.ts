@@ -12,11 +12,11 @@ import type { Encryption, EncryptionBase } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import { securityService } from '../../security/services/securityService';
 
-const PBKDF2_ITERATIONS = 600000;
-const KEY_SIZE = 256;
+export const PBKDF2_ITERATIONS = 600000;
+export const KEY_SIZE = 256;
 export const AUTH_SALT_LENGTH = 16;
-const IV_LENGTH = 12;
-const DEK_LENGTH = 32;
+export const IV_LENGTH = 12;
+export const DEK_LENGTH = 32;
 
 const { pbkdf2 } = crypto;
 

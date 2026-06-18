@@ -74,12 +74,21 @@ export const executeWithLoading = async <T>(
     successMessage?: string,
     errorMessage?: string
 ): Promise<T | null> => {
+    const MIN_SPINNER_DELAY_MS = 200;
+
     try {
+        const startedAt = Date.now();
         setLoading(true);
         const result = await operation();
         if (successMessage) {
             showToast(successMessage, 'success');
         }
+
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < MIN_SPINNER_DELAY_MS) {
+            await new Promise(resolve => setTimeout(resolve, MIN_SPINNER_DELAY_MS - elapsed));
+        }
+
         return result;
     } catch (error: any) {
         logger.warn('operation failed', { error });

@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
 import {
   hasExistingDefaultKeyPair,
   isImportKeyValid,
+  mergeOptimisticKeys,
   sortKeysForView,
 } from '../domain/keyScreenDomain';
 import type { KeyAction } from '../model/types';
@@ -23,6 +24,17 @@ export function useKeyScreen() {
     dispatch({ type: 'loadingChanged', isLoading });
   }, []);
 
+  // Clear optimistic keys when real keys update (reconciliation).
+  // Optimistic keys are shown immediately on create/import; once the backend
+  // refresh lands, the real keys replace them.
+  const prevVisibleKeysRef = useRef(visibleKeys);
+  useEffect(() => {
+    if (prevVisibleKeysRef.current !== visibleKeys) {
+      dispatch({ type: 'optimisticKeysCleared' });
+    }
+    prevVisibleKeysRef.current = visibleKeys;
+  }, [visibleKeys]);
+
   useKeyRouteParams(dispatch);
   useImportKeyDefaults({
     importKey: state.importKey,
@@ -32,9 +44,9 @@ export function useKeyScreen() {
     dispatch,
   });
 
-  const sortedKeys = useMemo(
-    () => sortKeysForView(visibleKeys),
-    [visibleKeys],
+  const displayKeys = useMemo(
+    () => sortKeysForView(mergeOptimisticKeys(visibleKeys, state.optimisticKeys, state.optimisticRemovedFingerprints)),
+    [visibleKeys, state.optimisticKeys, state.optimisticRemovedFingerprints],
   );
 
   const keyListExpansion = useKeyListExpansion(state.expandedKeyFingerprint, dispatch);
@@ -60,7 +72,7 @@ export function useKeyScreen() {
     state,
     user,
     userDecrypted,
-    sortedKeys,
+    sortedKeys: displayKeys,
     scrollRef: keyListExpansion.scrollRef,
     itemRefs: keyListExpansion.itemRefs,
     isResolvingKeys,

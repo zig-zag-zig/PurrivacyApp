@@ -8,6 +8,7 @@ interface UserBase {
 
 export interface UserEncrypted extends UserBase {
     keys: EncryptionBase[];
+    passphraseStorageEnabled?: boolean;
 }
 
 export type EncryptedKeyRecordWithId = EncryptionBase & {
@@ -29,6 +30,7 @@ export interface UserCreatePayload extends UserEncrypted {
 
 export interface UserDecrypted extends UserBase {
     keys: KeyPairWithRecordId[];
+    passphraseStorageEnabled?: boolean;
 }
 
 export interface LastSignedInUser {

@@ -59,24 +59,6 @@ const encryptRecords = async (records: object[], dek: string): Promise<Encryptio
   return encryptedRecords;
 };
 
-const syncLocalPassphraseCacheFromPayload = async (
-  userId: string,
-  key: KeyPairWithRecordId,
-): Promise<void> => {
-  if (!key.privateKey) return;
-
-  if (key.privateKeyPassphrase) {
-    await securityService.storePassphrase(
-      userId,
-      { [key.fingerprint]: key.privateKeyPassphrase },
-      key.fingerprint,
-    );
-    return;
-  }
-
-  await securityService.clearPassphrase(userId, key.fingerprint);
-};
-
 export async function createEncryptedUser(
   userId: string,
   userDecrypted: UserCreatePayload,
@@ -163,7 +145,6 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
     };
 
     decryptedKeys.push(key);
-    await syncLocalPassphraseCacheFromPayload(userId, key);
   }
 
   return { ...userEncrypted, keys: decryptedKeys };

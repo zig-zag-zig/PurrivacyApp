@@ -8,6 +8,9 @@ export type AppEventPayloadMap = {
     devTempKeys: undefined;
     mfaState: { mfaState: MfaState; source?: 'remoteNotification' };
     newRecoveryCodes: { recoveryCodes: string[] };
+    passphraseStorageChanged: { enabled: boolean };
+    passphraseSynced: { fingerprint: string; passphrase: string };
+    passphraseDeleted: { fingerprint: string };
     signOut: undefined;
     user: undefined;
 };
@@ -25,6 +28,9 @@ const appEventNames = new Set<AppEventName>([
     'devTempKeys',
     'mfaState',
     'newRecoveryCodes',
+    'passphraseStorageChanged',
+    'passphraseSynced',
+    'passphraseDeleted',
     'signOut',
     'user',
 ]);
@@ -59,4 +65,9 @@ export const EventService = {
     },
 
     getPendingEvents: () => new Map(pendingEvents),
+
+    resetForTesting: () => {
+        pendingEvents.clear();
+        eventListeners.clear();
+    },
 };

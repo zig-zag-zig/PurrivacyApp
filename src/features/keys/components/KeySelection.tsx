@@ -241,6 +241,7 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
                                         name={key.userId.trim()}
                                         onPassphraseChange={onPassphraseChange}
                                         hidden={key.privateKeyIsUnlocked}
+                                        storedPassphraseValue={key.privateKeyPassphrase}
                                     />
 
                                 }

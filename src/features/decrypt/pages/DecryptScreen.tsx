@@ -18,7 +18,7 @@ import { useDecryptPage } from '../hooks/useDecryptPage';
 export const DecryptScreen = () => {
   const decryptPage = useDecryptPage();
   const scrollRef = useRef<ScrollView>(null);
-  useGlobalSpinner(decryptPage.shouldRedirectToKeys || decryptPage.isLoadingOverlay);
+  useGlobalSpinner(decryptPage.isLoadingOverlay, { backgroundMode: 'opaque' });
 
   useEffect(() => {
     if (!decryptPage.state.decryptedContent) return;

@@ -17,8 +17,10 @@ export const KeyMaterialBlock = ({
 }: KeyMaterialBlockProps) => (
     <ScrollView
         nestedScrollEnabled
+        scrollEnabled
         style={[styles.keyBlock, copied && styles.keyBlockCopied]}
         contentContainerStyle={styles.keyBlockScrollContent}
+        onStartShouldSetResponder={() => true}
     >
         <TouchableOpacity
             onLongPress={onCopy}
@@ -42,7 +44,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: theme.colors.divider,
         borderRadius: theme.borderRadius.md,
-        overflow: 'hidden',
         maxHeight: 260,
     },
     keyBlockCopied: {

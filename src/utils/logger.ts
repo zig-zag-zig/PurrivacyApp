@@ -21,7 +21,7 @@ const safeStringify = (value: unknown): string => {
     }
 };
 
-const redact = (value: unknown): unknown => {
+export const redact = (value: unknown): unknown => {
     if (value instanceof Error) {
         const customProperties = Object.fromEntries(
             Object.entries(value).map(([key, entry]) => [

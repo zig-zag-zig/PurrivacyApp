@@ -6,6 +6,8 @@ type SettingsAction =
   | { type: 'revokeSessionsDialogChanged'; visible: boolean }
   | { type: 'regenerateCodesDialogChanged'; visible: boolean }
   | { type: 'revokeSessionsLoadingChanged'; loading: boolean }
+  | { type: 'disableMfaLoadingChanged'; loading: boolean }
+  | { type: 'regenerateCodesLoadingChanged'; loading: boolean }
   | { type: 'biometricToggleLoadingChanged'; loading: boolean }
   | { type: 'passphraseStorageLoadingChanged'; loading: boolean }
   | { type: 'logoutLoadingChanged'; loading: boolean };
@@ -16,6 +18,8 @@ export const initialSettingsState: SettingsUiState = {
   showRevokeSessionsDialog: false,
   showRegenerateCodesDialog: false,
   revokeSessionsLoading: false,
+  disableMfaLoading: false,
+  regenerateCodesLoading: false,
   biometricToggleLoading: false,
   passphraseStorageLoading: false,
   logoutLoading: false,
@@ -33,6 +37,10 @@ export function settingsReducer(state: SettingsUiState, action: SettingsAction):
       return { ...state, showRegenerateCodesDialog: action.visible };
     case 'revokeSessionsLoadingChanged':
       return { ...state, revokeSessionsLoading: action.loading };
+    case 'disableMfaLoadingChanged':
+      return { ...state, disableMfaLoading: action.loading };
+    case 'regenerateCodesLoadingChanged':
+      return { ...state, regenerateCodesLoading: action.loading };
     case 'biometricToggleLoadingChanged':
       return { ...state, biometricToggleLoading: action.loading };
     case 'passphraseStorageLoadingChanged':

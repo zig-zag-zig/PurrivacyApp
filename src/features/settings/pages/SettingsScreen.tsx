@@ -4,7 +4,6 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
@@ -15,7 +14,6 @@ import { useAppUpdate } from '../../updates/state/UpdateContext';
 export const SettingsScreen = () => {
   const settingsPage = useSettingsPage();
   const appUpdate = useAppUpdate();
-  useGlobalSpinner(settingsPage.isPageLoading);
 
   const updateDescription = appUpdate.status === 'available' && appUpdate.latestRelease
     ? `Version ${appUpdate.latestRelease.version} available${appUpdate.skippedReleaseTag === appUpdate.latestRelease.tagName ? ' (skipped on startup)' : ''}`
@@ -51,6 +49,7 @@ export const SettingsScreen = () => {
         itemType="mfa"
         onConfirm={settingsPage.onDisableMfa}
         onCancel={() => settingsPage.onDisableMfaDialogChanged(false)}
+        loading={settingsPage.state.disableMfaLoading}
       />
 
       <ConfirmationDialog
@@ -60,6 +59,7 @@ export const SettingsScreen = () => {
         itemType="recoveryCodes"
         onConfirm={settingsPage.onRegenerateRecoveryCodes}
         onCancel={() => settingsPage.onRegenerateCodesDialogChanged(false)}
+        loading={settingsPage.state.regenerateCodesLoading}
       />
 
       <SettingsOption
@@ -125,6 +125,7 @@ export const SettingsScreen = () => {
             value: settingsPage.isBiometricEnabled,
             onValueChange: settingsPage.onBiometricToggle,
           }}
+          loading={settingsPage.state.biometricToggleLoading}
           extraText={
             "Use your device biometrics to unlock the app after local lock."
           }
@@ -139,6 +140,7 @@ export const SettingsScreen = () => {
           value: settingsPage.passphraseStorageEnabled,
           onValueChange: settingsPage.onPassphraseStorageToggle,
         }}
+        loading={settingsPage.state.passphraseStorageLoading}
         extraText="Saved key passphrases autofill on this device without another authentication prompt."
       />
 
@@ -175,7 +177,7 @@ export const SettingsScreen = () => {
         text="Logout"
         testID="purrivacy.settings.logout"
         onPress={settingsPage.onLogout}
-        disabled={settingsPage.state.logoutLoading}
+        loading={settingsPage.state.logoutLoading}
       />
     </ScreenContainer>
   );
