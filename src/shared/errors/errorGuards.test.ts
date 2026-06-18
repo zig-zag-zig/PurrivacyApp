@@ -4,6 +4,7 @@ import {
     isRateLimitError,
     hasRefreshTokenFailure,
     isMfaRequired,
+    isWrongMfaCode,
     requiresSignOut,
 } from './errorGuards';
 
@@ -71,6 +72,25 @@ describe('isMfaRequired', () => {
     it('returns false for null/undefined', () => {
         expect(isMfaRequired(null)).toBe(false);
         expect(isMfaRequired(undefined)).toBe(false);
+    });
+});
+
+describe('isWrongMfaCode', () => {
+    it('returns true for top-level wrongMfaCode', () => {
+        expect(isWrongMfaCode({ wrongMfaCode: true })).toBe(true);
+    });
+
+    it('returns true for nested sessionError.wrongMfaCode', () => {
+        expect(isWrongMfaCode({ sessionError: { wrongMfaCode: true } })).toBe(true);
+    });
+
+    it('returns false when wrongMfaCode is absent', () => {
+        expect(isWrongMfaCode({ status: 400 })).toBe(false);
+    });
+
+    it('returns false for null/undefined', () => {
+        expect(isWrongMfaCode(null)).toBe(false);
+        expect(isWrongMfaCode(undefined)).toBe(false);
     });
 });
 

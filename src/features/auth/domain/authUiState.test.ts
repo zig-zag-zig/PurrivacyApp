@@ -19,4 +19,12 @@ describe('shouldShowUnlockScreen', () => {
     it('does not show unlock without a remembered account', () => {
         expect(shouldShowUnlockScreen(true, null)).toBe(false);
     });
+
+    it('does not show unlock when remembered user has empty username', () => {
+        expect(shouldShowUnlockScreen(true, { uid: 'u', username: '' })).toBe(false);
+    });
+
+    it('does not show unlock when remembered user has no username key', () => {
+        expect(shouldShowUnlockScreen(true, { uid: 'u' } as any)).toBe(false);
+    });
 });

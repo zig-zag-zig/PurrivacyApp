@@ -35,6 +35,21 @@ describe('SessionManager', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('revokes all sessions via the revoke-all-sessions endpoint', async () => {
+    const requestFn = vi.fn(async () => undefined);
+    const { SessionManager } = await import('./sessionManager');
+    const manager = new SessionManager(requestFn);
+
+    await manager.revokeAllSessions();
+
+    expect(requestFn).toHaveBeenCalledWith(
+      '/auth/revoke-all-sessions',
+      'POST',
+      undefined,
+      true,
+    );
+  });
+
   it('returns stored local session when available', async () => {
     const { SessionManager } = await import('./sessionManager');
     const manager = new SessionManager(vi.fn());

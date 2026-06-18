@@ -198,7 +198,7 @@ const rawEnv = {
 };
 
 const sentryDsn = parseOptionalUrl(rawEnv.EXPO_PUBLIC_SENTRY_DSN, 'EXPO_PUBLIC_SENTRY_DSN');
-const appEnv = resolveExtraValue('appEnv') ?? (__DEV__ ? 'development' : 'production');
+const appEnv = resolveExtraValue('appEnv') ?? ((typeof __DEV__ !== 'undefined' && __DEV__) ? 'development' : 'production');
 
 export const ENV = {
   apiBaseUrl: parseApiBaseUrl(getRequiredEnv('EXPO_PUBLIC_API_BASE_URL')),

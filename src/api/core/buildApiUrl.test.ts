@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.hoisted(() => { (globalThis as any).__DEV__ = true; });
-
 vi.mock('../../config/env', () => ({
     ENV: {
         apiBaseUrl: 'https://api.example.com/',
@@ -26,5 +24,13 @@ describe('buildApiUrl', () => {
 
     it('handles nested endpoints', () => {
         expect(buildApiUrl('/user/key-records')).toBe('https://api.example.com/v1/user/key-records');
+    });
+
+    it('strips multiple leading slashes from endpoint', () => {
+        expect(buildApiUrl('//user')).toBe('https://api.example.com/v1/user');
+    });
+
+    it('preserves trailing slash on endpoint (only leading slashes are stripped)', () => {
+        expect(buildApiUrl('/user/')).toBe('https://api.example.com/v1/user/');
     });
 });

@@ -38,7 +38,7 @@ describe('isSensitiveAndRequiresMfa', () => {
         expect(await isSensitiveAndRequiresMfa('/user/change-password', 'POST')).toBe(false);
     });
 
-    it('returns true for /mfa/enable even without stored session', async () => {
+    it('returns false for /mfa/enable when no stored session exists', async () => {
         securityServiceMock.getStoredSession.mockResolvedValue(null);
         expect(await isSensitiveAndRequiresMfa('/mfa/enable', 'POST')).toBe(false);
     });

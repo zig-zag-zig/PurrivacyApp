@@ -338,7 +338,7 @@ export const SigninScreen = () => {
                 />
 
                 <Button
-                    hidden={!isUnlockFlow}
+                    hidden={!isUnlockFlow || !showBiometricButton}
                     label="Unlock with biometrics"
                     onPress={onBiometricUnlock}
                     disabled={signinBusy || !showBiometricButton}

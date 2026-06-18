@@ -32,7 +32,7 @@ export async function processResponse(
             status: response.status,
             requestId,
             responseBody: data,
-            requestBody: __DEV__ ? body : '[redacted outside dev]',
+            requestBody: (typeof __DEV__ !== 'undefined' && __DEV__) ? body : '[redacted outside dev]',
         });
 
         return await handleHttpError(

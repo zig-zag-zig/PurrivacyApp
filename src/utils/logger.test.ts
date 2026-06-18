@@ -1,8 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 
-vi.hoisted(() => { (globalThis as any).__DEV__ = true; });
-
-import { redact } from './logger';
+import { redact, logger } from './logger';
 
 describe('redact', () => {
     it('redacts keys matching SECRET_KEY_RE pattern', () => {
@@ -76,5 +74,50 @@ describe('redact', () => {
         expect(redact(42)).toBe(42);
         expect(redact(null)).toBeNull();
         expect(redact(undefined)).toBeUndefined();
+    });
+
+    it('redacts mfaCode, seed, and private keys', () => {
+        const result = redact({
+            mfaCode: '123456',
+            seed: 'abandon abandon abandon',
+            privateKey: '-----BEGIN PGP PRIVATE KEY-----',
+        }) as Record<string, unknown>;
+
+        expect(result.mfaCode).toBe('[redacted]');
+        expect(result.seed).toBe('[redacted]');
+        expect(result.privateKey).toBe('[redacted]');
+    });
+});
+
+describe('logger output', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('logger.info writes to console.log', () => {
+        const spy = vi.spyOn(console, 'log').mockImplementation(() => { });
+        logger.info('test info message');
+        expect(spy).toHaveBeenCalledWith('test info message');
+    });
+
+    it('logger.warn writes to console.warn', () => {
+        const spy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+        logger.warn('test warn message');
+        expect(spy).toHaveBeenCalledWith('test warn message');
+    });
+
+    it('logger.error writes to console.error', () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => { });
+        logger.error('test error message');
+        expect(spy).toHaveBeenCalledWith('test error message');
+    });
+
+    it('logger writes metadata as redacted JSON', () => {
+        const spy = vi.spyOn(console, 'log').mockImplementation(() => { });
+        logger.info('msg', { accessToken: 'secret', safe: 'ok' });
+        expect(spy).toHaveBeenCalledWith(
+            'msg',
+            expect.stringContaining('"accessToken": "[redacted]"'),
+        );
     });
 });

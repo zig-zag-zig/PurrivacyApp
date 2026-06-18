@@ -16,7 +16,7 @@ export class AuthFlowError extends Error {
     readonly mfaCancelled?: boolean;
     readonly mfaTimedOut?: boolean;
     readonly rateLimited?: boolean;
-    requiresSignOut?: boolean;
+    readonly requiresSignOut?: boolean;
     readonly retryAfter?: string;
     readonly retryAfterSeconds?: number;
     readonly sessionError?: AuthErrorResponse;

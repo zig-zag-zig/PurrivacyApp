@@ -171,4 +171,26 @@ describe('PgpKeyService key record mutations', () => {
     });
     expect(mocks.setPassphraseStorageEnabled).toHaveBeenCalledWith('user-1', false);
   });
+
+  it('returns null when no user is decrypted (empty response)', async () => {
+    mocks.getUserDecrypted.mockResolvedValue(null);
+    const { PgpKeyService } = await import('./pgpKeyService');
+
+    const result = await PgpKeyService.getUserDecrypted('user-empty');
+
+    expect(result).toBeNull();
+    expect(mocks.getUserDecrypted).toHaveBeenCalledWith('user-empty');
+  });
+
+  it('deletes a key and all its linked encrypted records', async () => {
+    const toDelete = key({ fingerprint: 'fingerprint-del', recordId: 'record-del' });
+    const other = key({ fingerprint: 'fingerprint-other', recordId: 'record-other' });
+    mocks.getUserDecrypted.mockResolvedValue(user([toDelete, other]));
+    const { PgpKeyService } = await import('./pgpKeyService');
+
+    await PgpKeyService.deleteKey('user-1', toDelete);
+
+    const { deleteEncryptedKeyRecord } = await import('./keyRepository');
+    expect(deleteEncryptedKeyRecord).toHaveBeenCalledWith('record-del');
+  });
 });
