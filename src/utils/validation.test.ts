@@ -52,7 +52,7 @@ describe('validateKeyCreationForm', () => {
 
     it('validates email format when email is provided', () => {
         const errors = validateKeyCreationForm('Alice', 'bad-email', '', 'pass', 'pass', 'ECDSA', 0);
-        expect(errors.email).toBe('Please enter a valid email');
+        expect(errors.email).toBe('Enter a valid email (e.g. user@domain.com)');
     });
 
     it('validates max lengths for name, comment, and email', () => {

@@ -68,16 +68,6 @@ function replaceRequired(source, pattern, replacement, label) {
   return source.replace(pattern, replacement);
 }
 
-function resolveAppEnv() {
-  return process.env.APP_ENV || process.env.NODE_ENV || 'development';
-}
-
-function getAndroidApplicationId(androidNamespace) {
-  return resolveAppEnv() === 'e2e-test'
-    ? `${androidNamespace}.dev`
-    : androidNamespace;
-}
-
 const appConfig = readAppConfig();
 const expoConfig = readExpoConfig(appConfig);
 const versionName = validateVersion(appConfig.expo?.version);
@@ -87,8 +77,6 @@ const androidNamespace = expoConfig.android?.package || appConfig.expo?.android?
 if (typeof androidNamespace !== 'string' || androidNamespace.trim().length === 0) {
   fail('expo.android.package must be configured.');
 }
-
-const androidApplicationId = getAndroidApplicationId(androidNamespace);
 
 if (!fs.existsSync(androidBuildGradlePath)) {
   fail('android/app/build.gradle does not exist. Run `npx expo prebuild --platform android` first.');
@@ -116,9 +104,9 @@ buildGradle = replaceRequired(
 buildGradle = replaceRequired(
   buildGradle,
   /applicationId\s*=\s*["'][^"']+["']/,
-  `applicationId = '${androidApplicationId}'`,
+  `applicationId = '${androidNamespace}'`,
   'applicationId',
 );
 
 fs.writeFileSync(androidBuildGradlePath, buildGradle, 'utf8');
-console.log(`[android-version] Synced Android versionName=${versionName}, versionCode=${versionCode}, namespace=${androidNamespace}, applicationId=${androidApplicationId}`);
+console.log(`[android-version] Synced Android versionName=${versionName}, versionCode=${versionCode}, namespace=${androidNamespace}, applicationId=${androidNamespace}`);

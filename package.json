@@ -1,6 +1,6 @@
 {
   "name": "purrivacy",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "scripts": {
     "start": "node scripts/with-env.cjs development -- npx expo start",
     "android": "node scripts/with-env.cjs development -- expo run:android",

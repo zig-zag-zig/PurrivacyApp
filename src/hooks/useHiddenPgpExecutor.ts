@@ -27,12 +27,21 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
         return new Promise((resolve, reject) => {
             const id = opId.current++;
 
+            // Compute per-operation timeout based on RSA key size
+            let timeoutMs = 30000; // default
+            if (operation === 'generateKey' && data?.rsaBits) {
+                const bits = data.rsaBits;
+                if (bits >= 4096) timeoutMs = 180000;
+                else if (bits >= 3072) timeoutMs = 90000;
+                else if (bits >= 2048) timeoutMs = 45000;
+            }
+
             const timer = setTimeout(() => {
                 if (pending.current.has(id)) {
                     pending.current.delete(id);
                     reject(new Error(`Timeout ${operation} #${id}`));
                 }
-            }, 15000);
+            }, timeoutMs);
 
             pending.current.set(id, {
                 resolve,

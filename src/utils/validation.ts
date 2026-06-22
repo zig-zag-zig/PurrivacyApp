@@ -23,7 +23,7 @@ interface FormErrors {
 /**
  * Email validation regex
  */
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
 
 const validateMaxLength = (value: string, fieldName: string, maxLength: number): ValidationResult => {
     if (value.length > maxLength) {
@@ -39,7 +39,7 @@ const validateEmail = (email: string): ValidationResult => {
     }
 
     if (!EMAIL_REGEX.test(email)) {
-        return { isValid: false, error: 'Please enter a valid email' };
+        return { isValid: false, error: 'Enter a valid email (e.g. user@domain.com)' };
     }
 
     return { isValid: true };

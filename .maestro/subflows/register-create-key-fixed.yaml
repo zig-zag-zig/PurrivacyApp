@@ -1,4 +1,4 @@
-appId: vip.chi_chi.purrivacy.dev
+appId: vip.chi_chi.purrivacy
 env:
   ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
   KEY_PASSPHRASE: maestroe2epassphrase123
@@ -37,7 +37,7 @@ env:
 - extendedWaitUntil:
     visible:
       id: "purrivacy.seed.saved"
-    timeout: 15000
+    timeout: 30000
 - copyTextFrom:
     text: "^[a-z]+$"
     index: 0

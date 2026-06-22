@@ -1,4 +1,4 @@
-appId: vip.chi_chi.purrivacy.dev
+appId: vip.chi_chi.purrivacy
 ---
 - launchApp:
     clearState: true

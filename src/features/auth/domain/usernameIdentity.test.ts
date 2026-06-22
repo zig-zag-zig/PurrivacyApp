@@ -56,7 +56,7 @@ describe('validateUsername', () => {
 
     it('rejects special characters', () => {
         expect(validateUsername('cat!name')).toBe(
-            'Use only letters, numbers, and underscores',
+            'Use only letters, numbers, underscores, hyphens, dots, and plus signs',
         );
     });
 

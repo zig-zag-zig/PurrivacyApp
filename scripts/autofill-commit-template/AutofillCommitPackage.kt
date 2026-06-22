@@ -1,4 +1,4 @@
-package vip.chi_chi.purrivacy
+package vip.chi_chi.purrivacy.commit
 
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule

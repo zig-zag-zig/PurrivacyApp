@@ -1,0 +1,76 @@
+appId: vip.chi_chi.purrivacy
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${FIXTURE_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${FIXTURE_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 30000
+
+# Create quick EDDSA key
+- tapOn:
+    id: "purrivacy.key.action.create"
+- tapOn:
+    id: "purrivacy.key.create.name"
+- inputText: "E2E Key"
+- tapOn:
+    id: "purrivacy.key.create.email"
+- inputText: "e2e@key.test"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.key.create.algorithm"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.key.create.algorithm"
+- tapOn: "EDDSA"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.key.create.passphrase"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.key.create.passphrase"
+- inputText: "fixture-passphrase-123"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.key.create.confirmPassphrase"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.key.create.confirmPassphrase"
+- inputText: "fixture-passphrase-123"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.key.create.submit"
+    direction: DOWN
+    speed: 80
+    visibilityPercentage: 50
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.key.create.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.passphraseStorage.store"
+    timeout: 30000
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 30000

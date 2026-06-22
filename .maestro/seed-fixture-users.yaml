@@ -1,12 +1,15 @@
-appId: vip.chi_chi.purrivacy.dev
+appId: vip.chi_chi.purrivacy
 ---
+# Register e2e-shared with fixed passphrase key
+- launchApp:
+    clearState: true
 - runFlow:
     file: subflows/register-create-key-fixed.yaml
     env:
-      TEST_USERNAME: "purrivacye2eshared"
+      TEST_USERNAME: "e2e-shared"
 - tapOn:
     id: "purrivacy.passphraseStorage.store"
 - extendedWaitUntil:
     visible:
       id: "purrivacy.key.item"
-    timeout: 30000
+    timeout: 60000

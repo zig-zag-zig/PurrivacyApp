@@ -13,7 +13,6 @@ const firestoreHost = process.env.PURRIVACY_E2E_FIRESTORE_HOST || '127.0.0.1:808
 const firebaseDatabaseHost = process.env.PURRIVACY_E2E_FIREBASE_DATABASE_HOST || '127.0.0.1:9000';
 const insideEmulators = process.argv.includes('--inside-emulators');
 const defaultMaestroTargets = [
-  '.maestro/setup-test-user.yaml',
   '.maestro/invalid-login.yaml',
   '.maestro/logged-in-happy-path.yaml',
   '.maestro/encrypt-decrypt-roundtrip.yaml',
@@ -167,6 +166,7 @@ async function runInsideEmulators() {
 
   try {
     await waitForUrl(`http://127.0.0.1:${backendPort}/v1/health`);
+    runSync('node', ['scripts/seed-e2e-fixtures.cjs'], { cwd: appRoot, env: backendEnv });
     runSync('node', ['scripts/run-maestro.cjs', ...maestroTargets], { cwd: appRoot, env: backendEnv });
   } finally {
     process.off('SIGINT', onSigint);

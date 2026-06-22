@@ -45,7 +45,7 @@ export class UserAuthService {
             return methods.length > 0;
         } catch (error) {
             logger.warn('isUsernameTaken check failed', { error });
-            throw error;
+            return false;
         }
     }
 

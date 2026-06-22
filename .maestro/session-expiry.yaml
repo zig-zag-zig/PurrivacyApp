@@ -1,4 +1,4 @@
-appId: vip.chi_chi.purrivacy.dev
+appId: vip.chi_chi.purrivacy
 env:
   TEST_USERNAME: ${E2E_USERNAME}exp
   ACCOUNT_PASSWORD: Purrivacy-e2e-password-123

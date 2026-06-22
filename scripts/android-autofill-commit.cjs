@@ -59,6 +59,7 @@ function withAndroidAutofillCommit(config) {
             'main',
             'java',
             ...getAndroidPackagePath(packageName),
+            'commit'
         );
 
         try {
@@ -69,8 +70,8 @@ function withAndroidAutofillCommit(config) {
                 const dst = path.join(destDir, f);
                 let source = fs.readFileSync(src, 'utf8');
                 source = source.replace(
-                    new RegExp(`^package ${basePackageName.replace(/\./g, '\\.')}`, 'm'),
-                    `package ${packageName}`,
+                    new RegExp(`^package ${basePackageName.replace(/\./g, '\\.')}\\.commit`, 'm'),
+                    `package ${packageName}.commit`,
                 );
                 fs.writeFileSync(dst, source, 'utf8');
             }
@@ -88,7 +89,7 @@ function withAndroidAutofillCommit(config) {
 
             let mainApp = fs.readFileSync(mainAppPath, 'utf8');
             const originalMainApp = mainApp;
-            mainApp = addKotlinImport(mainApp, `${packageName}.AutofillCommitPackage`);
+            mainApp = addKotlinImport(mainApp, `${packageName}.commit.AutofillCommitPackage`);
             mainApp = addReactPackage(mainApp, 'AutofillCommitPackage');
 
             if (mainApp !== originalMainApp) {

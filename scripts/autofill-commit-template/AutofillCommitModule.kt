@@ -1,4 +1,4 @@
-package vip.chi_chi.purrivacy
+package vip.chi_chi.purrivacy.commit
 
 import android.content.Context
 import android.content.Intent
@@ -30,7 +30,7 @@ class AutofillCommitModule(reactContext: ReactApplicationContext) : ReactContext
             .putString(KEY_SEED, seed)
             .putString(KEY_USERNAME, username)
             .putString(KEY_PASSWORD, password)
-            .apply()
+            .commit()
         Log.e("AutofillModule", "restartActivity: saved to prefs")
         UiThreadUtil.runOnUiThread {
             val activity = reactApplicationContext.currentActivity ?: return@runOnUiThread
@@ -71,7 +71,7 @@ class AutofillCommitModule(reactContext: ReactApplicationContext) : ReactContext
             map.putString(KEY_SEED, seed)
             map.putString(KEY_USERNAME, prefs.getString(KEY_USERNAME, "") ?: "")
             map.putString(KEY_PASSWORD, prefs.getString(KEY_PASSWORD, "") ?: "")
-            prefs.edit().clear().apply()
+            prefs.edit().clear().commit()
             Log.e("AutofillModule", "consumePendingSignup: returning data")
             promise.resolve(map)
         } else {
