@@ -13,6 +13,7 @@ const firestoreHost = process.env.PURRIVACY_E2E_FIRESTORE_HOST || '127.0.0.1:808
 const firebaseDatabaseHost = process.env.PURRIVACY_E2E_FIREBASE_DATABASE_HOST || '127.0.0.1:9000';
 const insideEmulators = process.argv.includes('--inside-emulators');
 const defaultMaestroTargets = [
+  '.maestro/setup-test-user.yaml',
   '.maestro/invalid-login.yaml',
   '.maestro/logged-in-happy-path.yaml',
   '.maestro/encrypt-decrypt-roundtrip.yaml',

@@ -1,18 +1,9 @@
 appId: vip.chi_chi.purrivacy.dev
 env:
-  TEST_USERNAME: ${E2E_USERNAME}round
   ROUNDTRIP_MESSAGE: maestro round trip plaintext
 ---
 - runFlow:
-    file: subflows/register-create-key.yaml
-    env:
-      TEST_USERNAME: ${TEST_USERNAME}
-- tapOn:
-    id: "purrivacy.passphraseStorage.store"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.key.item"
-    timeout: 60000
+    file: subflows/login-test-user.yaml
 - tapOn:
     id: "purrivacy.tab.encrypt"
 - extendedWaitUntil:
@@ -125,6 +116,15 @@ env:
       - inputText: ${output.encryptedBody10}
       - pressKey: Enter
 - inputText: ${output.encryptedFooter}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.recipient.passphrase"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.recipient.passphrase"
+- inputText: "maestroe2epassphrase123"
 - hideKeyboard
 - scrollUntilVisible:
     element:

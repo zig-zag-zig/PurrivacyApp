@@ -1,22 +1,7 @@
 appId: vip.chi_chi.purrivacy.dev
-env:
-  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
 ---
-- runFlow:
-    file: subflows/login-test-user.yaml
-- tapOn:
-    id: "purrivacy.tab.settings"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.settings.screen"
-    timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "purrivacy.settings.logout"
-    direction: DOWN
-    timeout: 15000
-- tapOn:
-    id: "purrivacy.settings.logout"
+- launchApp:
+    clearState: true
 - extendedWaitUntil:
     visible:
       id: "purrivacy.signin.username"
@@ -26,7 +11,7 @@ env:
 - inputText: "purrivacye2eshared"
 - tapOn:
     id: "purrivacy.signin.password"
-- inputText: ${ACCOUNT_PASSWORD}
+- inputText: "Purrivacy-e2e-password-123"
 - hideKeyboard
 - tapOn:
     id: "purrivacy.signin.submit"
@@ -37,4 +22,4 @@ env:
 - extendedWaitUntil:
     visible:
       id: "purrivacy.key.item"
-    timeout: 60000
+    timeout: 30000

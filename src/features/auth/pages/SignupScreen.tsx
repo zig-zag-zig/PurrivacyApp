@@ -1,29 +1,28 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { validateMnemonic } from 'bip39';
 import { Button } from '../../../components/Button';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { SeedVerification } from '../components/SeedVerification';
 import { useAuth } from '../state/AuthContext';
 import { RootNavigationProps } from '../../../app/navigation/types';
 import { AuthService } from '../services/authService';
+import { UserAuthService } from '../services/userAuthService';
 import { theme } from '../../../styles/theme';
 import { useToast } from '../../../app/state/ToastContext';
 import { sanitizeUsernameInput, USERNAME_MAX_LENGTH, validateUsername } from '../domain/usernameIdentity';
-import { ERROR_MESSAGES, getUserFacingErrorMessage } from '../../../utils/errorHandling';
-import { logger } from '../../../utils/logger';
+import { ERROR_MESSAGES } from '../../../utils/errorHandling';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
+import { commitAutofill, restartActivity } from '../../../native/autofillCommit';
 
 export const SignupScreen = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-    const [step, setStep] = useState<'form' | 'seed'>('form');
-    const [seed, setSeed] = useState('');
-    const { signUp, isAuthLoading } = useAuth();
+    const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+    const { isAuthLoading } = useAuth();
     const navigation = useNavigation<RootNavigationProps>();
     const { showToast } = useToast();
 
@@ -34,13 +33,20 @@ export const SignupScreen = () => {
                 setPassword('');
                 setConfirmPassword('');
                 setFormErrors({});
-                setStep('form');
-                setSeed('');
             };
         }, [])
     );
 
-    const handleSignup = () => {
+    const routeParams = (useRoute() as any).params;
+    useEffect(() => {
+        if (routeParams?.username) {
+            setUsername(sanitizeUsernameInput(routeParams.username));
+            setPassword(routeParams.password || '');
+            setConfirmPassword(routeParams.password || '');
+        }
+    }, []);
+
+    const handleSignup = async () => {
         const errors: { [key: string]: string } = {};
         const submittedUsername = sanitizeUsernameInput(username);
         if (submittedUsername !== username) {
@@ -56,6 +62,20 @@ export const SignupScreen = () => {
         setFormErrors(errors);
         if (Object.keys(errors).length > 0) return;
 
+        setIsCheckingAvailability(true);
+        try {
+            const taken = await UserAuthService.isUsernameTaken(submittedUsername);
+            if (taken) {
+                showToast(ERROR_MESSAGES.SIGN_UP_FAILED, 'error');
+                return;
+            }
+        } catch {
+            showToast(ERROR_MESSAGES.NETWORK_ERROR, 'error');
+            return;
+        } finally {
+            setIsCheckingAvailability(false);
+        }
+
         let generatedSeed;
         let attempts = 0;
 
@@ -68,29 +88,9 @@ export const SignupScreen = () => {
             }
         } while (!validateMnemonic(generatedSeed));
 
-        setSeed(generatedSeed);
-        setStep('seed');
+        commitAutofill();
+        restartActivity(generatedSeed, submittedUsername, password);
     };
-
-    const handleSeedVerified = async () => {
-        try {
-            await signUp(sanitizeUsernameInput(username), password, seed);
-        } catch (error: any) {
-            logger.warn('sign-up failed', { error });
-            showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.SIGN_UP_FAILED), 'error');
-            setStep('form');
-        }
-    };
-
-    if (step === 'seed') {
-        return (
-            <SeedVerification
-                seed={seed}
-                onVerified={handleSeedVerified}
-                isLoading={isAuthLoading}
-            />
-        );
-    }
 
     const onUsernameChange = (text: string) => {
         setUsername(sanitizeUsernameInput(text));
@@ -125,7 +125,7 @@ export const SignupScreen = () => {
                     testID="purrivacy.signup.password"
                     value={password}
                     onChangeText={setPassword}
-                    autoComplete="password"
+                    autoComplete="new-password"
                     enableAutofill
                     secureTextEntry
                     showToggleSecureText
@@ -137,7 +137,7 @@ export const SignupScreen = () => {
                     testID="purrivacy.signup.confirmPassword"
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
-                    autoComplete="password"
+                    autoComplete="new-password"
                     enableAutofill
                     secureTextEntry
                     showToggleSecureText
@@ -149,6 +149,8 @@ export const SignupScreen = () => {
                     label="Sign Up"
                     testID="purrivacy.signup.submit"
                     onPress={handleSignup}
+                    loading={isCheckingAvailability || isAuthLoading}
+                    disabled={isCheckingAvailability || isAuthLoading}
                 />
 
                 <Button

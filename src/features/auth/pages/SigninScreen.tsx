@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
+import { consumePendingSignup } from '../../../native/autofillCommit';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useAuth } from '../state/AuthContext';
@@ -35,6 +36,7 @@ export const SigninScreen = () => {
     const signInInFlightRef = useRef(false);
     const usernamesThatDidNotLastUseBiometrics = useRef<Set<string>>(new Set());
     const usernamePrefillHandledRef = useRef(false);
+    const usernameRef = useRef<any>(null);
     const isFocused = useIsFocused();
 
     const suppressAutoBiometricForUsername = (value: string) => {
@@ -43,6 +45,15 @@ export const SigninScreen = () => {
         autoBiometricSuppressedUsernames.add(key);
         setAutoBiometricSuppressed(true);
     };
+
+    useEffect(() => {
+        consumePendingSignup().then((data) => {
+            if (data) {
+                navigation.navigate('Signup', { username: data.username, password: data.password });
+                navigation.navigate('SignupSeedVerification', data);
+            }
+        });
+    }, []);
 
     useEffect(() => {
         if (isFocused && lastSignedInUser?.username) {
@@ -302,6 +313,7 @@ export const SigninScreen = () => {
                     </View>
                 ) : (
                     <InputField
+                        ref={usernameRef}
                         testID="purrivacy.signin.username"
                         label="Username"
                         value={username}

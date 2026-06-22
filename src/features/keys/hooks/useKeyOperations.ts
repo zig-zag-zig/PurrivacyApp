@@ -12,6 +12,7 @@ import {
 import { logger } from '../../../utils/logger';
 import type { ToastType } from '../../../app/state/ToastContext';
 import { EventService } from '../../../services/eventService';
+import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
 import { identifyKeyType } from '../domain/pgpValidation';
 import {
   changeDevTempKeyExpiration,
@@ -46,6 +47,7 @@ export function useKeyOperations({
   showToast,
 }: KeyOperationsParams) {
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'key');
+  const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const refreshUserKeys = () => EventService.addEvent('user');
   const refreshDevTempKeys = () => EventService.addEvent('devTempKeys');
 
@@ -57,6 +59,9 @@ export function useKeyOperations({
 
     setLoading(true);
     try {
+      if (keyGenerationOptions.passphrase) {
+        ensurePassphraseStorageConsent().catch(() => {});
+      }
       const key = await PgpKeyService.createKey(
         user.uid,
         keyGenerationOptions,
@@ -133,6 +138,9 @@ export function useKeyOperations({
 
       setLoading(true);
       try {
+        if (state.importPassphrase) {
+          ensurePassphraseStorageConsent().catch(() => {});
+        }
         const importedKey = await PgpKeyService.importKey(
           user.uid,
           trimmedContent,

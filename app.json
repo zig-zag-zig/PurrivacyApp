@@ -3,7 +3,7 @@
     "sdkVersion": "56.0.0",
     "name": "Purrivacy",
     "slug": "pgp-frontend",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -29,7 +29,7 @@
       },
       "googleServicesFile": "./google-services.json",
       "package": "vip.chi_chi.purrivacy",
-      "versionCode": 5,
+      "versionCode": 6,
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES",
         "android.permission.USE_BIOMETRIC",
@@ -49,6 +49,7 @@
       "./scripts/patch-openpgp",
       "./scripts/native-security",
       "./scripts/android-update-installer",
+      "./scripts/android-autofill-commit",
       "expo-dev-client",
       "expo-secure-store",
       [

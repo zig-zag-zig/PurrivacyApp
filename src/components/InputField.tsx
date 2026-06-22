@@ -206,9 +206,10 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                         autoComplete={resolvedAutoComplete}
                         cursorColor={Platform.OS === 'android' ? cursorColor ?? theme.colors.primary : cursorColor}
                         importantForAutofill={Platform.OS === 'android' ? androidAutofillMode : importantForAutofill}
+                        importantForAccessibility={Platform.OS === 'android' && isAndroidAutofillDisabled ? 'no' : undefined}
                         selectionColor={selectionColor ?? theme.colors.primary}
                         selectionHandleColor={Platform.OS === 'android' ? selectionHandleColor ?? theme.colors.primary : selectionHandleColor}
-                        textContentType={Platform.OS === 'ios' ? textContentType : undefined}
+                        textContentType={Platform.OS === 'ios' ? (textContentType ?? (isAndroidAutofillDisabled && secureTextEntry ? 'oneTimeCode' : undefined)) : undefined}
                         underlineColorAndroid="transparent"
                         style={[
                             commonStyles.flex,

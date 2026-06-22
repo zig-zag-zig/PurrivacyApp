@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { UserAuthService } from '../services/userAuthService';
 import { UserDecrypted } from '../../../types/types';
@@ -32,28 +32,41 @@ export const useUserLoading = (
 
     // Handle pending password effect
     useEffect(() => {
-        const run = async () => {
-            if (user && pendingPassword) {
-                let success = false;
-                try {
-                    const encryptedUser = await UserAuthService.loadUserEncrypted(user);
-                    if (!encryptedUser) {
+        let cancelled = false;
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
+        const RETRY_DELAY_MS = 500;
+        const retryTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
+
+        const tryUnlock = async () => {
+            if (cancelled || !user || !pendingPassword) return;
+
+            let success = false;
+            try {
+                const encryptedUser = await UserAuthService.loadUserEncrypted(user);
+                if (!encryptedUser) {
+                    if (retryCount < MAX_RETRIES) {
+                        retryCount++;
+                        retryTimerRef.current = setTimeout(tryUnlock, RETRY_DELAY_MS);
                         return;
                     }
+                    return;
+                }
 
-                    await AuthService.decrypt(
-                        user.uid,
-                        encryptedUser.dekPassword.encryptedData,
-                        pendingPassword,
-                        encryptedUser.dekPassword.iv,
-                        true,
-                        encryptedUser.dekPassword.tag,
-                        encryptedUser.dekPassword.salt
-                    );
-                    success = true;
-                } catch (error: any) {
-                    logger.warn('failed to unlock user after sign-in', { error });
-                } finally {
+                await AuthService.decrypt(
+                    user.uid,
+                    encryptedUser.dekPassword.encryptedData,
+                    pendingPassword,
+                    encryptedUser.dekPassword.iv,
+                    true,
+                    encryptedUser.dekPassword.tag,
+                    encryptedUser.dekPassword.salt
+                );
+                success = true;
+            } catch (error: any) {
+                logger.warn('failed to unlock user after sign-in', { error });
+            } finally {
+                if (success || retryCount >= MAX_RETRIES) {
                     setPendingPassword(null);
                     if (success) {
                         runLoadUserRef.current = true;
@@ -62,7 +75,12 @@ export const useUserLoading = (
                 }
             }
         };
-        run();
+
+        tryUnlock();
+        return () => {
+            cancelled = true;
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        };
     }, [user, pendingPassword]);
 
     return {

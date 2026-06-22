@@ -1,0 +1,12 @@
+appId: vip.chi_chi.purrivacy.dev
+---
+- runFlow:
+    file: subflows/register-create-key-fixed.yaml
+    env:
+      TEST_USERNAME: "purrivacye2eshared"
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 30000

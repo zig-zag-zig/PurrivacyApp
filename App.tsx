@@ -3,8 +3,9 @@ import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 import { DarkTheme, NavigationContainer, useNavigation } from '@react-navigation/native';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider, useAuth } from './src/features/auth/state/AuthContext';
 import { StackNavigator } from './src/app/navigation/StackNavigator';
@@ -153,25 +154,27 @@ const AppContent = () => {
 function App() {
     return (
         <SafeAreaProvider>
-            <ErrorBoundary>
-                <GlobalSpinnerProvider>
-                    <ToastProvider>
-                        <AuthProvider>
-                            <MfaProvider>
-                                <ModalProvider>
-                                    <UpdateProvider>
-                                        <PassphraseBannerOverlayProvider>
-                                            <NavigationContainer theme={navigationTheme}>
-                                                <AppContent />
-                                            </NavigationContainer>
-                                        </PassphraseBannerOverlayProvider>
-                                    </UpdateProvider>
-                                </ModalProvider>
-                            </MfaProvider>
-                        </AuthProvider>
-                    </ToastProvider>
-                </GlobalSpinnerProvider>
-            </ErrorBoundary>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <ErrorBoundary>
+                    <GlobalSpinnerProvider>
+                        <ToastProvider>
+                            <AuthProvider>
+                                <MfaProvider>
+                                    <ModalProvider>
+                                        <UpdateProvider>
+                                            <PassphraseBannerOverlayProvider>
+                                                <NavigationContainer theme={navigationTheme}>
+                                                    <AppContent />
+                                                </NavigationContainer>
+                                            </PassphraseBannerOverlayProvider>
+                                        </UpdateProvider>
+                                    </ModalProvider>
+                                </MfaProvider>
+                            </AuthProvider>
+                        </ToastProvider>
+                    </GlobalSpinnerProvider>
+                </ErrorBoundary>
+            </GestureHandlerRootView>
         </SafeAreaProvider>
     );
 }

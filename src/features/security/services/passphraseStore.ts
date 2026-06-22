@@ -51,7 +51,6 @@ export const setPassphraseStorageEnabled = async (
 ): Promise<void> => {
     if (userId.trim() === '') return;
     await setNonSensitiveValue(passphraseStorageEnabledKey(userId), String(enabled));
-    await setPassphraseStoragePrompted(userId, true);
 
     if (!options?.skipRemoteSync && backendSync) {
         try {

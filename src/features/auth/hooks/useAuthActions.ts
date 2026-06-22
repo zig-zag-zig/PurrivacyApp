@@ -127,6 +127,7 @@ export function useAuthActions({
 
       await clearStoredSessionAndPushToken(currentUser.uid);
       await securityService.clearLastSignedInUser();
+      setUserDecrypted(null);
       setLastSignedInUser(null);
       setIsLocalSessionLocked(false);
       await firebaseSignOut(auth);

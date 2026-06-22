@@ -1,9 +1,10 @@
 import { RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 
 export type RootStackParamList = {
     Signin: undefined;
-    Signup: undefined;
+    Signup: { username?: string; password?: string } | undefined;
+    SignupSeedVerification: { seed: string; username: string; password: string };
     RecoverAccount: undefined;
     Security: { type: 'password' | 'delete' };
     MfaSetup: undefined;
@@ -21,7 +22,7 @@ export type TabParamList = {
     Settings: undefined;
 };
 
-export type RootNavigationProps = NativeStackNavigationProp<RootStackParamList>;
+export type RootNavigationProps = StackNavigationProp<RootStackParamList>;
 
 export type KeyScreenRouteProp = RouteProp<TabParamList, 'Key'>;
 export type EncryptScreenRouteProp = RouteProp<TabParamList, 'Encrypt'>;

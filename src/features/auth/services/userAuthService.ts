@@ -1,5 +1,5 @@
 import { User, UserCredential } from 'firebase/auth';
-import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signInWithCustomToken } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, fetchSignInMethodsForEmail, signInWithEmailAndPassword, signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../../../config/firebase';
 import { AuthService } from './authService';
 import { PgpKeyService } from '../../keys/services/pgpKeyService';
@@ -31,6 +31,20 @@ export class UserAuthService {
 
             return result;
         } catch (error: any) {
+            throw error;
+        }
+    }
+
+    /**
+     * Check whether a username is already registered.
+     * Uses Firebase's read-only fetchSignInMethodsForEmail — no auth required.
+     */
+    static async isUsernameTaken(username: string): Promise<boolean> {
+        try {
+            const methods = await fetchSignInMethodsForEmail(auth, usernameToAuthEmail(username));
+            return methods.length > 0;
+        } catch (error) {
+            logger.warn('isUsernameTaken check failed', { error });
             throw error;
         }
     }
