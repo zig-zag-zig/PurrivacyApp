@@ -85,9 +85,9 @@ export const PassphraseBannerOverlayProvider = ({ children }: { children: ReactN
     const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
     const bannerHeightRef = useRef(0);
     const activeBannerIdRef = useRef<string | null>(null);
-    const frameRef = useRef<number | null>(null);
     const opacity = useRef(new Animated.Value(0)).current;
     const viewportRef = useRef<View | null>(null);
+    const measureActiveBannerRef = useRef<() => void>(() => {});
 
     const hidePassphraseBanner = useCallback((id?: string) => {
         setActiveBanner(currentBanner => {
@@ -110,112 +110,118 @@ export const PassphraseBannerOverlayProvider = ({ children }: { children: ReactN
 
     const measureActiveBanner = useCallback(() => {
         if (!activeBanner) return;
-        if (frameRef.current !== null) return;
+        const anchor = activeBanner.anchorRef.current;
+        if (!anchor) return;
 
-        frameRef.current = requestAnimationFrame(() => {
-            frameRef.current = null;
-            const anchor = activeBanner.anchorRef.current;
-            if (!anchor) return;
-
-            const measureAnchor = (
-                rootX = 0,
-                rootY = 0,
-                rootWidth = Dimensions.get('window').width,
-                rootHeight = Dimensions.get('window').height,
-            ) => {
-                anchor.measureInWindow((windowX, windowY, width, height) => {
-                    const windowHeight = Dimensions.get('window').height;
-                    const fallbackKeyboardHeight = getFallbackKeyboardHeight(windowHeight);
-                    const viewportBottom = rootY + rootHeight;
-                    const viewportUsesFullWindow = rootHeight >= windowHeight - BANNER_SCREEN_MARGIN * 2;
-                    const fallbackKeyboardTop = viewportUsesFullWindow
-                        ? windowHeight - fallbackKeyboardHeight
-                        : viewportBottom;
-                    const estimatedHeight = activeBanner.mode === 'generate'
-                        ? GENERATOR_BANNER_HEIGHT
-                        : COMPACT_BANNER_HEIGHT;
-                    const bannerHeight = bannerHeightRef.current || estimatedHeight;
-                    const visibleTop = Math.max(
-                        BANNER_SCREEN_MARGIN,
-                        insets.top - rootY + BANNER_SCREEN_MARGIN,
-                    );
-                    const metricsKeyboardTop = Keyboard.metrics?.()?.screenY;
-                    const visibleBottom = Math.min(
-                        keyboardTop
-                            ?? metricsKeyboardTop
-                            ?? (
-                                Platform.OS === 'android' && activeBanner.keyboardFallbackEnabled
-                                    ? fallbackKeyboardTop
-                                    : viewportBottom
-                            ),
-                        viewportBottom - insets.bottom,
-                    ) - rootY - BANNER_SCREEN_MARGIN;
-                    const x = windowX - rootX;
-                    const y = windowY - rootY;
-                    const inputTop = y;
-                    const inputBottom = y + height;
-                    const placement = resolvePassphraseBannerPlacement({
-                        bannerHeight,
-                        currentPlacement: bannerLayout.width > 0 ? bannerLayout.placement : undefined,
-                        gap: BANNER_GAP,
-                        inputBottom,
-                        inputTop,
-                        viewportClearance: BANNER_VIEWPORT_CLEARANCE,
-                        visibleBottom,
-                        visibleTop,
-                    });
-                    const bannerWidth = Math.max(0, Math.min(width, rootWidth - BANNER_SCREEN_MARGIN * 2));
-                    const left = clamp(
-                        x,
-                        BANNER_SCREEN_MARGIN,
-                        Math.max(BANNER_SCREEN_MARGIN, rootWidth - bannerWidth - BANNER_SCREEN_MARGIN),
-                    );
-                    const candidateTop = placement === 'above'
-                        ? inputTop - BANNER_GAP - bannerHeight
-                        : inputBottom + BANNER_GAP;
-                    const top = clamp(
-                        candidateTop,
-                        visibleTop,
-                        Math.max(visibleTop, visibleBottom - bannerHeight),
-                    );
-                    const anchorCenterX = x + width / 2;
-                    const pointerLeft = clamp(
-                        anchorCenterX - left - POINTER_SIZE / 2,
-                        POINTER_SIZE,
-                        Math.max(POINTER_SIZE, bannerWidth - POINTER_SIZE * 2),
-                    );
-
-                    setBannerLayout(previousLayout => {
-                        const nextLayout = {
-                            left,
-                            placement,
-                            pointerLeft,
-                            top,
-                            width: bannerWidth,
-                        };
-
-                        if (
-                            previousLayout.left === nextLayout.left
-                            && previousLayout.placement === nextLayout.placement
-                            && previousLayout.pointerLeft === nextLayout.pointerLeft
-                            && previousLayout.top === nextLayout.top
-                            && previousLayout.width === nextLayout.width
-                        ) {
-                            return previousLayout;
-                        }
-
-                        return nextLayout;
-                    });
+        const measureAnchor = (
+            rootX = 0,
+            rootY = 0,
+            rootWidth = Dimensions.get('window').width,
+            rootHeight = Dimensions.get('window').height,
+        ) => {
+            anchor.measureInWindow((windowX, windowY, width, height) => {
+                const windowHeight = Dimensions.get('window').height;
+                const fallbackKeyboardHeight = getFallbackKeyboardHeight(windowHeight);
+                const viewportBottom = rootY + rootHeight;
+                const viewportUsesFullWindow = rootHeight >= windowHeight - BANNER_SCREEN_MARGIN * 2;
+                const fallbackKeyboardTop = viewportUsesFullWindow
+                    ? windowHeight - fallbackKeyboardHeight
+                    : viewportBottom;
+                const estimatedHeight = activeBanner.mode === 'generate'
+                    ? GENERATOR_BANNER_HEIGHT
+                    : COMPACT_BANNER_HEIGHT;
+                const bannerHeight = bannerHeightRef.current || estimatedHeight;
+                const visibleTop = Math.max(
+                    BANNER_SCREEN_MARGIN,
+                    insets.top - rootY + BANNER_SCREEN_MARGIN,
+                );
+                const metricsKeyboardTop = Keyboard.metrics?.()?.screenY;
+                const visibleBottom = Math.min(
+                    keyboardTop
+                        ?? metricsKeyboardTop
+                        ?? (
+                            Platform.OS === 'android' && activeBanner.keyboardFallbackEnabled
+                                ? fallbackKeyboardTop
+                                : viewportBottom
+                        ),
+                    viewportBottom - insets.bottom,
+                ) - rootY - BANNER_SCREEN_MARGIN;
+                const x = windowX - rootX;
+                const y = windowY - rootY;
+                const inputTop = y;
+                const inputBottom = y + height;
+                const placement = resolvePassphraseBannerPlacement({
+                    bannerHeight,
+                    currentPlacement: bannerLayout.width > 0 ? bannerLayout.placement : undefined,
+                    gap: BANNER_GAP,
+                    inputBottom,
+                    inputTop,
+                    viewportClearance: BANNER_VIEWPORT_CLEARANCE,
+                    visibleBottom,
+                    visibleTop,
                 });
-            };
+                const bannerWidth = Math.max(0, Math.min(width, rootWidth - BANNER_SCREEN_MARGIN * 2));
+                const left = clamp(
+                    x,
+                    BANNER_SCREEN_MARGIN,
+                    Math.max(BANNER_SCREEN_MARGIN, rootWidth - bannerWidth - BANNER_SCREEN_MARGIN),
+                );
+                const candidateTop = placement === 'above'
+                    ? inputTop - BANNER_GAP - bannerHeight
+                    : inputBottom + BANNER_GAP;
+                const top = clamp(
+                    candidateTop,
+                    visibleTop,
+                    Math.max(visibleTop, visibleBottom - bannerHeight),
+                );
+                const anchorCenterX = x + width / 2;
+                const pointerLeft = clamp(
+                    anchorCenterX - left - POINTER_SIZE / 2,
+                    POINTER_SIZE,
+                    Math.max(POINTER_SIZE, bannerWidth - POINTER_SIZE * 2),
+                );
 
-            if (viewportRef.current) {
-                viewportRef.current.measureInWindow(measureAnchor);
-            } else {
-                measureAnchor();
-            }
-        });
+                setBannerLayout(previousLayout => {
+                    const nextLayout = {
+                        left,
+                        placement,
+                        pointerLeft,
+                        top,
+                        width: bannerWidth,
+                    };
+
+                    if (
+                        previousLayout.left === nextLayout.left
+                        && previousLayout.placement === nextLayout.placement
+                        && previousLayout.pointerLeft === nextLayout.pointerLeft
+                        && previousLayout.top === nextLayout.top
+                        && previousLayout.width === nextLayout.width
+                    ) {
+                        return previousLayout;
+                    }
+
+                    return nextLayout;
+                });
+            });
+        };
+
+        if (viewportRef.current) {
+            viewportRef.current.measureInWindow(measureAnchor);
+        } else {
+            measureAnchor();
+        }
     }, [activeBanner, bannerLayout.placement, bannerLayout.width, insets.bottom, insets.top, keyboardTop]);
+
+    useEffect(() => {
+        measureActiveBannerRef.current = measureActiveBanner;
+    }, [measureActiveBanner]);
+
+    // Stable subscription — never tears down/re-registers during scroll
+    useEffect(() => {
+        return subscribePassphraseBannerReposition(() => {
+            measureActiveBannerRef.current();
+        });
+    }, []);
 
     useEffect(() => {
         Animated.timing(opacity, {
@@ -238,8 +244,6 @@ export const PassphraseBannerOverlayProvider = ({ children }: { children: ReactN
             measureActiveBanner();
         }
     }, [activeBanner, dimensions.height, dimensions.width, measureActiveBanner]);
-
-    useEffect(() => subscribePassphraseBannerReposition(measureActiveBanner), [measureActiveBanner]);
 
     useEffect(() => {
         if (!activeBanner) return undefined;
@@ -267,12 +271,6 @@ export const PassphraseBannerOverlayProvider = ({ children }: { children: ReactN
             measureActiveBanner();
         }
     }, [activeBanner, keyboardTop, measureActiveBanner]);
-
-    useEffect(() => () => {
-        if (frameRef.current !== null) {
-            cancelAnimationFrame(frameRef.current);
-        }
-    }, []);
 
     const contextValue = useMemo(() => ({
         hidePassphraseBanner,

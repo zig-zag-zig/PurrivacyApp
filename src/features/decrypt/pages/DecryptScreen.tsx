@@ -46,6 +46,8 @@ export const DecryptScreen = () => {
           largeText
           trimOnBlur
           error={decryptPage.state.formErrors.encryptedContent}
+          isIsolated={true}
+          allowPasteOverride={true}
           rightIcon={
             <FilePickerIcon
               onPress={decryptPage.onPickEncryptedFile}
@@ -101,6 +103,8 @@ export const DecryptScreen = () => {
                 testID="purrivacy.decrypt.detachedSignature"
                 value={decryptPage.state.signature}
                 onChangeText={decryptPage.onSignatureChanged}
+                isIsolated={true}
+                allowPasteOverride={true}
                 multiline
                 largeText
                 trimOnBlur

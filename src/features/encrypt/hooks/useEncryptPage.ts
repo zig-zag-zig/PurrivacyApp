@@ -20,6 +20,7 @@ import {
 } from '../domain/encryptDomain';
 import type { KeySelectionMap } from '../model/types';
 import { encryptReducer, initialEncryptState } from '../state/encryptReducer';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 export function useEncryptPage() {
   const route = useRoute<EncryptScreenRouteProp>();
@@ -29,6 +30,7 @@ export function useEncryptPage() {
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
   const shouldResetOnFocus = useRef(false);
   const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
+  const { secureCopy } = useSecureCopy();
 
   const pickFile = useFilePicker(['.txt']);
   const keySelectionKeys = visibleKeys;
@@ -190,13 +192,13 @@ export function useEncryptPage() {
 
   const handleCopyEncrypted = () => {
     if (!state.encryptedContent) return;
-    void Clipboard.setStringAsync(state.encryptedContent);
+    void secureCopy(state.encryptedContent);
     showToast(SUCCESS_MESSAGES.ENCRYPTED_COPIED, 'info');
   };
 
   const handleCopySignature = () => {
     if (!state.signature) return;
-    void Clipboard.setStringAsync(state.signature);
+    void secureCopy(state.signature);
     showToast(SUCCESS_MESSAGES.SIGNATURE_COPIED, 'info');
   };
 

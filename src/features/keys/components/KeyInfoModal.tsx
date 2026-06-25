@@ -7,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useToast } from '../../../app/state/ToastContext';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { ModalToastHost } from '../../../components/ModalToastHost';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 interface KeyInfoModalProps {
     visible: boolean;
@@ -21,6 +22,7 @@ export const KeyInfoModal: React.FC<KeyInfoModalProps> = ({
 }) => {
     const { showToast } = useToast();
     const [copied, setCopied] = useState(false);
+    const { secureCopy } = useSecureCopy();
     const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => () => {
@@ -32,7 +34,7 @@ export const KeyInfoModal: React.FC<KeyInfoModalProps> = ({
     const handleCopyPublicKey = () => {
         const publicKey = keyPair?.publicKey;
         if (publicKey) {
-            void Clipboard.setStringAsync(publicKey);
+            void secureCopy(publicKey);
             setCopied(true);
             if (copyFeedbackTimeoutRef.current) {
                 clearTimeout(copyFeedbackTimeoutRef.current);

@@ -12,6 +12,7 @@ import { RootNavigationProps } from '../../../app/navigation/types';
 import { AuthService } from '../services/authService';
 import { theme } from '../../../styles/theme';
 import { useToast } from '../../../app/state/ToastContext';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 interface SeedVerificationProps {
     seed: string;
@@ -25,6 +26,7 @@ export const SeedVerification: React.FC<SeedVerificationProps> = ({
     isLoading = false,
 }) => {
     const [confirmed, setConfirmed] = useState(false);
+    const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,7 +34,7 @@ export const SeedVerification: React.FC<SeedVerificationProps> = ({
     const { showToast } = useToast();
 
     const handleCopySeed = () => {
-        void Clipboard.setStringAsync(seed);
+        void secureCopy(seed);
         showToast('Seed copied to clipboard', 'success');
 
         setCopied(true);

@@ -14,6 +14,7 @@ import { theme } from '../../../styles/theme';
 import { RootNavigationProps } from '../../../app/navigation/types';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 export const MfaSetupScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();
@@ -22,6 +23,7 @@ export const MfaSetupScreen = () => {
     const { showRecoveryCodesModal } = useModal();
 
     const [setupData, setSetupData] = useState<any>(null);
+    const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     useGlobalSpinner(!setupData, { backgroundMode: 'opaque' });
@@ -69,7 +71,7 @@ export const MfaSetupScreen = () => {
         }
 
         try {
-            void Clipboard.setStringAsync(setupData.secret);
+            void secureCopy(setupData.secret);
             setCopied(true);
             if (copyFeedbackTimeoutRef.current) {
                 clearTimeout(copyFeedbackTimeoutRef.current);

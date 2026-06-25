@@ -1,20 +1,23 @@
 import { useRef } from 'react';
-import type {
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    ScrollViewProps,
+import {
+    Keyboard,
+    type NativeScrollEvent,
+    type NativeSyntheticEvent,
+    type ScrollViewProps,
 } from 'react-native';
 
 import {
     requestPassphraseBannerDismiss,
     requestPassphraseBannerReposition,
 } from '../services/passphraseBannerEvents';
+import { blurAllIsolatedInputs } from './IsolatedTextInput';
 
 type TouchHandler = NonNullable<ScrollViewProps['onTouchStart']>;
 type ScrollHandler = (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 
 type UsePassphraseBannerScrollEventsParams = {
     onScroll?: ScrollHandler;
+    onScrollBeginDrag?: ScrollHandler;
     onTouchEnd?: ScrollViewProps['onTouchEnd'];
     onTouchMove?: ScrollViewProps['onTouchMove'];
     onTouchStart?: ScrollViewProps['onTouchStart'];
@@ -22,6 +25,7 @@ type UsePassphraseBannerScrollEventsParams = {
 
 export function usePassphraseBannerScrollEvents({
     onScroll,
+    onScrollBeginDrag,
     onTouchEnd,
     onTouchMove,
     onTouchStart,
@@ -32,6 +36,13 @@ export function usePassphraseBannerScrollEvents({
     const handleScroll: ScrollHandler = event => {
         requestPassphraseBannerReposition();
         onScroll?.(event);
+    };
+
+    const handleScrollBeginDrag: ScrollHandler = event => {
+        // Dismiss the banner ONLY on user-initiated scrolls.
+        // Programmatic scrolls (like keyboard avoidance) do NOT trigger this event.
+        requestPassphraseBannerDismiss();
+        onScrollBeginDrag?.(event);
     };
 
     const handleTouchStart: TouchHandler = event => {
@@ -48,8 +59,13 @@ export function usePassphraseBannerScrollEvents({
         if (start) {
             const deltaX = Math.abs(event.nativeEvent.pageX - start.x);
             const deltaY = Math.abs(event.nativeEvent.pageY - start.y);
-            if (deltaX > 8 || deltaY > 8) {
+            // When the user initiates a scroll (>8px movement), dismiss the
+            // banner immediately. This only fires once per gesture (guarded
+            // by !touchMovedRef.current). Keyboard-induced scrolls don't
+            // trigger handleTouchMove, so the banner stays visible then.
+            if (!touchMovedRef.current && (deltaX > 8 || deltaY > 8)) {
                 touchMovedRef.current = true;
+                requestPassphraseBannerDismiss();
             }
         }
         onTouchMove?.(event);
@@ -58,6 +74,10 @@ export function usePassphraseBannerScrollEvents({
     const handleTouchEnd: TouchHandler = event => {
         if (!touchMovedRef.current) {
             requestPassphraseBannerDismiss();
+            // Blur all focused isolated inputs. This bypasses TextInput.State
+            // (which doesn't track requireNativeComponent views) and directly
+            // dispatches the blur command to each focused isolated input.
+            blurAllIsolatedInputs();
         }
         touchStartRef.current = null;
         touchMovedRef.current = false;
@@ -66,6 +86,7 @@ export function usePassphraseBannerScrollEvents({
 
     return {
         handleScroll,
+        handleScrollBeginDrag,
         handleTouchEnd,
         handleTouchMove,
         handleTouchStart,

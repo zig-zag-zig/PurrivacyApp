@@ -9,6 +9,7 @@ import { ModalToastHost } from '../../../components/ModalToastHost';
 import * as Clipboard from 'expo-clipboard';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 export type RecoveryCodesModalOptions = {
     recoveryCodes: string[];
@@ -25,6 +26,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
     source,
 }) => {
     const [copied, setCopied] = useState(false);
+    const { secureCopy } = useSecureCopy();
     const [copyFeedbackVisible, setCopyFeedbackVisible] = useState(false);
     const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { showToast } = useToast();
@@ -37,7 +39,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
 
     const copyAllCodes = () => {
         const allCodes = recoveryCodes.join('\n');
-        void Clipboard.setStringAsync(allCodes);
+        void secureCopy(allCodes);
         setCopied(true);
         setCopyFeedbackVisible(true);
         if (copyFeedbackTimeoutRef.current) {

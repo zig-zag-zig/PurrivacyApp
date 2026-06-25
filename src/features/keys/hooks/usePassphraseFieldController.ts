@@ -17,6 +17,7 @@ import {
 } from '../../security/services/passphraseGeneratorSettings';
 import type { PassphraseGeneratorSettings } from '../../security/services/passphraseGeneratorSettings';
 import { usePassphraseBannerOverlay } from '../components/PassphraseBannerOverlay';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 export type PassphraseBannerMode = 'stored' | 'generate' | 'none';
 
@@ -62,6 +63,7 @@ export function usePassphraseFieldController({
     storedPassphraseValue,
 }: UsePassphraseFieldControllerParams): UsePassphraseFieldControllerResult {
     const { user } = useAuth();
+    const { secureCopy } = useSecureCopy();
     const { hidePassphraseBanner, showPassphraseBanner } = usePassphraseBannerOverlay();
     const fieldId = useId();
     const bannerMode: PassphraseBannerMode = explicitBannerMode ?? (doNotUseAutofill ? 'none' : 'stored');
@@ -445,6 +447,22 @@ export function usePassphraseFieldController({
     const handleChangeText = (text: string) => {
         userEditedRef.current = true;
         commitPassphrase(text);
+        // If editing causes the value to diverge from the stored passphrase,
+        // re-enable banner readiness so the autofill banner can reappear
+        // without requiring a blur+refocus. After tapping the autofill banner,
+        // dismissBanner() sets isBannerReady=false; without this reset, typing
+        // again wouldn't surface the banner until the field loses and regains focus.
+        if (
+            bannerMode === 'stored'
+            && isFocused
+            && storedPassphrase
+            && text !== storedPassphrase
+        ) {
+            dismissedBannerTokenRef.current = null;
+            if (!isBannerReady) {
+                setIsBannerReady(true);
+            }
+        }
     };
 
     const handleAutofill = useCallback(() => {
@@ -472,7 +490,7 @@ export function usePassphraseFieldController({
     const handleCopyGeneratedPassphrase = useCallback(() => {
         if (!generatedPassphrase) return;
         markBannerInteraction();
-        void Clipboard.setStringAsync(generatedPassphrase);
+        void secureCopy(generatedPassphrase);
     }, [generatedPassphrase, markBannerInteraction]);
 
     const openGeneratorSettings = useCallback(() => {

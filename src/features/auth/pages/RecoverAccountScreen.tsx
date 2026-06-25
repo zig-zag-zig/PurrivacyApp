@@ -121,6 +121,8 @@ export const RecoverAccountScreen = () => {
                     showToggleSecureText
                     error={formErrors.seedPhrase}
                     normalizeOnBlur={AuthService.normalizeSeedPhrase}
+                    isIsolated={true}
+                    allowPasteOverride={true}
                 />
 
                 <PasswordForm

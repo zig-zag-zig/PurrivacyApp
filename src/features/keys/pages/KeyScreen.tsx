@@ -127,6 +127,8 @@ export const KeyScreen = () => {
             onChangeText={keyScreen.onImportKeyChanged}
             multiline
             largeText
+            isIsolated={true}
+            allowPasteOverride={true}
             maxLength={KEY_ARMOR_MAX_LENGTH}
             trimOnBlur
             rightIcon={

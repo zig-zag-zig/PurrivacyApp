@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TextInput, TextInputProps, TouchableOpacity, View, Platform } from 'react-native';
+import { IsolatedTextInput } from '../../../components/IsolatedTextInput';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
@@ -9,7 +10,7 @@ interface SecureTextDisplayProps extends TextInputProps {
     text: string;
     secure?: boolean;
     revealDuration?: number;
-    onChangeText?: (text: string) => void; // Add this for editable mode
+    onChangeText?: (text: string) => void;
 }
 
 export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
@@ -23,6 +24,8 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
     const [isRevealed, setIsRevealed] = useState(!secure);
     const [revealTimeout, setRevealTimeout] = useState<NodeJS.Timeout | null>(null);
     const { testID, accessibilityLabel } = props;
+
+    const InputComponent = Platform.OS === 'android' ? IsolatedTextInput : TextInput;
 
     const toggleReveal = () => {
         if (!secure) return;
@@ -51,20 +54,33 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
     return (
         <View style={[commonStyles.row, commonStyles.spaceBetween, commonStyles.surface, styles.container, style]}>
             {onChangeText ? (
-                <TextInput
-                    style={[commonStyles.textBody, commonStyles.flex]}
-                    value={text}
-                    onChangeText={onChangeText}
-                    secureTextEntry={!isRevealed && secure}
-                    placeholderTextColor={theme.colors.placeholder}
-                    {...props}
-                    autoComplete="off"
-                    cursorColor={theme.colors.primary}
-                    importantForAutofill="noExcludeDescendants"
-                    selectionColor={theme.colors.primary}
-                    selectionHandleColor={theme.colors.primary}
-                    underlineColorAndroid="transparent"
-                />
+                <>
+                    {/* iOS HEURISTIC DECOY: Absorbs Apple's autofill grouping for secure editable fields */}
+                    {Platform.OS === 'ios' && secure && (
+                        <TextInput
+                            style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1, opacity: 0.01 }}
+                            textContentType="username"
+                            autoComplete="username"
+                            pointerEvents="none"
+                            editable={false}
+                        />
+                    )}
+                    <InputComponent
+                        style={[commonStyles.textBody, commonStyles.flex]}
+                        value={text}
+                        onChangeText={onChangeText}
+                        secureTextEntry={!isRevealed && secure}
+                        placeholderTextColor={theme.colors.placeholder}
+                        {...props}
+                        autoComplete="off"
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        cursorColor={theme.colors.primary}
+                        selectionColor={theme.colors.primary}
+                        selectionHandleColor={theme.colors.primary}
+                        underlineColorAndroid="transparent"
+                    />
+                </>
             ) : (
                 <CustomText
                     testID={testID}

@@ -20,9 +20,11 @@ import {
 } from '../domain/decryptDomain';
 import type { KeySelectionMap } from '../model/types';
 import { decryptReducer, initialDecryptState } from '../state/decryptReducer';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 export function useDecryptPage() {
   const route = useRoute<DecryptScreenRouteProp>();
+  const { secureCopy } = useSecureCopy();
   const navigation = useNavigation<RootNavigationProps>();
   const { user, isAuthLoading, userDecrypted, visibleKeys } = useAuth();
   const { showToast } = useToast();
@@ -192,7 +194,7 @@ export function useDecryptPage() {
   };
 
   const handleCopy = () => {
-    void Clipboard.setStringAsync(state.decryptedContent);
+    void secureCopy(state.decryptedContent);
     showToast(SUCCESS_MESSAGES.DECRYPTED_COPIED, 'success');
   };
 

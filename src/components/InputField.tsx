@@ -9,6 +9,8 @@ import {
     View,
     ViewStyle,
 } from 'react-native';
+
+import { IsolatedTextInput, suppressBlurForToggle } from './IsolatedTextInput';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
@@ -24,6 +26,8 @@ interface InputFieldProps extends TextInputProps {
     containerStyle?: StyleProp<ViewStyle>;
     validate?: (text: string) => string | null;
     showToggleSecureText?: boolean;
+    isIsolated?: boolean;
+    allowPasteOverride?: boolean;
     rightIcon?: React.ReactNode;
     numberOnly?: boolean;
     maxDigits?: number;
@@ -75,6 +79,8 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             onInputWrapperRef,
             onInputTouchStart,
             readOnly = false,
+            isIsolated = false,
+            allowPasteOverride = false,
             trimOnBlur = false,
             normalizeOnBlur,
             onFocus: parentOnFocus,
@@ -165,6 +171,10 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                 : theme.colors.textSecondary;
 
         if (hidden) return null;
+        const shouldHideContextMenu = allowPasteOverride ? false : (Boolean(secureTextEntry) && secureTextHidden);
+        const keyboardType = numberOnly ? 'number-pad' : email ? 'email-address' : 'default';
+        const useIsolated = Platform.OS === 'android' && isIsolated && !multiline;
+        const InputComponent = useIsolated ? IsolatedTextInput : TextInput;
 
         return (
             <View style={[label && styles.fieldContainerWithLabel, containerStyle]}>
@@ -200,7 +210,17 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                     }}
                     onTouchStart={onInputTouchStart}
                 >
-                    <TextInput
+                    {/* iOS HEURISTIC DECOY: Absorbs Apple's autofill grouping for isolated fields */}
+                    {Platform.OS === 'ios' && isIsolated && (
+                        <TextInput
+                            style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1, opacity: 0.01 }}
+                            textContentType="username"
+                            autoComplete="username"
+                            pointerEvents="none"
+                            editable={false}
+                        />
+                    )}
+                    <InputComponent
                         {...textInputProps}
                         ref={assignInputRef}
                         autoComplete={resolvedAutoComplete}
@@ -283,9 +303,11 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                             }
                         }}
                         onChangeText={handleChangeText}
-                        keyboardType={numberOnly ? 'number-pad' : email ? 'email-address' : 'default'}
+                        keyboardType={keyboardType}
                         secureTextEntry={Boolean(secureTextEntry) ? secureTextHidden : false}
-                        autoCapitalize={autoCapitalize}
+                        autoCapitalize={isIsolated ? 'none' : autoCapitalize}
+                        autoCorrect={isIsolated ? false : props.autoCorrect}
+                        contextMenuHidden={shouldHideContextMenu}
                     />
                     {rightIcon && (
                         <View style={{
@@ -309,7 +331,17 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                     )}
                     {showToggleSecureText && (
                         <TouchableOpacity
-                            onPress={() => setIsRevealed((v) => !v)}
+                            onPress={() => {
+                                // Suppress blur so handleTouchEnd → blurAllIsolatedInputs
+                                // doesn't clear focus ~90ms after the toggle.
+                                suppressBlurForToggle();
+                                setIsRevealed((v) => !v);
+                                // Re-focus the input after toggling reveal
+                                // (backup for any residual focus loss).
+                                setTimeout(() => {
+                                    inputRef.current?.focus?.();
+                                }, 0);
+                            }}
                             style={{
                                 position: 'absolute',
                                 right: 8,

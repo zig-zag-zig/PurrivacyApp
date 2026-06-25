@@ -19,6 +19,7 @@ import { KeyManagementForm } from './KeyManagementForm';
 import { KeyMaterialBlock } from './KeyMaterialBlock';
 import { PrivateKeyRevealPanel } from './PrivateKeyRevealPanel';
 import type { PrivateKeyRevealLoading } from './PrivateKeyRevealPanel';
+import { useSecureCopy } from '../../../hooks/useSecureCopy';
 
 type KeyItemProps = {
     pgpKey: KeyPair;
@@ -54,6 +55,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         isBiometricEnabled,
         setLoginWithReauthenticateWithCredential,
     } = useAuth();
+    const { secureCopy } = useSecureCopy();
 
     useEffect(() => {
         if (!newPass) setNewPassConfirm('');
@@ -91,7 +93,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
 
     const handleCopyPublicKey = () => {
         Keyboard.dismiss();
-        void Clipboard.setStringAsync(pgpKey.publicKey || '');
+        void secureCopy(pgpKey.publicKey || '');
         publicKeyCopyFeedback.markCopied();
         showToast(SUCCESS_MESSAGES.PUBLIC_KEY_COPIED, 'success');
     };
@@ -158,7 +160,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const handleCopyPrivateKey = () => {
         if (!privateKeyVisible || !pgpKey.privateKey) return;
         Keyboard.dismiss();
-        void Clipboard.setStringAsync(pgpKey.privateKey);
+        void secureCopy(pgpKey.privateKey);
         privateKeyCopyFeedback.markCopied();
         showToast('Private key copied', 'success');
     };

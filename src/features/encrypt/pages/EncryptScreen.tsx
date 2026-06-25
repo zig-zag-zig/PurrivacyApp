@@ -41,6 +41,8 @@ export const EncryptScreen = () => {
         onChangeText={encryptPage.onContentChanged}
         autoCapitalize="sentences"
         autoComplete="off"
+        isIsolated={true}
+        allowPasteOverride={true}
         multiline
         largeText
         error={encryptPage.state.formErrors.content}

@@ -1,6 +1,6 @@
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-const SECRET_KEY_RE = /(token|secret|password|authorization|credential|private|mfaCode|refreshToken|accessToken|seed)/i;
+const SECRET_KEY_RE = /(token|secret|password|passphrase|authorization|credential|private|mfaCode|refreshToken|accessToken|seed|dek|plaintext|clearText)/i;
 const EXPO_MANIFEST_KEYS = ['id', 'createdAt', 'runtimeVersion', 'launchAsset'];
 
 const isDevRuntime = (): boolean => (

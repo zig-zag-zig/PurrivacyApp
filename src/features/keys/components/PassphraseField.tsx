@@ -67,6 +67,7 @@ export const PassphraseField: React.FC<PassphraseFieldProps> = ({
                 onFocus={controller.handleFocus}
                 onBlur={controller.handleBlur}
                 secureTextEntry
+                isIsolated={true}
                 showToggleSecureText
                 label={label}
                 labelTopBackgroundColor={labelTopBackgroundColor}
