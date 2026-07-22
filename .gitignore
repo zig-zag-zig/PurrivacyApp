@@ -83,3 +83,4 @@ android/*
 ios/*
 *-debug.log
 coverage/
+.pi*

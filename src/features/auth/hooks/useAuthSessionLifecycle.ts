@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { User } from 'firebase/auth';
 
-import { useRegisterForPushNotifications } from '../../../hooks/useRegisterForPushNotifications';
+import { useRegisterForPushNotifications } from '../../../shared/hooks/useRegisterForPushNotifications';
 import type { UserDecrypted } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import { EventService } from '../../../services/eventService';
@@ -109,8 +109,19 @@ export function useAuthSessionLifecycle({
         setIsCheckingInactivity,
         setAuthCompleted,
       })
-        .catch((error) => {
+        .catch(async (error) => {
           logger.warn('failed to finish authenticated session setup', { error });
+          // Ensure terminal transition so flags do not remain stuck.
+          // finishAuthenticatedSession already handles expected load/nil/timeout
+          // failures by calling lock(); this catch covers unexpected rejection paths.
+          try {
+            await lock();
+          } catch {
+            // If lock itself throws, settle flags directly to prevent infinite spinner.
+            setIsAuthLoading(false);
+            setIsCheckingInactivity(false);
+            setAuthCompleted(true);
+          }
         })
     }
   }, [sessionAuthenticated, fbUser]);

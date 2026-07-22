@@ -1,5 +1,4 @@
-import { getUserId } from '../../features/auth/domain/authUtils';
-import { securityService } from '../../features/security/services/securityService';
+import { getApiRuntime } from '../runtime';
 import { EventService } from '../../services/eventService';
 import type { MfaState, SessionResponse } from '../../types/types';
 import { logger } from '../../utils/logger';
@@ -29,8 +28,9 @@ export class SessionManager {
     }
 
     async syncRemoteMfaState(mfaState: MfaState): Promise<void> {
-        const userId = getUserId();
-        const storedSession = await securityService.getStoredSession(userId);
+        const runtime = getApiRuntime();
+        const userId = runtime.identity.getUserId();
+        const storedSession = await runtime.sessionStore.getStoredSession(userId);
         const nextMfaTrusted = mfaState.mfaEnabled && mfaState.mfaTrusted;
 
         if (
@@ -43,7 +43,7 @@ export class SessionManager {
 
         this.accessTokens.clear();
         this.forceFreshSessionAfterRemoteMfaState = true;
-        await securityService.updateStoredSessionMfaState(
+        await runtime.sessionStore.updateStoredSessionMfaState(
             userId,
             mfaState.mfaEnabled,
             mfaState.mfaTrusted,
@@ -52,7 +52,7 @@ export class SessionManager {
 
     async storeSessionResponse(response: SessionResponse, userId: string): Promise<void> {
         this.accessTokens.store(response);
-        await securityService.storeSession(response, userId);
+        await getApiRuntime().sessionStore.storeSession(response, userId);
     }
 
     async createSession(
@@ -104,7 +104,7 @@ export class SessionManager {
         try {
             const response = await this.request('/auth/session', 'POST', body, true, options, retryOnFailure);
             if (response.accessToken) {
-                const userId = getUserId();
+                const userId = getApiRuntime().identity.getUserId();
                 await this.storeSessionResponse(response as SessionResponse, userId);
                 this.forceFreshSessionAfterRemoteMfaState = false;
             }
@@ -112,7 +112,7 @@ export class SessionManager {
         } catch (error: any) {
             if (isTerminalStoredSessionError(error)) {
                 try {
-                    await this.clearBackendSession(getUserId());
+                    await this.clearBackendSession(getApiRuntime().identity.getUserId());
                 } catch { }
             }
 
@@ -132,7 +132,8 @@ export class SessionManager {
 
         if (!accessToken) {
             try {
-                const session = await securityService.getStoredSession(getUserId());
+                const runtime = getApiRuntime();
+                const session = await runtime.sessionStore.getStoredSession(runtime.identity.getUserId());
                 if (session && (!session.mfaEnabled || session.mfaTrusted)) {
                     const refreshed = await this.refreshSession();
                     accessToken = refreshed.accessToken;
@@ -166,13 +167,14 @@ export class SessionManager {
 
     private async clearBackendSession(userId: string): Promise<void> {
         this.accessTokens.clear();
-        await securityService.clearStoredSession(userId);
+        await getApiRuntime().sessionStore.clearStoredSession(userId);
     }
 
     private async tryGetLocalSession(): Promise<SessionResponse | null> {
         try {
-            const userId = getUserId();
-            const session = await securityService.getStoredSession(userId);
+            const runtime = getApiRuntime();
+            const userId = runtime.identity.getUserId();
+            const session = await runtime.sessionStore.getStoredSession(userId);
 
             if (!session) {
                 return null;
@@ -238,8 +240,9 @@ export class SessionManager {
     }
 
     private async refreshSessionOnce(): Promise<SessionResponse> {
-        const userId = getUserId();
-        const session = await securityService.getStoredSession(userId);
+        const runtime = getApiRuntime();
+        const userId = runtime.identity.getUserId();
+        const session = await runtime.sessionStore.getStoredSession(userId);
         if (!session) {
             throw new Error('No session to refresh');
         }

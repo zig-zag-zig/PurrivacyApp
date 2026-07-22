@@ -1,10 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect } from 'react';
-import { EventPayload, EventService, isAppEventName } from '../services/eventService';
-import type { AppEventPayloadMap } from '../services/eventService';
+import { EventPayload, EventService, isAppEventName } from '../../services/eventService';
+import type { AppEventPayloadMap } from '../../services/eventService';
 import * as Device from 'expo-device';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 

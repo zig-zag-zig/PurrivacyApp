@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback, createContext, ReactNode, useContext } from 'react';
+import React, { useState, useRef, useEffect, useCallback, createContext, ReactNode, useContext, useMemo } from 'react';
 import { BackHandler } from 'react-native';
 import { useToast } from './ToastContext';
-import { MfaModal, MfaModalOptions } from '../../features/mfa/components/MfaModal';
-import { RecoveryCodesModal, RecoveryCodesModalOptions } from '../../features/mfa/components/RecoveryCodesModal';
+import { MfaModal } from '../../features/mfa/components/MfaModal';
+import { RecoveryCodesModal } from '../../features/mfa/components/RecoveryCodesModal';
+import type { MfaModalOptions, RecoveryCodesModalOptions, MfaModalResult } from '../../shared/modals/types';
 import { PassphraseStorageConsentModal } from '../../features/security/components/PassphraseStorageConsentModal';
 import {
     setMfaModalHandler,
@@ -12,9 +13,7 @@ import {
 import { EventService } from '../../services/eventService';
 import { shouldCloseMfaModal } from '../../features/mfa/domain/mfaModalClose';
 
-export type MfaModalResult = {
-    code: string | null;
-};
+
 
 type ModalType = 'mfa' | 'recoveryCodes' | 'passphraseStorageConsent' | null;
 
@@ -219,7 +218,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
         };
     }, [showMfaModal, showPassphraseStorageConsentModal, showRecoveryCodesModal]);
 
-    const value: ModalContextType = {
+    const value = useMemo<ModalContextType>(() => ({
         showMfaModal,
         showRecoveryCodesModal,
         showPassphraseStorageConsentModal,
@@ -227,7 +226,15 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
         currentModal,
         modalProps,
         triggerMfaClear,
-    };
+    }), [
+        showMfaModal,
+        showRecoveryCodesModal,
+        showPassphraseStorageConsentModal,
+        hideModal,
+        currentModal,
+        modalProps,
+        triggerMfaClear,
+    ]);
 
     return (
         <ModalContext.Provider value={value}>

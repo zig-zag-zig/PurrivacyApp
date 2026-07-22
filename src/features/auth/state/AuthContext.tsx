@@ -74,6 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loadUser,
     setUserDecrypted,
     setIsAuthLoading,
+    invalidateLoads,
   } = useUserLoading(user, userRef, runLoadUserRef);
   const pendingPasswordRef = useRef<string | null>(null);
 
@@ -169,7 +170,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const {
     signOut,
-    lock,
+    lock: lockSession,
     deleteCurrentAccount,
     clearPartialFirebaseAuth,
     createSession,
@@ -187,6 +188,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     },
     setters: authStateSetters,
   });
+
+  // Invalidate in-flight loadUser before/with every lock so late resolves cannot
+  // re-hydrate decrypted state after the lock boundary.
+  const lock = React.useCallback(async () => {
+    invalidateLoads();
+    await lockSession();
+  }, [invalidateLoads, lockSession]);
 
   useAppInactivityLock({
     user,
@@ -222,32 +230,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setters: authStateSetters,
   });
 
+  const value = useMemo<AuthContextType>(() => ({
+    user,
+    isAuthLoading,
+    isLocalSessionLocked,
+    authCompleted,
+    isCheckingInactivity,
+    userDecrypted,
+    visibleKeys,
+    isBiometricAvailable,
+    isBiometricEnabled,
+    canGoDirectlyToBiometricAuth,
+    appStateIsBackground,
+    lastSignedInUser,
+    signInWithFirebaseCustomToken,
+    setLastUsedBiometricSignIn,
+    toggleBiometric,
+    signUp,
+    signin,
+    signOut,
+    lock,
+    deleteCurrentAccount,
+    setLoginWithReauthenticateWithCredential,
+    clearSecureStore,
+    initializeBiometricState,
+  }), [
+    user,
+    isAuthLoading,
+    isLocalSessionLocked,
+    authCompleted,
+    isCheckingInactivity,
+    userDecrypted,
+    visibleKeys,
+    isBiometricAvailable,
+    isBiometricEnabled,
+    canGoDirectlyToBiometricAuth,
+    appStateIsBackground,
+    lastSignedInUser,
+    signInWithFirebaseCustomToken,
+    setLastUsedBiometricSignIn,
+    toggleBiometric,
+    signUp,
+    signin,
+    signOut,
+    lock,
+    deleteCurrentAccount,
+    setLoginWithReauthenticateWithCredential,
+    clearSecureStore,
+    initializeBiometricState,
+  ]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthLoading,
-      isLocalSessionLocked,
-      authCompleted,
-      isCheckingInactivity,
-      userDecrypted,
-      visibleKeys,
-      isBiometricAvailable,
-      isBiometricEnabled,
-      canGoDirectlyToBiometricAuth,
-      appStateIsBackground,
-      lastSignedInUser,
-      signInWithFirebaseCustomToken,
-      setLastUsedBiometricSignIn: (value: boolean) => setLastUsedBiometricSignIn(value),
-      toggleBiometric,
-      signUp,
-      signin,
-      signOut,
-      lock,
-      deleteCurrentAccount,
-      setLoginWithReauthenticateWithCredential,
-      clearSecureStore,
-      initializeBiometricState,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -2,9 +2,9 @@ import React from 'react';
 import type { ComponentProps } from 'react';
 import { ActivityIndicator, TouchableOpacity, View, Switch, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { commonStyles } from '../../../styles/commonStyles';
-import { theme } from '../../../styles/theme';
-import { CustomText } from '../../../components/CustomText';
+import { commonStyles } from '../../styles/commonStyles';
+import { theme } from '../../styles/theme';
+import { CustomText } from '../../components/CustomText';
 
 type MaterialIconName = ComponentProps<typeof Icon>['name'];
 

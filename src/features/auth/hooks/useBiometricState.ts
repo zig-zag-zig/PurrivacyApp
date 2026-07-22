@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BiometricAuthService } from '../../security/services/biometricAuthService';
 import { getUsername } from '../domain/authUtils';
 import { logger } from '../../../utils/logger';
@@ -26,7 +26,7 @@ export const useBiometricState = (
         setCanGoDirectlyToBiometricAuth(canGoDirectly);
     }, [authCompleted, appStateIsBackground, fbUser, isLocalSessionLocked, lastUsedBiometricSignIn, user]);
 
-    const initializeBiometricState = async () => {
+    const initializeBiometricState = useCallback(async () => {
         try {
             const username = getUsername();
             const { available, enabled } = await BiometricAuthService.getBiometricState(username);
@@ -39,22 +39,22 @@ export const useBiometricState = (
             setIsBiometricEnabled(false);
             return { available: false, enabled: false };
         }
-    };
+    }, [setIsBiometricAvailable, setIsBiometricEnabled]);
 
-    const toggleBiometric = async (enabled: boolean) => {
+    const toggleBiometric = useCallback(async (enabled: boolean) => {
         const username = getUsername();
         await BiometricAuthService.toggleBiometric(username, enabled);
         await initializeBiometricState();
-    };
+    }, [initializeBiometricState]);
 
-    const promptBiometric = async (username: string): Promise<void> => {
+    const promptBiometric = useCallback(async (username: string): Promise<void> => {
         try {
             await BiometricAuthService.promptBiometric(username);
             await initializeBiometricState();
         } catch (error) {
             logger.warn("failed to prompt biometric unlock", { error });
         }
-    };
+    }, [initializeBiometricState]);
 
     return {
         isBiometricAvailable,

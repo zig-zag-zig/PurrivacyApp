@@ -318,7 +318,7 @@ export async function storeSyncedPassphrase(
   }
 }
 
-export async function clearAllStoredPassphrases(
+async function clearAllStoredPassphrases(
   userId: string,
   keys: KeyPairWithRecordId[],
 ): Promise<void> {

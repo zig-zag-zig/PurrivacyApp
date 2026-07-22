@@ -1,6 +1,4 @@
-import { MfaModalOptions } from '../features/mfa/components/MfaModal';
-import { RecoveryCodesModalOptions } from '../features/mfa/components/RecoveryCodesModal';
-import { MfaModalResult } from '../app/state/ModalContext';
+import type { MfaModalOptions, RecoveryCodesModalOptions, MfaModalResult } from '../shared/modals/types';
 
 type MfaModalHandler = (options: MfaModalOptions) => Promise<MfaModalResult>;
 type RecoveryCodesModalHandler = (options: RecoveryCodesModalOptions) => Promise<void>;

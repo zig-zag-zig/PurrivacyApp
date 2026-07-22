@@ -14,7 +14,7 @@ import { theme } from '../../../styles/theme';
 import { RootNavigationProps } from '../../../app/navigation/types';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 export const MfaSetupScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();

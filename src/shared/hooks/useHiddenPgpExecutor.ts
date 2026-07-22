@@ -2,8 +2,8 @@ import { RefObject, useCallback, useEffect, useRef } from 'react';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { WebView } from 'react-native-webview';
 
-import type { PGPExecutor } from '../services/pgpCryptoService';
-import { logger } from '../utils/logger';
+import type { PGPExecutor } from '../../services/pgpCryptoService';
+import { logger } from '../../utils/logger';
 
 type PendingOperation = {
     resolve: (value: any) => void;

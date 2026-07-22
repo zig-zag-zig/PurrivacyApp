@@ -1,7 +1,7 @@
 import type { Dispatch } from 'react';
 import type { User } from 'firebase/auth';
 
-import { useFilePicker } from '../../../hooks/useFilePicker';
+import { useFilePicker } from '../../../shared/hooks/useFilePicker';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyGenerationOptions, KeyPair, UserDecrypted } from '../../../types/types';
 import {

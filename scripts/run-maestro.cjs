@@ -4,7 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const ports = [5000, 9099];
+// Host ports reverse-proxied into the emulator. Override via PURRIVACY_E2E_ADB_REVERSE_PORTS=5000,9099
+const ports = String(process.env.PURRIVACY_E2E_ADB_REVERSE_PORTS || '5000,9099')
+  .split(',')
+  .map((p) => Number(p.trim()))
+  .filter((p) => Number.isFinite(p) && p > 0);
 const defaultTargets = [
   '.maestro/invalid-login.yaml',
   '.maestro/logged-in-happy-path.yaml',

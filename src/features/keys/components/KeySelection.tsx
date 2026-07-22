@@ -6,7 +6,7 @@ import { PassphraseField } from './PassphraseField';
 import { KeyList } from './KeyList';
 import { CustomText } from '../../../components/CustomText';
 import { findDefaultKey, isKeySelected } from '../domain/keyUtils';
-import { SettingsOption } from '../../settings/components/SettingsOption';
+import { SettingsOption } from '../../../shared/ui/SettingsOption';
 import { theme } from '../../../styles/theme';
 import { useAuth } from '../../auth/state/AuthContext';
 import { incrementPopularity, getAllPopularities, sortKeysByPopularity, sortKeysAlphabetically } from '../domain/popularityStorage';

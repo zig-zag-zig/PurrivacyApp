@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import type { User, UserCredential } from 'firebase/auth';
 import { deleteUser as deleteFirebaseUser, signOut as firebaseSignOut } from 'firebase/auth';
 
@@ -77,7 +78,7 @@ export function useAuthActions({
   } = setters;
   const { showToast } = useToast();
 
-  const rememberLastSignedInUser = async (firebaseUser: User): Promise<void> => {
+  const rememberLastSignedInUser = useCallback(async (firebaseUser: User): Promise<void> => {
     const lastSignedInUser: LastSignedInUser = {
       uid: firebaseUser.uid,
       username: getUsernameFromUser(firebaseUser),
@@ -88,9 +89,9 @@ export function useAuthActions({
     } catch (error) {
       logger.warn('failed to remember last signed-in user', { error });
     }
-  };
+  }, [setLastSignedInUser]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setIsAuthLoading(true);
     clearSessionTimer();
     clearPendingBiometricPromptRetry();
@@ -137,9 +138,15 @@ export function useAuthActions({
       logger.error('sign-out failed', { error });
       throw new Error(error.message || 'Logout failed');
     }
-  };
+  }, [
+    clearPendingBiometricPromptRetry,
+    setIsAuthLoading,
+    setLastSignedInUser,
+    setUserDecrypted,
+    setIsLocalSessionLocked,
+  ]);
 
-  const clearDeletedAccountClientState = async (
+  const clearDeletedAccountClientState = useCallback(async (
     userId: string,
     username: string,
   ): Promise<void> => {
@@ -185,9 +192,22 @@ export function useAuthActions({
     setAuthCompleted(true);
     suppressLastSignedInUserPersistRef.current = false;
     setIsAuthLoading(false);
-  };
+  }, [
+    clearPendingBiometricPromptRetry,
+    setIsAuthLoading,
+    setAuthCompleted,
+    setFbUser,
+    setIsCheckingInactivity,
+    setIsLocalSessionLocked,
+    setLastSignedInUser,
+    setLastUsedBiometricSignIn,
+    setPendingPassword,
+    setSessionAuthenticated,
+    setUser,
+    setUserDecrypted,
+  ]);
 
-  const deleteCurrentAccount = async (currentUser: User): Promise<void> => {
+  const deleteCurrentAccount = useCallback(async (currentUser: User): Promise<void> => {
     const userId = currentUser.uid;
     const username = getUsernameFromUser(currentUser) || '';
     let firebaseDeleteError: any = null;
@@ -208,9 +228,9 @@ export function useAuthActions({
     if (firebaseDeleteError) {
       throw firebaseDeleteError;
     }
-  };
+  }, [clearDeletedAccountClientState, setIsAuthLoading]);
 
-  const lock = async () => {
+  const lock = useCallback(async () => {
     setIsAuthLoading(true);
     clearSessionTimer();
     clearPendingBiometricPromptRetry();
@@ -219,6 +239,8 @@ export function useAuthActions({
     const currentUser = getUser();
     if (!currentUser) {
       setIsAuthLoading(false);
+      setIsCheckingInactivity(false);
+      setAuthCompleted(true);
       return;
     }
 
@@ -245,9 +267,22 @@ export function useAuthActions({
       logger.error('lock failed', { error });
       throw new Error(error.message || 'Lock failed');
     }
-  };
+  }, [
+    clearPendingBiometricPromptRetry,
+    setIsAuthLoading,
+    setPendingPassword,
+    setUserDecrypted,
+    setLastSignedInUser,
+    setSessionAuthenticated,
+    setIsLocalSessionLocked,
+    setUser,
+    setFbUser,
+    setIsCheckingInactivity,
+    setAuthCompleted,
+    setLastUsedBiometricSignIn,
+  ]);
 
-  const clearPartialFirebaseAuth = async () => {
+  const clearPartialFirebaseAuth = useCallback(async () => {
     await clearPartialFirebaseAuthState({
       clearPendingBiometricPromptRetry,
       shouldPromptBiometricRef,
@@ -258,9 +293,16 @@ export function useAuthActions({
       setIsLocalSessionLocked,
       setIsAuthLoading,
     });
-  };
+  }, [
+    clearPendingBiometricPromptRetry,
+    setUser,
+    setFbUser,
+    setSessionAuthenticated,
+    setIsLocalSessionLocked,
+    setIsAuthLoading,
+  ]);
 
-  const createSession = async (): Promise<void> => {
+  const createSession = useCallback(async (): Promise<void> => {
     await createBackendAuthSession({
       isGettingSessionRef,
       userInitAuthRef,
@@ -274,13 +316,21 @@ export function useAuthActions({
       signOut,
       lock,
     });
-  };
+  }, [
+    showToast,
+    clearPartialFirebaseAuth,
+    signOut,
+    lock,
+    setSessionAuthenticated,
+    setIsAuthLoading,
+    setAuthCompleted,
+  ]);
 
-  const setLoginWithReauthenticateWithCredential = (value: boolean) => {
+  const setLoginWithReauthenticateWithCredential = useCallback((value: boolean) => {
     loginWithReauthenticateWithCredentialRef.current = value;
-  };
+  }, []);
 
-  const signInWithFirebaseCustomToken = async (
+  const signInWithFirebaseCustomToken = useCallback(async (
     customToken: string,
     legitCustomTokenSignIn: boolean,
   ): Promise<User> => {
@@ -290,13 +340,13 @@ export function useAuthActions({
     userRef.current = firebaseUser;
     await rememberLastSignedInUser(firebaseUser);
     return firebaseUser;
-  };
+  }, [rememberLastSignedInUser]);
 
-  const clearSecureStore = async () => {
+  const clearSecureStore = useCallback(async () => {
     await securityService.clearSecureStorage(getUserId(), getUsername());
-  };
+  }, []);
 
-  const signUp = async (
+  const signUp = useCallback(async (
     username: string,
     password: string,
     seed: string,
@@ -323,9 +373,13 @@ export function useAuthActions({
       setIsAuthLoading(false);
       throw error;
     }
-  };
+  }, [
+    rememberLastSignedInUser,
+    setFbUser,
+    setIsAuthLoading,
+  ]);
 
-  const signin = async (
+  const signin = useCallback(async (
     username: string,
     password: string,
     isBiometricSignIn: boolean,
@@ -374,7 +428,15 @@ export function useAuthActions({
       setIsAuthLoading(false);
       throw error;
     }
-  };
+  }, [
+    initializeBiometricState,
+    rememberLastSignedInUser,
+    setFbUser,
+    setIsAuthLoading,
+    setLastUsedBiometricSignIn,
+    setPendingPassword,
+    setSessionAuthenticated,
+  ]);
 
   return {
     signOut,

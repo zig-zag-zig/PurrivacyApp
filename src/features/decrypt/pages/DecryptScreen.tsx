@@ -11,7 +11,7 @@ import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
-import { SettingsOption } from '../../settings/components/SettingsOption';
+import { SettingsOption } from '../../../shared/ui/SettingsOption';
 import { DecryptionResult } from '../components/DecryptionResult';
 import { useDecryptPage } from '../hooks/useDecryptPage';
 

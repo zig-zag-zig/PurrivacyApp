@@ -12,7 +12,7 @@ import { RootNavigationProps } from '../../../app/navigation/types';
 import { AuthService } from '../services/authService';
 import { theme } from '../../../styles/theme';
 import { useToast } from '../../../app/state/ToastContext';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 interface SeedVerificationProps {
     seed: string;

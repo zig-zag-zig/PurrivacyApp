@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { ApiClient } from '../../../api/client';
@@ -52,15 +52,15 @@ export function useMfaActions(
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const setupMfa = async (): Promise<MfaSetupResponse> => runMfaAction(
+  const setupMfa = useCallback(async (): Promise<MfaSetupResponse> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to setup MFA',
     'failed to setup mfa',
     () => ApiClient.setupMfa(),
-  );
+  ), [setIsLoading, setError]);
 
-  const enableMfa = async (): Promise<void> => runMfaAction(
+  const enableMfa = useCallback(async (): Promise<void> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to enable MFA',
@@ -77,9 +77,9 @@ export function useMfaActions(
 
       showToast('MFA enabled successfully', 'success');
     },
-  );
+  ), [setIsLoading, setError, setMfaState, showToast]);
 
-  const disableMfa = async (): Promise<void> => runMfaAction(
+  const disableMfa = useCallback(async (): Promise<void> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to disable MFA',
@@ -96,9 +96,9 @@ export function useMfaActions(
 
       showToast('MFA disabled successfully', 'success');
     },
-  );
+  ), [setIsLoading, setError, setMfaState, showToast]);
 
-  const setSessionTrust = async (mfaTrusted: boolean): Promise<void> => runMfaAction(
+  const setSessionTrust = useCallback(async (mfaTrusted: boolean): Promise<void> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to manage session trust',
@@ -121,9 +121,9 @@ export function useMfaActions(
         'success',
       );
     },
-  );
+  ), [setIsLoading, setError, setMfaState, showToast]);
 
-  const regenerateRecoveryCodes = async (): Promise<string[]> => runMfaAction(
+  const regenerateRecoveryCodes = useCallback(async (): Promise<string[]> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to regenerate recovery codes',
@@ -145,15 +145,15 @@ export function useMfaActions(
 
       return response.recoveryCodes;
     },
-  );
+  ), [setIsLoading, setError, showToast]);
 
-  const getRemainingRecoveryCodes = async (): Promise<RecoveryCodeRemainingResponse> => runMfaAction(
+  const getRemainingRecoveryCodes = useCallback(async (): Promise<RecoveryCodeRemainingResponse> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to get remaining recovery codes',
     'failed to get remaining recovery codes',
     () => ApiClient.getRemainingRecoveryCodes(),
-  );
+  ), [setIsLoading, setError]);
 
   return {
     setupMfa,

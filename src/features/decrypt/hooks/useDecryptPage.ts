@@ -1,13 +1,13 @@
-import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { InteractionManager } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useReducer } from 'react';
 import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
 import type { DecryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
-import { useFilePicker } from '../../../hooks/useFilePicker';
+import { useFilePicker } from '../../../shared/hooks/useFilePicker';
+import { useKeyPrerequisiteRedirect } from '../../../shared/hooks/useKeyPrerequisiteRedirect';
+import { useResetStateOnBlurSuccess } from '../../../shared/hooks/useResetStateOnBlurSuccess';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
 import { getDefaultSelectedPrivateKey } from '../../keys/domain/keyUtils';
@@ -20,7 +20,7 @@ import {
 } from '../domain/decryptDomain';
 import type { KeySelectionMap } from '../model/types';
 import { decryptReducer, initialDecryptState } from '../state/decryptReducer';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 export function useDecryptPage() {
   const route = useRoute<DecryptScreenRouteProp>();
@@ -29,13 +29,23 @@ export function useDecryptPage() {
   const { user, isAuthLoading, userDecrypted, visibleKeys } = useAuth();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(decryptReducer, initialDecryptState);
-  const shouldResetOnFocus = useRef(false);
-  const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
 
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'message');
   const keySelectionKeys = visibleKeys;
   const privateKeys = keySelectionKeys.filter(key => key.privateKey);
   const shouldRedirectToKeys = Boolean(userDecrypted && !isAuthLoading && privateKeys.length === 0);
+
+  const { isRedirecting: isRedirectingToKeys } = useKeyPrerequisiteRedirect(
+    shouldRedirectToKeys,
+    'Create or import a private key before decrypting.',
+    { screen: 'Key', params: { action: 'create' } },
+    navigation,
+  );
+
+  useResetStateOnBlurSuccess(
+    state.wasSuccessful,
+    () => dispatch({ type: 'resetAfterSuccess' }),
+  );
 
   useEffect(() => {
     if (!hasSelectedKeys(state.selectedPublicKeys)) {
@@ -55,26 +65,6 @@ export function useDecryptPage() {
 
   }, [keySelectionKeys, state.selectedPrivateKey]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!shouldRedirectToKeys) {
-        setIsRedirectingToKeys(false);
-        return;
-      }
-
-      setIsRedirectingToKeys(true);
-      showToast('Create or import a private key before decrypting.', 'info');
-      const interaction = InteractionManager.runAfterInteractions(() => {
-        navigation.navigate('Home', { screen: 'Key', params: { action: 'create' } });
-      });
-
-      return () => {
-        interaction.cancel?.();
-        setIsRedirectingToKeys(false);
-      };
-    }, [navigation, shouldRedirectToKeys, showToast]),
-  );
-
   useEffect(() => {
     if (route.params?.text) {
       dispatch({ type: 'encryptedContentChanged', content: route.params.text });
@@ -85,21 +75,6 @@ export function useDecryptPage() {
     const required = isPassphraseRequired(keySelectionKeys, state.selectedPrivateKey);
     dispatch({ type: 'passphraseRequiredChanged', required });
   }, [keySelectionKeys, state.selectedPrivateKey]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (shouldResetOnFocus.current) {
-        dispatch({ type: 'resetAfterSuccess' });
-        shouldResetOnFocus.current = false;
-      }
-
-      return () => {
-        if (state.wasSuccessful) {
-          shouldResetOnFocus.current = true;
-        }
-      };
-    }, [state.wasSuccessful]),
-  );
 
   const setSelectedPrivateKey: (value: SetStateAction<KeySelectionMap>) => void = value => {
     const next = typeof value === 'function' ? value(state.selectedPrivateKey) : value;

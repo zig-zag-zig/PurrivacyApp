@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { validateArmor } from '../features/keys/domain/pgpValidation';
+import { validateArmor } from '../../features/keys/domain/pgpValidation';
 
 const isUserFacingFilePickerError = (message: string): boolean => (
     /^Only .+ files are allowed$/.test(message) ||

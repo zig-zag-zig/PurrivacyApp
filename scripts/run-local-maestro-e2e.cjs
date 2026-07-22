@@ -191,6 +191,26 @@ if (!insideEmulators) {
   }
   const command = commandArgs.map(arg => JSON.stringify(arg)).join(' ');
 
+  // Write a temporary firebase.json so emulator ports can coexist with other projects.
+  // Defaults match historical ports; override with PURRIVACY_E2E_*_HOST env vars.
+  const authPort = Number((firebaseAuthHost.split(':').pop()) || 9099);
+  const fsPort = Number((firestoreHost.split(':').pop()) || 8080);
+  const dbPort = Number((firebaseDatabaseHost.split(':').pop()) || 9000);
+  const firebaseConfigPath = path.join(appRoot, 'firebase.json');
+  const wroteConfig = !require('fs').existsSync(firebaseConfigPath);
+  if (wroteConfig) {
+    require('fs').writeFileSync(firebaseConfigPath, JSON.stringify({
+      emulators: {
+        auth: { host: '127.0.0.1', port: authPort },
+        firestore: { host: '127.0.0.1', port: fsPort },
+        database: { host: '127.0.0.1', port: dbPort },
+        ui: { enabled: false },
+        singleProjectMode: true,
+      },
+    }, null, 2));
+    console.log(`[e2e] wrote temporary ${firebaseConfigPath} (auth=${authPort}, firestore=${fsPort}, database=${dbPort})`);
+  }
+
   try {
     runSync('npx', [
       'firebase',
@@ -202,9 +222,16 @@ if (!insideEmulators) {
       command,
     ], {
       env: backendEnv,
+      cwd: appRoot,
     });
   } catch (error) {
+    if (wroteConfig) {
+      try { require('fs').unlinkSync(firebaseConfigPath); } catch { /* ignore */ }
+    }
     reportAndExit(error);
+  }
+  if (wroteConfig) {
+    try { require('fs').unlinkSync(firebaseConfigPath); } catch { /* ignore */ }
   }
 } else {
   runInsideEmulators().catch(reportAndExit);

@@ -9,12 +9,9 @@ import { ModalToastHost } from '../../../components/ModalToastHost';
 import * as Clipboard from 'expo-clipboard';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
-export type RecoveryCodesModalOptions = {
-    recoveryCodes: string[];
-    source: 'setup' | 'regenerate' | 'auto-generated';
-};
+import type { RecoveryCodesModalOptions } from '../../../shared/modals/types';
 
 interface RecoveryCodesModalProps extends RecoveryCodesModalOptions {
     onComplete: () => void;

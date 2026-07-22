@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, useState, ReactNode } from 'react';
 import {
     MfaState,
     MfaSetupResponse,
@@ -36,7 +36,7 @@ export const MfaProvider: React.FC<MfaProviderProps> = ({ children }) => {
 
     useMfaEvents(user, setMfaState);
 
-    const value: MfaContextType = {
+    const value = useMemo<MfaContextType>(() => ({
         mfaState,
         setupMfa: mfaActions.setupMfa,
         enableMfa: mfaActions.enableMfa,
@@ -46,7 +46,17 @@ export const MfaProvider: React.FC<MfaProviderProps> = ({ children }) => {
         getRemainingRecoveryCodes: mfaActions.getRemainingRecoveryCodes,
         isLoading: mfaActions.isLoading,
         error: mfaActions.error,
-    };
+    }), [
+        mfaState,
+        mfaActions.setupMfa,
+        mfaActions.enableMfa,
+        mfaActions.disableMfa,
+        mfaActions.setSessionTrust,
+        mfaActions.regenerateRecoveryCodes,
+        mfaActions.getRemainingRecoveryCodes,
+        mfaActions.isLoading,
+        mfaActions.error,
+    ]);
 
     return (
         <MfaContext.Provider value={value}>

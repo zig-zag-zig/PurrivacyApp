@@ -14,6 +14,10 @@ Feature-first structure
   - Sensitive account actions, security hooks, and secure-storage services.
 - `mfa`
   - MFA setup flow, MFA modal UI, and MFA orchestration utilities.
+- `updates`
+  - APK/GitHub update checks and update UI.
+- `share-intent`
+  - Inbound share routing helpers/hooks.
 
 Notes
 

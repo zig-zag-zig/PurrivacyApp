@@ -12,7 +12,7 @@ import {
     RecoveryTokenResponse,
     UserKeyRecordsResponse,
 } from '../types/types';
-import { getUserId } from '../features/auth/domain/authUtils';
+import { getApiRuntime } from './runtime';
 import { createApiRequester } from './core/apiRequestFactory';
 import { createRecoveryApi } from './auth/recoveryApi';
 import { createMfaApi } from './mfa/mfaApi';
@@ -150,7 +150,7 @@ const ensureInitialized = (): void => {
     const ua = createUserApi(request);
     const ra = createRecoveryApi(request);
     const ma = createMfaApi(request, async (response) => {
-        await sm.storeSessionResponse(response, getUserId());
+        await sm.storeSessionResponse(response, getApiRuntime().identity.getUserId());
     });
 
     _sessionManager = sm;

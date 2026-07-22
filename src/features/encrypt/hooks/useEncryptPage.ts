@@ -1,13 +1,13 @@
-import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { InteractionManager } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback, useEffect, useReducer } from 'react';
 import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
 import type { EncryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
-import { useFilePicker } from '../../../hooks/useFilePicker';
+import { useFilePicker } from '../../../shared/hooks/useFilePicker';
+import { useKeyPrerequisiteRedirect } from '../../../shared/hooks/useKeyPrerequisiteRedirect';
+import { useResetStateOnBlurSuccess } from '../../../shared/hooks/useResetStateOnBlurSuccess';
 import type { KeyPair } from '../../../types/types';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateEncryptionForm } from '../../../utils/validation';
@@ -20,7 +20,7 @@ import {
 } from '../domain/encryptDomain';
 import type { KeySelectionMap } from '../model/types';
 import { encryptReducer, initialEncryptState } from '../state/encryptReducer';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 export function useEncryptPage() {
   const route = useRoute<EncryptScreenRouteProp>();
@@ -28,53 +28,28 @@ export function useEncryptPage() {
   const { userDecrypted, visibleKeys, user, isAuthLoading } = useAuth();
   const { showToast } = useToast();
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
-  const shouldResetOnFocus = useRef(false);
-  const [isRedirectingToKeys, setIsRedirectingToKeys] = useState(false);
   const { secureCopy } = useSecureCopy();
 
   const pickFile = useFilePicker(['.txt']);
   const keySelectionKeys = visibleKeys;
   const shouldRedirectToKeys = Boolean(userDecrypted && !isAuthLoading && keySelectionKeys.length === 0);
 
+  const { isRedirecting: isRedirectingToKeys } = useKeyPrerequisiteRedirect(
+    shouldRedirectToKeys,
+    'Import or create a public key before encrypting.',
+    { screen: 'Key', params: { action: 'import' } },
+    navigation,
+  );
+
+  useResetStateOnBlurSuccess(
+    state.wasSuccessful,
+    () => dispatch({ type: 'resetAfterSuccess' }),
+  );
+
   useEffect(() => {
     const completeKeyPairs = getCompleteKeyPairs(keySelectionKeys);
     dispatch({ type: 'completeKeyPairsChanged', completeKeyPairs });
   }, [keySelectionKeys]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!shouldRedirectToKeys) {
-        setIsRedirectingToKeys(false);
-        return;
-      }
-
-      setIsRedirectingToKeys(true);
-      showToast('Import or create a public key before encrypting.', 'info');
-      const interaction = InteractionManager.runAfterInteractions(() => {
-        navigation.navigate('Home', { screen: 'Key', params: { action: 'import' } });
-      });
-
-      return () => {
-        interaction.cancel?.();
-        setIsRedirectingToKeys(false);
-      };
-    }, [navigation, shouldRedirectToKeys, showToast]),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      if (shouldResetOnFocus.current) {
-        dispatch({ type: 'resetAfterSuccess' });
-        shouldResetOnFocus.current = false;
-      }
-
-      return () => {
-        if (state.wasSuccessful) {
-          shouldResetOnFocus.current = true;
-        }
-      };
-    }, [state.wasSuccessful]),
-  );
 
   useEffect(() => {
     if (route.params?.text) {

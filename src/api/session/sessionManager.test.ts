@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ApiRuntime } from '../runtime';
 
-const securityServiceMock = vi.hoisted(() => ({
+const mockRuntime: Partial<ApiRuntime> = {};
+const identityMock = { getUserId: () => 'user-id', getUser: () => null };
+const sessionStoreMock = {
   clearStoredSession: vi.fn(),
   getStoredSession: vi.fn(),
   storeSession: vi.fn(),
   updateStoredSessionMfaState: vi.fn(),
-}));
+  updateStoredSessionMfaTrust: vi.fn(),
+};
 
-vi.mock('../../features/auth/domain/authUtils', () => ({
-  getUserId: () => 'user-id',
-}));
-
-vi.mock('../../features/security/services/securityService', () => ({
-  securityService: securityServiceMock,
+vi.mock('../runtime', () => ({
+  getApiRuntime: () => mockRuntime,
+  configureApiRuntime: vi.fn(),
 }));
 
 vi.mock('../core/buildApiUrl', () => ({
@@ -29,6 +30,18 @@ describe('SessionManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    // Configure runtime with session store mock
+    Object.assign(mockRuntime, {
+      identity: identityMock,
+      sessionStore: sessionStoreMock,
+      mfa: {
+        getIsInMfaHandler: () => false,
+        handleRateLimitError: vi.fn(),
+        handleSensitiveMfaError: vi.fn(),
+        handleSessionMfaError: vi.fn(),
+        handleMissingHeadersError: vi.fn(),
+      },
+    });
   });
 
   afterEach(() => {
@@ -66,7 +79,7 @@ describe('SessionManager', () => {
     };
 
     await manager.storeSessionResponse(sessionResponse, 'user-id');
-    securityServiceMock.getStoredSession.mockResolvedValue({
+    sessionStoreMock.getStoredSession.mockResolvedValue({
       refreshToken: 'stored-rt',
       refreshTokenExpiresAt: new Date(refreshTokenExpiresAt),
       mfaEnabled: false,
@@ -108,7 +121,7 @@ describe('SessionManager', () => {
     const { SessionManager } = await import('./sessionManager');
     const manager = new SessionManager(vi.fn());
 
-    securityServiceMock.getStoredSession.mockResolvedValue({
+    sessionStoreMock.getStoredSession.mockResolvedValue({
       refreshToken: 'expired-rt',
       refreshTokenExpiresAt: new Date(),
       mfaEnabled: false,
@@ -122,7 +135,7 @@ describe('SessionManager', () => {
     await expect(manager.createSession(true)).rejects.toMatchObject({
       requiresSignOut: true,
     });
-    expect(securityServiceMock.clearStoredSession).toHaveBeenCalled();
+    expect(sessionStoreMock.clearStoredSession).toHaveBeenCalled();
   });
 
   it('handles rate limit errors from stored session', async () => {
@@ -132,7 +145,7 @@ describe('SessionManager', () => {
     const { SessionManager } = await import('./sessionManager');
     const manager = new SessionManager(vi.fn());
 
-    securityServiceMock.getStoredSession.mockResolvedValue({
+    sessionStoreMock.getStoredSession.mockResolvedValue({
       refreshToken: 'rt',
       refreshTokenExpiresAt: new Date(),
       mfaEnabled: false,

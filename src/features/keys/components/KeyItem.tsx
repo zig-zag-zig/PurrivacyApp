@@ -19,7 +19,7 @@ import { KeyManagementForm } from './KeyManagementForm';
 import { KeyMaterialBlock } from './KeyMaterialBlock';
 import { PrivateKeyRevealPanel } from './PrivateKeyRevealPanel';
 import type { PrivateKeyRevealLoading } from './PrivateKeyRevealPanel';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 type KeyItemProps = {
     pgpKey: KeyPair;

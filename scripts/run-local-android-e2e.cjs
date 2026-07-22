@@ -316,8 +316,11 @@ try {
     run(process.execPath, maestroArgs);
   }
 } catch (error) {
-  console.error(error.message);
+  console.error(`[e2e] ${error.message}`);
   process.exitCode = error.exitCode ?? 1;
 } finally {
   stopEmulatorForE2E(emulatorState);
+}
+if (process.exitCode) {
+  process.exit(process.exitCode);
 }

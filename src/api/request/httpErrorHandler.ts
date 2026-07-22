@@ -1,5 +1,4 @@
-import { MfaErrorHandler } from '../../features/mfa/api/mfaErrorHandler';
-import { MfaUtils } from '../../features/mfa/domain/mfaUtils';
+import { getApiRuntime } from '../runtime';
 import { EventService } from '../../services/eventService';
 import { ApiRequestError } from '../apiError';
 import { AuthFlowError } from '../auth/authFlowError';
@@ -58,7 +57,7 @@ export async function handleHttpError(
         }
     }
 
-    if (errorData.wrongMfaCode && MfaUtils.getIsInMfaHandler()) {
+    if (errorData.wrongMfaCode && getApiRuntime().mfa.getIsInMfaHandler()) {
         throw new AuthFlowError('Wrong MFA code', {
             wrongMfaCode: true,
             sessionError: {
@@ -70,20 +69,20 @@ export async function handleHttpError(
     }
 
     if (status === 429) {
-        await MfaErrorHandler.handleRateLimitError(errorData);
+        await getApiRuntime().mfa.handleRateLimitError(errorData);
     }
 
     if (retryOnFailure && !errorData.wrongMfaCode) {
         if (errorData.mfaRequiredSensitive || (errorData.mfaRequired && isSession)) {
             if (requiresAuth) {
                 if (errorData.mfaRequiredSensitive) {
-                    return await MfaErrorHandler.handleSensitiveMfaError(
+                    return await getApiRuntime().mfa.handleSensitiveMfaError(
                         endpoint, method, body, requiresAuth, retryOnFailure,
                         options || {}, requestFn,
                     );
                 }
 
-                return await MfaErrorHandler.handleSessionMfaError(
+                return await getApiRuntime().mfa.handleSessionMfaError(
                     endpoint, method, body, requiresAuth, retryOnFailure,
                     options || {}, isSession, requestFn, createSessionFn,
                 );
@@ -112,7 +111,7 @@ export async function handleHttpError(
             (errorData.sessionHeaderMissing || errorData.accessTokenInvalid || errorData.accessTokenExpired) &&
             endpoint !== '/auth/session'
         ) {
-            return await MfaErrorHandler.handleMissingHeadersError(
+            return await getApiRuntime().mfa.handleMissingHeadersError(
                 endpoint, method, body, requiresAuth, retryOnFailure, options || {}, errorData, requestFn, createSessionFn,
             );
         }

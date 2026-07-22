@@ -16,7 +16,7 @@ import {
     UIManager,
 } from 'react-native';
 
-export type IsolatedTextInputProps = TextInputProps;
+type IsolatedTextInputProps = TextInputProps;
 
 const NativeIsolatedTextInput =
     Platform.OS === 'android'
@@ -44,17 +44,17 @@ export function blurAllIsolatedInputs(): void {
     // input wrapper, so handleTouchEnd fires blurAllIsolatedInputs, but we
     // don't want to blur the input we just toggled reveal on.
     if (Date.now() < suppressBlurUntil) {
-        console.log('[ISOLATED_JS] skipping blur (toggle pressed)');
+        if (__DEV__) console.log('[ISOLATED_JS] skipping blur (toggle pressed)');
         return;
     }
     const entry = focusedEntryRef.current;
-    console.log('[ISOLATED_JS] blurAllIsolatedInputs called', { hasEntry: entry != null });
+    if (__DEV__) console.log('[ISOLATED_JS] blurAllIsolatedInputs called', { hasEntry: entry != null });
     if (!entry) return;
     const now = Date.now();
 
     // Only blur if the input has been focused for a sustained time (>FOCUS_GUARD_MS).
     if (now - entry.focusedAt < FOCUS_GUARD_MS) {
-        console.log('[ISOLATED_JS] skipping recently focused input');
+        if (__DEV__) console.log('[ISOLATED_JS] skipping recently focused input');
         return;
     }
 
@@ -89,7 +89,7 @@ export const IsolatedTextInput = forwardRef<TextInput, IsolatedTextInputProps>(
         const dispatchCommand = useCallback(
             (command: string, args: unknown[]) => {
                 const node = nativeRef.current;
-                console.log('[ISOLATED_JS] dispatchCommand', { command, hasNode: node != null });
+                if (__DEV__) console.log('[ISOLATED_JS] dispatchCommand', { command, hasNode: node != null });
                 if (node == null) return;
                 const config = UIManager.getViewManagerConfig('IsolatedTextInput');
                 const commands = config?.Commands as Record<string, number> | undefined;
@@ -98,7 +98,7 @@ export const IsolatedTextInput = forwardRef<TextInput, IsolatedTextInputProps>(
                 // refs. Use _nativeTag (the internal Fabric node handle) instead.
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tag = (node as any)?._nativeTag ?? findNodeHandle(node);
-                console.log('[ISOLATED_JS] dispatchViewManagerCommand', { commandId, tag });
+                if (__DEV__) console.log('[ISOLATED_JS] dispatchViewManagerCommand', { commandId, tag });
                 if (tag == null) return;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 UIManager.dispatchViewManagerCommand(tag as any, commandId as any, args as any);
@@ -129,7 +129,7 @@ export const IsolatedTextInput = forwardRef<TextInput, IsolatedTextInputProps>(
             (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
                 focusedRef.current = true;
                 const now = Date.now();
-                console.log('[ISOLATED_JS] handleFocus', { now });
+                if (__DEV__) console.log('[ISOLATED_JS] handleFocus', { now });
                 // Track the focused entry with timestamp. blurAllIsolatedInputs
                 // uses this to skip blur for inputs focused within FOCUS_GUARD_MS
                 // (the tap-gesture window), preventing blur-flicker when tapping
@@ -143,7 +143,7 @@ export const IsolatedTextInput = forwardRef<TextInput, IsolatedTextInputProps>(
         const handleBlur = useCallback(
             (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
                 focusedRef.current = false;
-                console.log('[ISOLATED_JS] handleBlur');
+                if (__DEV__) console.log('[ISOLATED_JS] handleBlur');
                 // Clear the tracker entry. When transferring focus between
                 // fields, this fires on ACTION_DOWN (before handleTouchEnd),
                 // so blurAllIsolatedInputs finds no entry and is a no-op.

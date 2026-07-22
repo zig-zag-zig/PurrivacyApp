@@ -9,7 +9,7 @@ import { RecoverAccountScreen } from '../../features/auth/pages/RecoverAccountSc
 import { SigninScreen } from '../../features/auth/pages/SigninScreen';
 import { SignupScreen } from '../../features/auth/pages/SignupScreen';
 import { SignupSeedVerificationScreen } from '../../features/auth/pages/SignupSeedVerificationScreen';
-import { useNotificationService } from '../../hooks/useNotificationService';
+import { useNotificationService } from '../../shared/hooks/useNotificationService';
 import { logger } from '../../utils/logger';
 import { theme } from '../../styles/theme';
 

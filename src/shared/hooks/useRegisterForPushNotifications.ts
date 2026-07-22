@@ -1,8 +1,8 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { storage } from '../utils/storage';
-import { logger } from '../utils/logger';
+import { storage } from '../../utils/storage';
+import { logger } from '../../utils/logger';
 
 export const useRegisterForPushNotifications = () => {
 

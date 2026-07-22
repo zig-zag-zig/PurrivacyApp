@@ -4,9 +4,9 @@ import { SecureStorageModule } from '../services/biometricSecureStorage';
 // Prefix constants
 export const FIRST_TIME_PROMPT_PREFIX = 'first_time_biometric_prompt_';
 export const LAST_USED_AUTH_WAS_BIOMETRIC_PREFIX = 'last_used_auth_was_biometric_';
-export const PASSPHRASE_PREFIX = 'passphrase_';
-export const PASSPHRASE_EXISTS_PREFIX = 'passphrase_exists_';
-export const PASSPHRASE_INDEX_PREFIX = 'passphrase_index_';
+const PASSPHRASE_PREFIX = 'passphrase_';
+const PASSPHRASE_EXISTS_PREFIX = 'passphrase_exists_';
+const PASSPHRASE_INDEX_PREFIX = 'passphrase_index_';
 export const PASSPHRASE_STORAGE_ENABLED_PREFIX = 'passphrase_storage_enabled_';
 export const PASSPHRASE_STORAGE_PROMPTED_PREFIX = 'passphrase_storage_prompted_';
 export const PASSPHRASE_GENERATOR_SETTINGS_KEY = 'passphrase_generator_settings';

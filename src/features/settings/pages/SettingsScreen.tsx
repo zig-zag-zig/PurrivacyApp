@@ -7,7 +7,7 @@ import { ScreenContainer } from '../../../components/ScreenContainer';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
-import { SettingsOption } from '../components/SettingsOption';
+import { SettingsOption } from '../../../shared/ui/SettingsOption';
 import { useSettingsPage } from '../hooks/useSettingsPage';
 import { useAppUpdate } from '../../updates/state/UpdateContext';
 

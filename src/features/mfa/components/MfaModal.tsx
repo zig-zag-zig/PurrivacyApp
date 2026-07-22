@@ -11,11 +11,7 @@ import { ScreenContainer } from '../../../components/ScreenContainer';
 import { theme } from '../../../styles/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export type MfaModalOptions = {
-    isSensitive?: boolean;
-    isLoginFlow?: boolean;
-    message?: string;
-};
+import type { MfaModalOptions } from '../../../shared/modals/types';
 
 interface MfaModalProps extends MfaModalOptions {
     onClose: () => void;

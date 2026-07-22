@@ -1,5 +1,4 @@
-import { getUserId } from '../../features/auth/domain/authUtils';
-import { securityService } from '../../features/security/services/securityService';
+import { getApiRuntime } from '../runtime';
 import { logger } from '../../utils/logger';
 
 const SENSITIVE_ENDPOINTS = [
@@ -14,8 +13,9 @@ const SENSITIVE_ENDPOINTS = [
 
 export async function isSensitiveAndRequiresMfa(endpoint: string, method: string): Promise<boolean> {
     try {
-        const userId = getUserId();
-        const session = await securityService.getStoredSession(userId);
+        const runtime = getApiRuntime();
+        const userId = runtime.identity.getUserId();
+        const session = await runtime.sessionStore.getStoredSession(userId);
 
         if (session && (session.mfaEnabled || endpoint === '/mfa/enable')) {
             for (const sensitiveEndpoint of SENSITIVE_ENDPOINTS) {

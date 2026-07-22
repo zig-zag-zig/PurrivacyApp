@@ -7,13 +7,13 @@ import type {
   UserKeyRecordsResponse,
 } from '../../types/types';
 import type { ApiRequestFn } from '../core/apiRequestFactory';
-import { getUser } from '../../features/auth/domain/authUtils';
+import { getApiRuntime } from '../runtime';
 import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
 import { parseResponseBody } from '../request/parseResponseBody';
 
 async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<any> {
-  const currentUser = getUser();
+  const currentUser = getApiRuntime().identity.getUser();
   const token = await currentUser?.getIdToken(true);
   if (!token) {
     throw new ApiRequestError('User is not authenticated', 401, { bearerHeaderMissing: true });

@@ -4,7 +4,9 @@ const mockCreateUserApi = vi.hoisted(() => vi.fn());
 const mockCreateRecoveryApi = vi.hoisted(() => vi.fn());
 const mockCreateMfaApi = vi.hoisted(() => vi.fn());
 const mockCreateApiRequester = vi.hoisted(() => vi.fn());
-const mockGetUserId = vi.hoisted(() => vi.fn(() => 'user-123'));
+import type { ApiRuntime } from './runtime';
+const mockRuntime: Partial<ApiRuntime> = {};
+const mockIdentity = { getUserId: () => 'user-123', getUser: () => null };
 const mockSessionManagerClass = vi.hoisted(() => vi.fn());
 
 vi.mock('./core/apiRequestFactory', () => ({
@@ -27,8 +29,9 @@ vi.mock('./session/sessionManager', () => ({
     SessionManager: mockSessionManagerClass,
 }));
 
-vi.mock('../features/auth/domain/authUtils', () => ({
-    getUserId: mockGetUserId,
+vi.mock('./runtime', () => ({
+    getApiRuntime: () => mockRuntime,
+    configureApiRuntime: vi.fn(),
 }));
 
 import { ApiClient } from './client';
@@ -46,6 +49,23 @@ const makeSm = (): Record<string, ReturnType<typeof vi.fn>> => ({
 beforeEach(() => {
     vi.clearAllMocks();
     __testResetApiClient();
+    Object.assign(mockRuntime, {
+        identity: mockIdentity,
+        sessionStore: {
+            clearStoredSession: vi.fn(),
+            getStoredSession: vi.fn(),
+            storeSession: vi.fn(),
+            updateStoredSessionMfaState: vi.fn(),
+            updateStoredSessionMfaTrust: vi.fn(),
+        },
+        mfa: {
+            getIsInMfaHandler: () => false,
+            handleRateLimitError: vi.fn(),
+            handleSensitiveMfaError: vi.fn(),
+            handleSessionMfaError: vi.fn(),
+            handleMissingHeadersError: vi.fn(),
+        },
+    });
 });
 
 describe('ApiClient', () => {

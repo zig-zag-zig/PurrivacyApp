@@ -7,7 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useToast } from '../../../app/state/ToastContext';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { ModalToastHost } from '../../../components/ModalToastHost';
-import { useSecureCopy } from '../../../hooks/useSecureCopy';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 
 interface KeyInfoModalProps {
     visible: boolean;

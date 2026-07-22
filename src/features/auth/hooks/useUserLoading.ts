@@ -1,34 +1,56 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { User } from 'firebase/auth';
 import { UserAuthService } from '../services/userAuthService';
 import { UserDecrypted } from '../../../types/types';
 import { AuthService } from '../services/authService';
 import { logger } from '../../../utils/logger';
+
 export const useUserLoading = (
     user: User | null,
     userRef: React.RefObject<User | null>,
-    runLoadUserRef: React.RefObject<boolean>
+    runLoadUserRef: React.RefObject<boolean>,
 ) => {
     const [userDecrypted, setUserDecrypted] = useState<UserDecrypted | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(false);
     const [pendingPassword, setPendingPassword] = useState<string | null>(null);
+    /** Bumps on lock / invalidation so late loadUser results never commit decrypted state. */
+    const loadGenerationRef = useRef(0);
 
-    const loadUser = async (): Promise<UserDecrypted | null> => {
+    const invalidateLoads = useCallback(() => {
+        loadGenerationRef.current += 1;
+        runLoadUserRef.current = false;
+    }, [runLoadUserRef]);
+
+    const loadUser = useCallback(async (): Promise<UserDecrypted | null> => {
+        const generation = loadGenerationRef.current;
         let decryptedUser: UserDecrypted | null = null;
         try {
             if (!userRef.current || !runLoadUserRef.current) {
-                setUserDecrypted(null);
                 return null;
             }
             decryptedUser = await UserAuthService.loadUserDecrypted(userRef.current);
+            // Stale: locked / superseded while awaiting.
+            if (
+                generation !== loadGenerationRef.current
+                || !runLoadUserRef.current
+                || !userRef.current
+            ) {
+                return null;
+            }
             return decryptedUser;
         } catch (error) {
             logger.warn('failed to load user', { error });
             return null;
         } finally {
-            setUserDecrypted(decryptedUser);
+            const stillValid =
+                generation === loadGenerationRef.current
+                && runLoadUserRef.current
+                && Boolean(userRef.current);
+            if (stillValid) {
+                setUserDecrypted(decryptedUser);
+            }
         }
-    };
+    }, [runLoadUserRef, userRef]);
 
     // Handle pending password effect
     useEffect(() => {
@@ -91,5 +113,6 @@ export const useUserLoading = (
         setIsAuthLoading,
         setPendingPassword,
         loadUser,
+        invalidateLoads,
     };
 };

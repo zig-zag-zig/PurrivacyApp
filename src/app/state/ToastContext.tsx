@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleProp, View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -143,7 +143,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children = false }
     const mountRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const toastIdRef = useRef(0);
 
-    const clearTimers = () => {
+    const clearTimers = useCallback(() => {
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
@@ -152,7 +152,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children = false }
             clearTimeout(mountRef.current);
             mountRef.current = null;
         }
-    };
+    }, []);
 
     const toToastMessage = (message: unknown): string => {
         if (typeof message === 'string') {
@@ -167,7 +167,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children = false }
         return '';
     };
 
-    const showToast = (message: unknown, type: ToastType, position?: ToastPosition, timeout?: number) => {
+    const showToast = useCallback((message: unknown, type: ToastType, position?: ToastPosition, timeout?: number) => {
         const trimmedMessage = toToastMessage(message);
         if (trimmedMessage.length === 0) {
             return;
@@ -195,21 +195,26 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children = false }
                 timeoutRef.current = null;
             }, duration);
         }
-    };
+    }, [clearTimers, setToast]);
 
-    const dismissToast = () => {
+    const dismissToast = useCallback(() => {
         clearTimers();
         setToast(null);
-    };
+    }, [clearTimers, setToast]);
 
     useEffect(() => clearTimers, []);
 
-    const value: ToastContextType = {
+    const value = useMemo<ToastContextType>(() => ({
         showToast,
         insets,
         toast,
         dismissToast,
-    };
+    }), [
+        showToast,
+        insets,
+        toast,
+        dismissToast,
+    ]);
 
     return (
         <ToastContext.Provider value={value}>

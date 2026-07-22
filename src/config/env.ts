@@ -153,7 +153,7 @@ export function parseOptionalString(value: string | undefined): string | null {
   return trimmed || null;
 }
 
-export function parseOptionalUrl(value: string | undefined, name: string): string | null {
+function parseOptionalUrl(value: string | undefined, name: string): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
     return null;

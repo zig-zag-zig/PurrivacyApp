@@ -2,7 +2,7 @@ import React, { useRef, forwardRef, useImperativeHandle } from 'react';
 import { WebView } from 'react-native-webview';
 import { PGPExecutor } from '../services/pgpCryptoService';
 import openpgpScript from '../../assets/pgp/openpgp.bundle.js';
-import { useHiddenPgpExecutor } from '../hooks/useHiddenPgpExecutor';
+import { useHiddenPgpExecutor } from '../shared/hooks/useHiddenPgpExecutor';
 import { logger } from '../utils/logger';
 
 export interface HiddenPGPWebViewRef extends PGPExecutor {

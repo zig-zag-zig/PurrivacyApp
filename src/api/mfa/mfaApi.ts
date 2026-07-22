@@ -1,5 +1,4 @@
-import { getUserId } from '../../features/auth/domain/authUtils';
-import { securityService } from '../../features/security/services/securityService';
+import { getApiRuntime } from '../runtime';
 import type {
   MfaSetupResponse,
   RecoveryCodeRegenerateResponse,
@@ -57,7 +56,8 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
       ) as { mfaTrusted: boolean };
 
       if (typeof response.mfaTrusted === 'boolean') {
-        await securityService.updateStoredSessionMfaTrust(getUserId(), response.mfaTrusted);
+        const runtime = getApiRuntime();
+        await runtime.sessionStore.updateStoredSessionMfaTrust(runtime.identity.getUserId(), response.mfaTrusted);
       }
 
       return response;

@@ -1,7 +1,7 @@
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 
-import { getUser } from '../../features/auth/domain/authUtils';
+import { getApiRuntime } from '../runtime';
 import { ApiRequestError } from '../apiError';
 import type { CreateSessionFn, RequestOptions } from './requestOptions';
 
@@ -46,7 +46,7 @@ export async function buildAuthHeaders(
         return headers;
     }
 
-    const currentUser = getUser();
+    const currentUser = getApiRuntime().identity.getUser();
     const token = await currentUser?.getIdToken();
     if (!token) {
         throw new ApiRequestError('User is not authenticated', 401, { bearerHeaderMissing: true });

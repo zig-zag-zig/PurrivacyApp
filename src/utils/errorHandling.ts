@@ -67,7 +67,7 @@ export const SUCCESS_MESSAGES = {
 /**
  * Standardized async operation wrapper with loading state
  */
-export const executeWithLoading = async <T>(
+const executeWithLoading = async <T>(
     operation: () => Promise<T>,
     setLoading: (loading: boolean) => void,
     showToast: (message: string, type: ToastType) => void,
