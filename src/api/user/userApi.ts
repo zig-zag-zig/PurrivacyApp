@@ -12,6 +12,7 @@ import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
 import { isJsonObject } from '../request/errorData';
 import { parseResponseBody } from '../request/parseResponseBody';
+import { parseUserEncrypted } from '../request/responseSchema';
 
 async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<UserEncrypted> {
   const currentUser = getApiRuntime().identity.getUser();
@@ -49,7 +50,9 @@ async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<User
     throw new ApiRequestError(message, response.status, isJsonObject(data) ? data : {});
   }
 
-  return data as UserEncrypted;
+  // LANE M: this direct-fetch path bypasses processResponse, so the response
+  // is runtime-validated here instead of being cast through.
+  return parseUserEncrypted(data, '/user', 'POST');
 }
 
 export function createUserApi(request: ApiRequestFn) {

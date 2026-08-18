@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 import { handleHttpError } from './httpErrorHandler';
 import { isJsonObject } from './errorData';
 import { parseResponseBody } from './parseResponseBody';
+import { validateResponse } from './responseSchema';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
 
 export async function processResponse(
@@ -22,11 +23,12 @@ export async function processResponse(
 
     const data: unknown = await parseResponseBody(response);
     const requestId = response.headers.get('x-request-id');
-    if (requestId && isJsonObject(data)) {
-        data.requestId = data.requestId || requestId;
-    }
 
     if (!response.ok) {
+        if (requestId && isJsonObject(data)) {
+            data.requestId = data.requestId || requestId;
+        }
+
         logger.warn('api response error body', {
             endpoint,
             method,
@@ -50,6 +52,17 @@ export async function processResponse(
         );
     }
 
+    // LANE M: every typed response is runtime-validated at the boundary before
+    // feature code can read it. Missing or malformed known fields reject with
+    // ApiSchemaError; unknown extra fields are allowed (logged at debug by the
+    // parsers) for forward compatibility. Endpoints without a DTO contract
+    // pass through unchanged.
+    const validatedData = validateResponse(endpoint, method, data);
+
+    if (requestId && isJsonObject(validatedData)) {
+        validatedData.requestId = validatedData.requestId || requestId;
+    }
+
     if (endpoint !== '/auth/session') {
         EventService.addEvent('closeMfaModal');
     }
@@ -63,5 +76,5 @@ export async function processResponse(
         }
     }
 
-    return data;
+    return validatedData;
 }
