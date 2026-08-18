@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from './src/features/auth/state/AuthContext';
 import { StackNavigator } from './src/app/navigation/StackNavigator';
 import { resetSessionTimer } from './src/features/security/services/activityService';
 import { pendingSignupSession } from './src/features/auth/services/pendingSignupSession';
+import { useScreenCaptureProtection } from './src/features/security/hooks/useScreenCaptureProtection';
 import { theme } from './src/styles/theme';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from './src/app/state/ToastContext';
@@ -58,6 +59,10 @@ const AppContent = () => {
             pendingSignupSession.clear();
         }
     }, [appStateIsBackground]);
+
+    // APP-SEC-003 (iOS): block screenshots/recording while a user is signed
+    // in. Android is handled globally by FLAG_SECURE at prebuild.
+    useScreenCaptureProtection(Boolean(user));
     useGlobalSpinner(showStartupLoading || (authCompleted && isCheckingInactivity));
     usePassphraseStorageAutoSync(userDecrypted);
     useStartupUpdateCheck(authCompleted);
