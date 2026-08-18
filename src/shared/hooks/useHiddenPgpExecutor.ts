@@ -34,9 +34,24 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
         return new Promise<PgpOperationResponse<T>>((resolve, reject) => {
             const id = opId.current++;
 
-            // Compute per-operation timeout based on RSA key size
-            let timeoutMs = 30000; // default
-            if (operation === 'generateKeyPair') {
+            // Compute per-operation timeout. Crypto-heavy operations
+            // (encrypt/decrypt/key-password changes) do PBKDF2 with 600k
+            // iterations inside the WebView and can exceed the flat 30s cap
+            // on slower devices/emulators; light ops keep the short default.
+            const CRYPTO_HEAVY_OPS = new Set<PgpOperationName>([
+                'encryptMessage',
+                'decryptMessage',
+                'changePassphrase',
+                'changeExpiration',
+                'validatePrivateKeyPassphrase',
+                'createDetachedSignature',
+                'verifyDetachedSignature',
+                'extractPublicKeyFromPrivate',
+            ]);
+            let timeoutMs = 30000; // default (light ops)
+            if (CRYPTO_HEAVY_OPS.has(operation)) {
+                timeoutMs = 90000;
+            } else if (operation === 'generateKeyPair') {
                 const bits = (data as PgpRequestMap['generateKeyPair']['data'] | undefined)?.bitStrength;
                 if (bits !== undefined && bits >= 4096) timeoutMs = 180000;
                 else if (bits !== undefined && bits >= 3072) timeoutMs = 90000;
