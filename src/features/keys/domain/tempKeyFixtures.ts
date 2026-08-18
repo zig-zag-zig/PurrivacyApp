@@ -1,7 +1,7 @@
 import { ENV } from '../../../config/env';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyPair } from '../../../types/types';
-import { storage } from '../../../utils/storage';
+import { devFixtureStore } from '../../../utils/stores/devFixtureStore';
 import { logger } from '../../../utils/logger';
 
 type CachedTempKeyPayload = {
@@ -11,7 +11,6 @@ type CachedTempKeyPayload = {
 };
 
 const CACHE_VERSION = 3;
-const CACHE_KEY = 'dev-real-pgp-temp-keys';
 const DEV_TEMP_EMAIL_DOMAIN = 'purrivacy.local';
 const DEV_TEMP_KEY_PASSPHRASE = 'testpassword';
 
@@ -65,7 +64,7 @@ async function persistTempKeys(keys: KeyPair[], generatedCount = generatedTempKe
   generatedTempKeyCount = Math.max(generatedCount, keys.length);
   cachedTempKeys = keys;
 
-  await storage.setItem(CACHE_KEY, {
+  await devFixtureStore.write({
     version: CACHE_VERSION,
     generatedCount: generatedTempKeyCount,
     keys,
@@ -120,7 +119,7 @@ async function loadOrCreateKeys(): Promise<KeyPair[]> {
     return cachedTempKeys.slice(0, ENV.devTempKeyCount);
   }
 
-  const cachedPayload = normalizeCachedKeys(await storage.getItem(CACHE_KEY));
+  const cachedPayload = normalizeCachedKeys(await devFixtureStore.read());
   generatedTempKeyCount = cachedPayload.generatedCount;
   const keys = await createMissingTempKeys(
     cachedPayload.keys,

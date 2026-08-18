@@ -1,43 +1,27 @@
-import { storage } from '../../../utils/storage';
+import { popularityStore } from '../../../utils/stores/popularityStore';
 import { KeyPair } from '../../../types/types';
 import { getDisplayName } from './displayNameUtils';
-
-const PREFIX = 'popularity_';
-
-/**
- * Get storage key for a user's key popularity
- */
-function getKey(userId: string, keyId: string): string {
-    return `${PREFIX}${userId}_${keyId}`;
-}
 
 /**
  * Increment popularity count for a specific key.
  * If the key does not exist, initialize it to 1.
  */
 export async function incrementPopularity(userId: string, keyId: string): Promise<void> {
-    const storageKey = getKey(userId, keyId);
-    const current = await storage.getItem(storageKey);
-    const count = typeof current === 'number' ? current : 0;
-    await storage.setItem(storageKey, count + 1);
+    await popularityStore.update(index => ({
+        ...index,
+        [userId]: {
+            ...index[userId],
+            [keyId]: (index[userId]?.[keyId] ?? 0) + 1,
+        },
+    }));
 }
 
 /**
  * Get all popularity entries for a user as a map from keyId to count.
- * Uses prefix filtering on storage keys.
  */
 export async function getAllPopularities(userId: string): Promise<Record<string, number>> {
-    const prefix = `${PREFIX}${userId}_`;
-    const items = await storage.getItemsByPrefix(prefix);
-    const result: Record<string, number> = {};
-    for (const key in items) {
-        const keyId = key.slice(prefix.length);
-        const value = items[key];
-        if (typeof value === 'number') {
-            result[keyId] = value;
-        }
-    }
-    return result;
+    const index = await popularityStore.read();
+    return index[userId] ?? {};
 }
 
 /**
