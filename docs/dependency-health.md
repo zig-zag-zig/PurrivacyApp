@@ -13,7 +13,7 @@ Last updated: after Phase 2 (dependency alignment lane, APP-SEC-012).
   Aligned in this lane: `expo` (+9 patch releases: constants, dev-client, file-system,
   local-authentication, notifications, sharing, splash-screen, task-manager, updates)
   and `react-native-screens` 4.25.2 → `~4.26.0`.
-- `npm run verify` (tsc --noEmit + vitest) passes with the aligned set: **826/826 tests**.
+- `npm run verify` (tsc --noEmit + vitest) passes with the aligned set: **853/853 tests**.
 - `npm run doctor`: **21/22 checks pass**. The single remaining failure is the Hermes V1
   memory-regression check, which **cannot be fixed on SDK 56** (see below).
 
@@ -46,7 +46,7 @@ Out of scope for this lane (separate future effort). The upgrade should cover:
    and the config plugins. After the SDK bump, regenerate natives via the repo's
    prebuild flow, update `app.config.js` if SDK 57 changes any plugin options, and
    rebuild the debug APK (`npm run build:debug`) to validate the dev client.
-4. **Risk areas** — verify in order: `npm run verify` (tsc + 826 vitest tests),
+4. **Risk areas** — verify in order: `npm run verify` (tsc + 853 vitest tests),
    `npm run doctor` (must reach 22/22), debug build, Maestro E2E suite
    (`npm run e2e:smoke`), and the release build (`npm run build:release`). Specifically
    exercise Hermes-memory-sensitive flows (large key stores, crypto batch operations)

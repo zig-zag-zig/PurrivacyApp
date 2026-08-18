@@ -1,7 +1,7 @@
 import type { MfaState } from '../features/mfa/model/mfaTypes';
 
 /** Generic payload fallback for external consumers that handle events loosely. */
-export type EventPayload = Record<string, unknown>;
+// Payloads are narrowed per event via AppEventPayloadMap below.
 
 export type AppEventPayloadMap = {
     clearMfaCode: { isWrongMfaCode?: boolean } | undefined;

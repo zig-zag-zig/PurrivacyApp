@@ -113,7 +113,6 @@ export const useFirebaseAuth = ({
                     runLoadUserRef.current = false;
                     dispatch({
                         type: 'LOCAL_LOCK_DETECTED',
-                        user: currentUser,
                         lastSignedInUser: {
                             uid: currentUser.uid,
                             username: getUsernameFromUser(currentUser),
@@ -144,7 +143,6 @@ export const useFirebaseAuth = ({
                             runLoadUserRef.current = false;
                             dispatch({
                                 type: 'LOCAL_LOCK_DETECTED',
-                                user: currentUser,
                                 lastSignedInUser,
                             });
                             return;

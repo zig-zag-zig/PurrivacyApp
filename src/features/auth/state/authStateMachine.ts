@@ -73,13 +73,12 @@ export type AuthEvent =
   | { type: 'BOOTSTRAP_COMPLETED' }
   | { type: 'FIREBASE_USER_ESTABLISHED'; user: User }
   | { type: 'FIREBASE_USER_LOST' }
-  | { type: 'LOCAL_LOCK_DETECTED'; user: User; lastSignedInUser: LastSignedInUser }
+  | { type: 'LOCAL_LOCK_DETECTED'; lastSignedInUser: LastSignedInUser }
   // ── backend session / MFA ───────────────────────────────────────────────
   | { type: 'SESSION_CREATED' }
   | { type: 'SESSION_AUTH_LOST' }
   | { type: 'MFA_CHALLENGE_RAISED' }
   | { type: 'MFA_CHALLENGE_CANCELLED' }
-  | { type: 'MFA_CHALLENGE_RESOLVED' }
   // ── local unlock ────────────────────────────────────────────────────────
   | { type: 'UNLOCK_REQUESTED' }
   | { type: 'UNLOCK_SUCCEEDED' }
@@ -289,7 +288,6 @@ export function authReducer(state: AuthMachineState, event: AuthEvent): AuthMach
       };
 
     case 'MFA_CHALLENGE_CANCELLED':
-    case 'MFA_CHALLENGE_RESOLVED':
       if (state.phase !== 'mfa-pending') {
         return state; // well-defined no-op outside the MFA flow
       }

@@ -215,7 +215,7 @@ describe('LOCAL_LOCK_DETECTED', () => {
   it('moves any phase to locally-locked with a last-signed-in user', () => {
     const s = run([
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
-      { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+      { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
     ]);
     expect(s.phase).toBe('locally-locked');
     expect(s.isLocalSessionLocked).toBe(true);
@@ -232,7 +232,7 @@ describe('LOCAL_LOCK_DETECTED', () => {
       { type: 'SESSION_CREATED' },
       { type: 'USER_DECRYPTED_CHANGED', userDecrypted: makeDecrypted() },
       { type: 'AUTHENTICATED_UI_READY' },
-      { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+      { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
     ]);
     expect(s.phase).toBe('locally-locked');
     expect(s.userDecrypted).toBeNull();
@@ -270,7 +270,7 @@ describe('SESSION_CREATED', () => {
 
   it('resolves unlocking to firebase-authenticated (biometric unlock path)', () => {
     const s = run([
-      { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+      { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
       { type: 'UNLOCK_REQUESTED' },
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
       { type: 'SESSION_CREATED' },
@@ -342,18 +342,18 @@ describe('MFA_CHALLENGE_CANCELLED / RESOLVED', () => {
     expect(s.priorPhase).toBeNull();
   });
 
-  it('resolve returns to the prior phase', () => {
+  it('cancel returns to the prior phase (resolve path removed; SESSION_CREATED covers it)', () => {
     const s = run([
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
       { type: 'MFA_CHALLENGE_RAISED' },
-      { type: 'MFA_CHALLENGE_RESOLVED' },
+      { type: 'MFA_CHALLENGE_CANCELLED' },
     ]);
     expect(s.phase).toBe('firebase-authenticated');
   });
 
   it('cancel from an unlocking-sourced challenge returns to unlocking', () => {
     const s = run([
-      { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+      { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
       { type: 'UNLOCK_REQUESTED' },
       { type: 'MFA_CHALLENGE_RAISED' },
       { type: 'MFA_CHALLENGE_CANCELLED' },
@@ -394,7 +394,7 @@ describe('MFA_CHALLENGE_CANCELLED / RESOLVED', () => {
 // ---------------------------------------------------------------------------
 
 const lockedState = (): AuthMachineState => run([
-  { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+  { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
 ]);
 
 describe('UNLOCK_REQUESTED', () => {
@@ -924,7 +924,7 @@ describe('end-to-end journeys', () => {
 
   it('cold start with lock marker: bootstrapping -> locally-locked', () => {
     const s = run([
-      { type: 'LOCAL_LOCK_DETECTED', user: makeUser(), lastSignedInUser: makeLastSignedIn() },
+      { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
     ]);
     expect(s.phase).toBe('locally-locked');
     expect(s.authCompleted).toBe(true);

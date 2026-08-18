@@ -20,8 +20,12 @@ import { isRecord } from '../../shared/errors/errorGuards';
 export const parseNotificationData = (data: unknown): Record<string, unknown> => {
     const outer = isRecord(data);
     const innerData = outer && isRecord(data.data) ? data.data : {};
-    const payloadString =
-        typeof innerData.dataString === 'string' ? innerData.dataString : innerData.body;
+    // Legacy parity: an empty dataString falls back to body rather than
+    // short-circuiting to innerData.
+    let payloadString: unknown = innerData.dataString;
+    if (typeof payloadString !== 'string' || payloadString.length === 0) {
+        payloadString = innerData.body;
+    }
     if (typeof payloadString !== 'string' || payloadString.length === 0) {
         return innerData;
     }

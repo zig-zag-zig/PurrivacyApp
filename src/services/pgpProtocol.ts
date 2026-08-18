@@ -95,8 +95,6 @@ export interface PgpRequestMap {
 
 export type PgpOperationName = keyof PgpRequestMap;
 
-export type PgpOperationRequest = PgpRequestMap[PgpOperationName];
-
 /** Per-operation response types. */
 export interface PgpResponseMap {
     ping: { pong: true; timestamp: number };

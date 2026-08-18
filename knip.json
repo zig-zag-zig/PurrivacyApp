@@ -4,6 +4,8 @@
         "App.tsx",
         "index.js",
         "index.ts",
+        "src/**/*.test.{ts,tsx}",
+        "tests/**/*.test.ts",
         "scripts/android-autofill-commit.cjs",
         "scripts/android-autofill-highlight.js",
         "scripts/android-build-variants.js",
@@ -24,6 +26,7 @@
         "scripts/sync-android-version.cjs",
         "scripts/update-signing-keygen.cjs"
     ],
+    "ignoreExportsUsedInFile": true,
     "ignoreDependencies": [
         "@expo/config-plugins",
         "buffer",
@@ -33,10 +36,6 @@
         "android/**",
         "ios/**",
         "node_modules/**",
-        "**/__tests__/**",
-        "**/*.test.{js,ts,tsx}",
-        "**/*.spec.{js,ts,tsx}",
-        "**/*.mock.{js,ts,tsx}",
         "metro.config.js",
         "*.config.js"
     ]
