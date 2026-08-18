@@ -3,6 +3,7 @@ import {
     UserCreatePayload,
     Encryption,
     EncryptedKeyRecordWithId,
+    MfaSetupNonceResponse,
     MfaSetupResponse,
     RecoveryCodeRegenerateResponse,
     RecoveryCodeRemainingResponse,
@@ -79,12 +80,20 @@ export class ApiClient {
         await getUa().savePushToken(pushToken);
     }
 
+    static async setPassphraseStorage(enabled: boolean) {
+        await getUa().setPassphraseStorage(enabled);
+    }
+
     static async deletePushToken(pushToken: string) {
         await getUa().deletePushToken(pushToken);
     }
 
-    static async setupMfa(): Promise<MfaSetupResponse> {
-        return getMa().setupMfa();
+    static async setupMfa(nonce: string): Promise<MfaSetupResponse> {
+        return getMa().setupMfa(nonce);
+    }
+
+    static async mintMfaSetupNonce(): Promise<MfaSetupNonceResponse> {
+        return getMa().mintMfaSetupNonce();
     }
 
     static async enableMfa(): Promise<SessionResponse> {

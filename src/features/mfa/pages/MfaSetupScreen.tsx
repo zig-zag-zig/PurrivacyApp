@@ -7,6 +7,7 @@ import { ScreenContainer } from '../../../components/ScreenContainer';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { useMfa } from '../state/MfaContext';
+import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
 import { useModal } from '../../../app/state/ModalContext';
 import { commonStyles } from '../../../styles/commonStyles';
@@ -19,6 +20,7 @@ import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 export const MfaSetupScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();
     const { setupMfa, enableMfa, isLoading } = useMfa();
+    const { signOut } = useAuth();
     const { showToast } = useToast();
     const { showRecoveryCodesModal } = useModal();
 
@@ -43,6 +45,16 @@ export const MfaSetupScreen = () => {
             const data = await setupMfa();
             setSetupData(data);
         } catch (error: any) {
+            // Backend API-SEC-006: fresh primary authentication is required to
+            // start MFA enrollment. The generic 401 path in httpErrorHandler
+            // does not flag it, so surface a clear message and drop the user
+            // back to a fresh sign-in instead of the opaque "Failed to
+            // initialize" + silent back.
+            if (error?.status === 401 || String(error?.error ?? error?.message ?? '').includes('Fresh authentication')) {
+                await signOut();
+                showToast('Please sign in again to set up two-factor authentication', 'error');
+                return;
+            }
             showToast('Failed to initialize MFA setup', 'error');
             navigation.goBack();
         }

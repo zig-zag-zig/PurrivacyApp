@@ -198,10 +198,20 @@ describe('ApiClient', () => {
             const ma = { setupMfa: vi.fn(async () => ({ secret: 's' })) } as any;
             __testSetMfaApi(ma);
 
-            const result = await ApiClient.setupMfa();
+            const result = await ApiClient.setupMfa('nonce-abc');
 
-            expect(ma.setupMfa).toHaveBeenCalled();
+            expect(ma.setupMfa).toHaveBeenCalledWith('nonce-abc');
             expect(result).toEqual({ secret: 's' });
+        });
+
+        it('delegates mintMfaSetupNonce', async () => {
+            const ma = { mintMfaSetupNonce: vi.fn(async () => ({ nonce: 'n', expiresAt: 't' })) } as any;
+            __testSetMfaApi(ma);
+
+            const result = await ApiClient.mintMfaSetupNonce();
+
+            expect(ma.mintMfaSetupNonce).toHaveBeenCalled();
+            expect(result).toEqual({ nonce: 'n', expiresAt: 't' });
         });
 
         it('delegates enableMfa', async () => {

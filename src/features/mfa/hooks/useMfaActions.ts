@@ -57,7 +57,11 @@ export function useMfaActions(
     setError,
     'Failed to setup MFA',
     'failed to setup mfa',
-    () => ApiClient.setupMfa(),
+    async () => {
+      // Fresh-auth nonce first (backend API-SEC-006), then setup with it.
+      const { nonce } = await ApiClient.mintMfaSetupNonce();
+      return ApiClient.setupMfa(nonce);
+    },
   ), [setIsLoading, setError]);
 
   const enableMfa = useCallback(async (): Promise<void> => runMfaAction(

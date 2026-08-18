@@ -25,6 +25,7 @@ import type {
     EncryptedKeyRecordWithId,
     Encryption,
     EncryptionBase,
+    MfaSetupNonceResponse,
     MfaSetupResponse,
     RecoveryChallengeResponse,
     RecoveryCodeRegenerateResponse,
@@ -192,6 +193,20 @@ export function parseRecoveryTokenResponse(data: unknown, endpoint: string, meth
     return result;
 }
 
+export function parseMfaSetupNonceResponse(
+    data: unknown,
+    endpoint: string,
+    method: string,
+): MfaSetupNonceResponse {
+    const raw = asRecord(data, endpoint, method);
+    const result: MfaSetupNonceResponse = {
+        nonce: requireString(raw, 'nonce', endpoint, method),
+        expiresAt: requireString(raw, 'expiresAt', endpoint, method),
+    };
+    logUnknownFields(raw, endpoint, method, ['nonce', 'expiresAt']);
+    return result;
+}
+
 export function parseMfaSetupResponse(data: unknown, endpoint: string, method: string): MfaSetupResponse {
     const raw = asRecord(data, endpoint, method);
     const result: MfaSetupResponse = {
@@ -329,6 +344,7 @@ const EXACT_PARSERS: Record<string, Parser> = {
     'POST /auth/recovery/challenge': parseRecoveryChallengeResponse,
     'POST /auth/recovery/token': parseRecoveryTokenResponse,
     'POST /mfa/setup': parseMfaSetupResponse,
+    'POST /auth/session/mfa-setup-nonce': parseMfaSetupNonceResponse,
     'POST /mfa/enable': parseSessionResponse,
     'POST /mfa/disable': parseSessionResponse,
     'POST /mfa/session/trust': parseMfaTrustResponse,

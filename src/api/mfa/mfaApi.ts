@@ -1,5 +1,6 @@
 import { getApiRuntime } from '../runtime';
 import type {
+  MfaSetupNonceResponse,
   MfaSetupResponse,
   RecoveryCodeRegenerateResponse,
   RecoveryCodeRemainingResponse,
@@ -17,8 +18,14 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
   };
 
   return {
-    setupMfa(): Promise<MfaSetupResponse> {
-      return request('/mfa/setup', 'POST') as Promise<MfaSetupResponse>;
+    mintMfaSetupNonce(): Promise<MfaSetupNonceResponse> {
+      // Fresh-auth nonce required before MFA setup (backend API-SEC-006).
+      // No mfaCode at this point — the session was recently authenticated.
+      return request('/auth/session/mfa-setup-nonce', 'POST', {}, true) as Promise<MfaSetupNonceResponse>;
+    },
+
+    setupMfa(nonce: string): Promise<MfaSetupResponse> {
+      return request('/mfa/setup', 'POST', { nonce }) as Promise<MfaSetupResponse>;
     },
 
     async enableMfa(): Promise<SessionResponse> {

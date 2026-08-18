@@ -23,6 +23,12 @@ export interface MfaSetupResponse {
     message: string;
 }
 
+/** Fresh-auth nonce required to start MFA setup (backend API-SEC-006). */
+export interface MfaSetupNonceResponse {
+    nonce: string;
+    expiresAt: string;
+}
+
 export interface RecoveryCodeRegenerateResponse {
     recoveryCodes: string[];
 }

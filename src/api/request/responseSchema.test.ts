@@ -10,6 +10,7 @@ import { ApiSchemaError } from '../apiError';
 import {
     parseCreateUserResponse,
     parseEncryptedKeyRecordWithId,
+    parseMfaSetupNonceResponse,
     parseMfaSetupResponse,
     parseMfaTrustResponse,
     parseRecoveryChallengeResponse,
@@ -138,6 +139,35 @@ describe('parseRecoveryTokenResponse', () => {
                 ENDPOINT,
                 METHOD,
             )),
+        );
+    });
+});
+
+describe('parseMfaSetupNonceResponse', () => {
+    it('accepts a valid nonce response', () => {
+        const valid = { nonce: 'abc123', expiresAt: '2026-08-18T12:00:00.000Z' };
+        expect(parseMfaSetupNonceResponse(valid, ENDPOINT, METHOD)).toEqual(valid);
+    });
+
+    it('rejects a missing nonce', async () => {
+        await expectSchemaError(
+            Promise.resolve().then(() => parseMfaSetupNonceResponse(
+                { expiresAt: '2026-08-18T12:00:00.000Z' },
+                ENDPOINT,
+                METHOD,
+            )),
+            'nonce',
+        );
+    });
+
+    it('rejects a non-string expiresAt', async () => {
+        await expectSchemaError(
+            Promise.resolve().then(() => parseMfaSetupNonceResponse(
+                { nonce: 'abc', expiresAt: 123 },
+                ENDPOINT,
+                METHOD,
+            )),
+            'expiresAt',
         );
     });
 });

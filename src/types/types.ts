@@ -32,6 +32,7 @@ export type {
 
 export type {
     AuthErrorResponse,
+    MfaSetupNonceResponse,
     MfaSetupResponse,
     MfaState,
     RecoveryCodeRegenerateResponse,

@@ -106,5 +106,9 @@ export function createUserApi(request: ApiRequestFn) {
       await request('/user/delete-push-token', 'POST', { pushToken }, true, { useSessionAuth: false });
     },
 
+    async setPassphraseStorage(enabled: boolean): Promise<void> {
+      await request('/user/passphrase-storage', 'POST', { enabled }, true, { includeDeviceId: true });
+    },
+
   };
 }
