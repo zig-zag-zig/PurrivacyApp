@@ -37,6 +37,11 @@ import type {
 
 type Parser = (data: unknown, endpoint: string, method: string) => unknown;
 
+/** Backend `POST /user` (registration) response: `{ success: boolean }`. */
+export interface CreateUserResponse {
+    success: boolean;
+}
+
 // ─── Shared field checks ────────────────────────────────────────────────────
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -259,6 +264,20 @@ export function parseRecoveryCodeRemainingResponse(
     return result;
 }
 
+export function parseCreateUserResponse(
+    data: unknown,
+    endpoint: string,
+    method: string,
+): CreateUserResponse {
+    const raw = asRecord(data, endpoint, method);
+    const success = requireBoolean(raw, 'success', endpoint, method);
+    if (success !== true) {
+        fail(endpoint, method, 'field "success" must be true (registration did not complete)');
+    }
+    logUnknownFields(raw, endpoint, method, ['success']);
+    return { success };
+}
+
 export function parseUserEncrypted(data: unknown, endpoint: string, method: string): UserEncrypted {
     const raw = asRecord(data, endpoint, method);
     const keysRaw = raw.keys;
@@ -317,7 +336,7 @@ const EXACT_PARSERS: Record<string, Parser> = {
     'GET /mfa/recovery-codes/remaining': parseRecoveryCodeRemainingResponse,
     'POST /auth/session': parseSessionResponse,
     'POST /auth/session/refresh': parseSessionResponse,
-    'POST /user': parseUserEncrypted,
+    'POST /user': parseCreateUserResponse,
     'GET /user': parseUserEncrypted,
     'GET /user/key-records': parseUserKeyRecordsResponse,
     'POST /user/key-records': parseEncryptedKeyRecordWithId,

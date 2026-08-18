@@ -12,9 +12,9 @@ import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
 import { isJsonObject } from '../request/errorData';
 import { parseResponseBody } from '../request/parseResponseBody';
-import { parseUserEncrypted } from '../request/responseSchema';
+import { parseCreateUserResponse, parseUserEncrypted, CreateUserResponse } from '../request/responseSchema';
 
-async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<UserEncrypted> {
+async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<CreateUserResponse> {
   const currentUser = getApiRuntime().identity.getUser();
   const token = await currentUser?.getIdToken(true);
   if (!token) {
@@ -51,8 +51,10 @@ async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<User
   }
 
   // LANE M: this direct-fetch path bypasses processResponse, so the response
-  // is runtime-validated here instead of being cast through.
-  return parseUserEncrypted(data, '/user', 'POST');
+  // is runtime-validated here instead of being cast through. The backend's
+  // POST /user returns { success: boolean } (verified against the API source),
+  // NOT the UserEncrypted shape that GET /user returns.
+  return parseCreateUserResponse(data, '/user', 'POST');
 }
 
 export function createUserApi(request: ApiRequestFn) {

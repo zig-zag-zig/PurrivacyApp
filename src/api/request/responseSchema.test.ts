@@ -8,6 +8,7 @@ vi.mock('../../utils/logger', () => ({
 
 import { ApiSchemaError } from '../apiError';
 import {
+    parseCreateUserResponse,
     parseEncryptedKeyRecordWithId,
     parseMfaSetupResponse,
     parseMfaTrustResponse,
@@ -319,6 +320,33 @@ describe('parseRecoveryCodeRemainingResponse', () => {
                 METHOD,
             )),
             'remainingCodes',
+        );
+    });
+});
+
+describe('parseCreateUserResponse', () => {
+    it('accepts a successful registration response', () => {
+        expect(parseCreateUserResponse({ success: true }, ENDPOINT, METHOD)).toEqual({ success: true });
+    });
+
+    it('rejects success: false (registration did not complete)', async () => {
+        await expectSchemaError(
+            Promise.resolve().then(() => parseCreateUserResponse({ success: false }, ENDPOINT, METHOD)),
+            'success',
+        );
+    });
+
+    it('rejects a missing success field', async () => {
+        await expectSchemaError(
+            Promise.resolve().then(() => parseCreateUserResponse({}, ENDPOINT, METHOD)),
+            'success',
+        );
+    });
+
+    it('rejects a non-object body', async () => {
+        await expectSchemaError(
+            Promise.resolve().then(() => parseCreateUserResponse('nope', ENDPOINT, METHOD)),
+            '',
         );
     });
 });

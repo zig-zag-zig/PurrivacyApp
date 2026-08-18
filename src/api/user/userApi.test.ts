@@ -26,11 +26,9 @@ describe('createUserApi.create (direct-fetch boundary, LANE M)', () => {
         recoveryVerifierHash: 'hash',
     };
 
-    const validUserResponse = {
-        dekPassword: { encryptedData: 'a', iv: 'b', tag: 'c', salt: 'd' },
-        dekSeed: { encryptedData: 'e', iv: 'f', tag: 'g', salt: 'h' },
-        keys: [{ encryptedData: 'x', iv: 'y', tag: 'z' }],
-    };
+    // Backend POST /user (registration) returns { success: boolean } —
+    // verified against the API source (userRoutes.ts → createUser).
+    const validUserResponse = { success: true };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -56,17 +54,21 @@ describe('createUserApi.create (direct-fetch boundary, LANE M)', () => {
     });
 
     it('rejects a malformed response with ApiSchemaError instead of leaking a cast', async () => {
-        globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ keys: 'nope' }), { status: 201 }));
+        globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ success: 'nope' }), { status: 201 }));
 
         const api = createUserApi(vi.fn());
         await expect(api.create(userPayload)).rejects.toBeInstanceOf(ApiSchemaError);
     });
 
     it('rejects a missing-field response with ApiSchemaError', async () => {
-        globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-            dekPassword: { encryptedData: 'a', iv: 'b', tag: 'c', salt: 'd' },
-            keys: [],
-        }), { status: 201 }));
+        globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({}), { status: 201 }));
+
+        const api = createUserApi(vi.fn());
+        await expect(api.create(userPayload)).rejects.toBeInstanceOf(ApiSchemaError);
+    });
+
+    it('rejects success:false as a failed registration', async () => {
+        globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ success: false }), { status: 201 }));
 
         const api = createUserApi(vi.fn());
         await expect(api.create(userPayload)).rejects.toBeInstanceOf(ApiSchemaError);
