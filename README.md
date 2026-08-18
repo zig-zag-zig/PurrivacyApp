@@ -96,10 +96,21 @@ or embedded in the app.
 re-case, or percent-encode it differently, or verification will fail (and the
 update will safely fall back to the browser).
 
-**Production requirement:** the pinned key is a development keypair. The
-release owner must regenerate a fresh keypair (`update-signing-keygen.cjs`)
-and re-pin the new public key in `updateSigning.ts` before the next production
-release, then sign the manifest with the new private key.
+**Production key:** the pinned key is the production keypair. Its private
+half lives at `scripts/release-signing/update-signing-key-production.pem`
+(gitignored, 0600) — **back it up to secure offline storage now**; losing it
+means future releases can never ship signed in-app updates to existing
+installs. Sign production manifests with:
+
+```bash
+node scripts/sign-update-manifest.cjs --key scripts/release-signing/update-signing-key-production.pem \
+  --apk ./Purrivacy.apk --tag v1.0.9 \
+  --url https://github.com/<owner>/<repo>/releases/download/v1.0.9/Purrivacy.apk
+```
+
+If the private key is ever compromised: generate a fresh keypair
+(`update-signing-keygen.cjs`), re-pin in `updateSigning.ts`, ship the app
+update, and sign only with the new key going forward.
 
 Start the development server:
 

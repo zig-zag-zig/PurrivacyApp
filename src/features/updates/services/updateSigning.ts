@@ -4,16 +4,15 @@ import crypto from 'react-native-quick-crypto';
 /**
  * Release-signing public key pinned in the app (APP-SEC-002).
  *
- * SPKI DER, base64. The matching private key lives OUTSIDE the repository
- * (scripts/release-signing/, gitignored, mode 0600). Generate a fresh keypair
- * with `node scripts/update-signing-keygen.cjs` and re-pin the public key here
- * before every production release.
- *
- * DEV KEYPAIR — the release owner MUST regenerate and re-pin before production:
- * see README "Signed Android update manifests".
+ * SPKI DER, base64. PRODUCTION keypair generated 2026-08-18; the matching
+ * private key lives OUTSIDE the repository
+ * (scripts/release-signing/update-signing-key-production.pem, gitignored,
+ * mode 0600). Back it up to secure offline storage; treat any suspicion of
+ * compromise as a rotation event: generate a new keypair, re-pin here, and
+ * ship the change before signing further releases.
  */
 export const UPDATE_SIGNING_PUBLIC_KEY_SPKI_DER =
-  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/mq9Z8eDU8HNE4kCWGzWAErUK/ehjaE8LQOkDFK3LtBbygfoxjMlTWP47JP2YfoXOQmv3kmJDtldCK2s2dUmTg==';
+  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEmhqXZO3o4Q8vVaAsHPDsOcdNSnwd106mgylDIj69bH/+rgrkJTJENdZbqNI3Ib+97gzF/Y0s7MPDkLEhIBPgQ==';
 
 const SIGNING_PUBLIC_KEY = Buffer.from(UPDATE_SIGNING_PUBLIC_KEY_SPKI_DER, 'base64');
 

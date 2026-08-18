@@ -12,9 +12,11 @@
  * After running this script, paste the printed base64 public key (SPKI DER) into
  * UPDATE_SIGNING_PUBLIC_KEY_SPKI_DER in src/features/updates/services/updateSigning.ts.
  *
- * SECURITY NOTE: the pinned key in the app is a DEV keypair. The release owner MUST
- * regenerate a fresh keypair and re-pin the new public key in the app before the
- * next production release (see README "Signed Android update manifests").
+ * SECURITY NOTE: the pinned key is the PRODUCTION keypair
+ * (update-signing-key-production.pem). Back the private key up to secure
+ * offline storage; if it is ever compromised, generate a fresh keypair,
+ * re-pin, and ship before signing further releases
+ * (see README "Signed Android update manifests").
  */
 'use strict';
 
