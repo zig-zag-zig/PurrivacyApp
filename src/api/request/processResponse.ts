@@ -1,6 +1,7 @@
 import { EventService } from '../../services/eventService';
 import { logger } from '../../utils/logger';
 import { handleHttpError } from './httpErrorHandler';
+import { isJsonObject } from './errorData';
 import { parseResponseBody } from './parseResponseBody';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
 
@@ -8,20 +9,20 @@ export async function processResponse(
     response: Response,
     endpoint: string,
     method: string,
-    body: any,
+    body: unknown,
     requiresAuth: boolean,
     retryOnFailure: boolean,
     options: RequestOptions | undefined,
     requestFn: RequestFn,
     createSessionFn: CreateSessionFn,
-): Promise<any> {
+): Promise<unknown> {
     if (response.status === 204) {
         return;
     }
 
-    const data = await parseResponseBody(response);
+    const data: unknown = await parseResponseBody(response);
     const requestId = response.headers.get('x-request-id');
-    if (requestId && typeof data === 'object' && data !== null) {
+    if (requestId && isJsonObject(data)) {
         data.requestId = data.requestId || requestId;
     }
 
@@ -52,8 +53,14 @@ export async function processResponse(
     if (endpoint !== '/auth/session') {
         EventService.addEvent('closeMfaModal');
     }
-    if (data.newRecoveryCodes) {
-        EventService.addEvent('newRecoveryCodes', { recoveryCodes: data.newRecoveryCodes });
+
+    // The backend may attach freshly generated recovery codes to any ok
+    // response; only a well-formed string array is trusted as such.
+    if (isJsonObject(data)) {
+        const recoveryCodes = data.newRecoveryCodes;
+        if (Array.isArray(recoveryCodes) && recoveryCodes.every((code): code is string => typeof code === 'string')) {
+            EventService.addEvent('newRecoveryCodes', { recoveryCodes });
+        }
     }
 
     return data;

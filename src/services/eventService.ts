@@ -1,5 +1,6 @@
 import type { MfaState } from '../features/mfa/model/mfaTypes';
 
+/** Generic payload fallback for external consumers that handle events loosely. */
 export type EventPayload = Record<string, unknown>;
 
 export type AppEventPayloadMap = {
@@ -17,9 +18,13 @@ export type AppEventPayloadMap = {
 
 type AppEventName = keyof AppEventPayloadMap;
 
+/**
+ * Listener signature. `payload` is correlated to `eventName` through
+ * `AppEventPayloadMap`, so listeners can narrow with `eventName === '...'`.
+ */
 type AppEventListener = (
     eventName: AppEventName,
-    payload: EventPayload | undefined,
+    payload: AppEventPayloadMap[AppEventName] | undefined,
 ) => void;
 
 const appEventNames = new Set<AppEventName>([
@@ -35,7 +40,7 @@ const appEventNames = new Set<AppEventName>([
     'user',
 ]);
 
-const pendingEvents = new Map<AppEventName, EventPayload | undefined>();
+const pendingEvents = new Map<AppEventName, AppEventPayloadMap[AppEventName] | undefined>();
 const eventListeners = new Set<AppEventListener>();
 
 export const isAppEventName = (eventName: string): eventName is AppEventName => (
@@ -48,15 +53,16 @@ type EventArgs<T extends AppEventName> = undefined extends AppEventPayloadMap[T]
 
 export const EventService = {
     addEvent: <T extends AppEventName>(eventName: T, ...args: EventArgs<T>) => {
-        const payload = args[0] as EventPayload | undefined;
+        const payload = args[0];
         pendingEvents.set(eventName, payload);
         eventListeners.forEach(cb => cb(eventName, payload));
     },
 
     consumeEvent: <T extends AppEventName>(eventName: T): AppEventPayloadMap[T] | undefined => {
-        const payload = pendingEvents.get(eventName);
+        // The map stores the payload union; the caller's `T` correlates it.
+        const payload = pendingEvents.get(eventName) as AppEventPayloadMap[T] | undefined;
         pendingEvents.delete(eventName);
-        return payload as AppEventPayloadMap[T] | undefined;
+        return payload;
     },
 
     addListener: (callback: AppEventListener) => {

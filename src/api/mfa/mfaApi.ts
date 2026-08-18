@@ -18,7 +18,7 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
 
   return {
     setupMfa(): Promise<MfaSetupResponse> {
-      return request('/mfa/setup', 'POST');
+      return request('/mfa/setup', 'POST') as Promise<MfaSetupResponse>;
     },
 
     async enableMfa(): Promise<SessionResponse> {
@@ -64,11 +64,11 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
     },
 
     regenerateRecoveryCodes(): Promise<RecoveryCodeRegenerateResponse> {
-      return request('/mfa/recovery-codes/regenerate', 'POST', {}, true);
+      return request('/mfa/recovery-codes/regenerate', 'POST', {}, true) as Promise<RecoveryCodeRegenerateResponse>;
     },
 
     getRemainingRecoveryCodes(): Promise<RecoveryCodeRemainingResponse> {
-      return request('/mfa/recovery-codes/remaining', 'GET', undefined, true);
+      return request('/mfa/recovery-codes/remaining', 'GET', undefined, true) as Promise<RecoveryCodeRemainingResponse>;
     },
   };
 }

@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { storage } from '../../utils/storage';
+import { setPushToken } from '../../utils/stores/pushTokenCache';
 import { logger } from '../../utils/logger';
 
 export const useRegisterForPushNotifications = () => {
@@ -18,7 +18,7 @@ export const useRegisterForPushNotifications = () => {
         try {
             const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
             await savePushToken(token);
-            await storage.setItem('expoPushToken', token);
+            await setPushToken(token);
         } catch (error) {
             logger.warn('failed to register push notifications', { error });
         }

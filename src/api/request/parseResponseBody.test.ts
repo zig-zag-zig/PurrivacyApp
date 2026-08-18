@@ -32,21 +32,21 @@ describe('parseResponseBody', () => {
 
     it('strips HTML from non-JSON error responses', async () => {
         const result = await parseResponseBody(makeResponse('<h1>Internal Server Error</h1>', false, 500));
-        expect(result.error).toBe('Internal Server Error');
+        expect((result as Record<string, unknown>).error).toBe('Internal Server Error');
     });
 
     it('returns plain text as error for non-ok responses', async () => {
         const result = await parseResponseBody(makeResponse('Something went wrong', false, 400));
-        expect(result.error).toBe('Something went wrong');
+        expect((result as Record<string, unknown>).error).toBe('Something went wrong');
     });
 
     it('returns raw text as error for ok responses with non-JSON', async () => {
         const result = await parseResponseBody(makeResponse('plain text', true, 200));
-        expect(result.error).toBe('plain text');
+        expect((result as Record<string, unknown>).error).toBe('plain text');
     });
 
     it('falls back to HTTP status message when HTML stripping leaves nothing', async () => {
         const result = await parseResponseBody(makeResponse('<br><br>', false, 502));
-        expect(result.error).toBe('HTTP error! Status: 502');
+        expect((result as Record<string, unknown>).error).toBe('HTTP error! Status: 502');
     });
 });

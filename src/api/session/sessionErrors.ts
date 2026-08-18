@@ -1,30 +1,40 @@
 import { EventService } from '../../services/eventService';
 import { AuthErrorResponse } from '../../types/types';
 import { AuthFlowError } from '../auth/authFlowError';
+import { isRecord } from '../../shared/errors/errorGuards';
 import {
     isRateLimitError as sharedIsRateLimitError,
     hasRefreshTokenFailure,
 } from '../../shared/errors/errorGuards';
 
-const getSessionError = (error: any): AuthErrorResponse | undefined => {
-    return error?.sessionError ?? error;
+/**
+ * Extracts the nested `sessionError` when present, falling back to the error
+ * itself — mirroring the historic `error?.sessionError ?? error` access.
+ */
+const getSessionError = (error: unknown): AuthErrorResponse | undefined => {
+    const rec = isRecord(error) ? error : null;
+    if (!rec) {
+        return undefined;
+    }
+    return (rec.sessionError ?? rec) as AuthErrorResponse | undefined;
 };
 
 export const isRateLimitError = sharedIsRateLimitError;
 
-export const isTerminalStoredSessionError = (error: any): boolean => {
+export const isTerminalStoredSessionError = (error: unknown): boolean => {
     return hasRefreshTokenFailure(error);
 };
 
-export const isStoredSessionMfaRequired = (error: any): boolean => {
-    const sessionError = error?.sessionError ?? error;
+export const isStoredSessionMfaRequired = (error: unknown): boolean => {
+    const sessionError = getSessionError(error);
     return Boolean(sessionError?.mfaRequired);
 };
 
-export const markRequiresSignOut = (error: any): any => {
-    if (error && typeof error === 'object') {
-        error.requiresSignOut = true;
-        return error;
+export const markRequiresSignOut = (error: unknown): unknown => {
+    const rec = isRecord(error) ? error : null;
+    if (rec) {
+        rec.requiresSignOut = true;
+        return rec;
     }
 
     return { error, requiresSignOut: true };
@@ -38,7 +48,7 @@ export const missingStoredSessionError = (): AuthFlowError => {
     });
 };
 
-export const throwStoredSessionAuthFailure = (error: any, emitSignOut: boolean): never => {
+export const throwStoredSessionAuthFailure = (error: unknown, emitSignOut: boolean): never => {
     const authError = markRequiresSignOut(error);
     if (emitSignOut) {
         EventService.addEvent('signOut');
@@ -46,17 +56,18 @@ export const throwStoredSessionAuthFailure = (error: any, emitSignOut: boolean):
     throw authError;
 };
 
-export const isExpectedSessionCreationError = (error: any): boolean => {
+export const isExpectedSessionCreationError = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
     const sessionError = getSessionError(error);
 
     return Boolean(
         isTerminalStoredSessionError(error) ||
         isRateLimitError(error) ||
-        error?.mfaRequired ||
-        error?.mfaRequiredSensitive ||
-        error?.mfaCancelled ||
-        error?.retryAfter ||
-        error?.wrongMfaCode ||
+        rec?.mfaRequired ||
+        rec?.mfaRequiredSensitive ||
+        rec?.mfaCancelled ||
+        rec?.retryAfter ||
+        rec?.wrongMfaCode ||
         sessionError?.mfaRequired ||
         sessionError?.mfaRequiredSensitive ||
         sessionError?.wrongMfaCode

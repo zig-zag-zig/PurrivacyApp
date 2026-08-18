@@ -136,6 +136,30 @@ describe('processResponse', () => {
         );
     });
 
+    it('does not emit newRecoveryCodes for a tampered non-array body', async () => {
+        const response = new Response('{"newRecoveryCodes":"not-an-array"}', { status: 200 });
+        mockParseResponseBody.mockResolvedValueOnce({ newRecoveryCodes: 'not-an-array' });
+
+        await processResponse(
+            response, '/mfa/recovery-codes/regenerate', 'POST', undefined,
+            false, false, undefined, requestFn, createSessionFn,
+        );
+
+        expect(mockEventService.addEvent).not.toHaveBeenCalledWith('newRecoveryCodes', expect.anything());
+    });
+
+    it('does not emit newRecoveryCodes for an array with non-string entries', async () => {
+        const response = new Response('{"newRecoveryCodes":["a",5]}', { status: 200 });
+        mockParseResponseBody.mockResolvedValueOnce({ newRecoveryCodes: ['a', 5] });
+
+        await processResponse(
+            response, '/mfa/recovery-codes/regenerate', 'POST', undefined,
+            false, false, undefined, requestFn, createSessionFn,
+        );
+
+        expect(mockEventService.addEvent).not.toHaveBeenCalledWith('newRecoveryCodes', expect.anything());
+    });
+
     it('returns parsed data for successful responses', async () => {
         const response = new Response('{"data":"value"}', { status: 200 });
         mockParseResponseBody.mockResolvedValueOnce({ data: 'value' });

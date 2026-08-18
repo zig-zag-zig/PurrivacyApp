@@ -1,10 +1,14 @@
 import { AuthErrorResponse } from '../../../types/types';
 import { securityService } from '../../security/services/securityService';
 import { RequestOptions } from '../../../api/requestHelpers';
+import type { ApiErrorData } from '../../../api/request/errorData';
 import { getUserId } from '../../auth/domain/authUtils';
 import { MfaUtils } from '../domain/mfaUtils';
 import { logger } from '../../../utils/logger';
 import { AuthFlowError } from '../../../api/auth/authFlowError';
+import { isRecord, isSessionErrorMfaRequired } from '../../../shared/errors/errorGuards';
+import type { MfaApiRequestFn } from '../../../api/runtime';
+import type { CreateSessionFn } from '../../../api/request/requestOptions';
 export class MfaErrorHandler {
     /**
      * Handle sensitive MFA errors (for sensitive endpoints)
@@ -12,12 +16,12 @@ export class MfaErrorHandler {
     static async handleSensitiveMfaError(
         endpoint: string,
         method: string,
-        body: any,
+        body: unknown,
         requiresAuth: boolean,
         retryOnFailure: boolean,
         options: RequestOptions,
-        requestFn: (endpoint: string, method: string, body?: any, requiresAuth?: boolean, options?: RequestOptions, retryOnFailure?: boolean) => Promise<any>
-    ): Promise<any> {
+        requestFn: MfaApiRequestFn
+    ): Promise<unknown> {
         return await MfaUtils.executeMfaFlow({
             isSensitive: true,
             isLoginFlow: false,
@@ -37,14 +41,14 @@ export class MfaErrorHandler {
     static async handleSessionMfaError(
         endpoint: string,
         method: string,
-        body: any,
+        body: unknown,
         requiresAuth: boolean,
         retryOnFailure: boolean,
         options: RequestOptions,
         isSession: boolean,
-        requestFn: (endpoint: string, method: string, body?: any, requiresAuth?: boolean, options?: RequestOptions, retryOnFailure?: boolean) => Promise<any>,
-        createSessionFn: (retryOnFailure: boolean, mfaCode?: string) => Promise<any>
-    ): Promise<any> {
+        requestFn: MfaApiRequestFn,
+        createSessionFn: CreateSessionFn
+    ): Promise<unknown> {
         return await MfaUtils.executeMfaFlow({
             isSensitive: false,
             isLoginFlow: true,
@@ -73,31 +77,34 @@ export class MfaErrorHandler {
     static async handleMissingHeadersError(
         endpoint: string,
         method: string,
-        body: any,
+        body: unknown,
         requiresAuth: boolean,
         retryOnFailure: boolean,
         options: RequestOptions,
-        errorData: AuthErrorResponse,
-        requestFn: (endpoint: string, method: string, body?: any, requiresAuth?: boolean, options?: RequestOptions, retryOnFailure?: boolean) => Promise<any>,
-        createSessionFn: (retryOnFailure: boolean, mfaCode?: string) => Promise<any>
-    ): Promise<any> {
+        errorData: ApiErrorData,
+        requestFn: MfaApiRequestFn,
+        createSessionFn: CreateSessionFn
+    ): Promise<unknown> {
         if (!requiresAuth) {
-            const errorMessage = (errorData as any).error || `Authentication failed: Missing headers`;
+            const errorMessage = errorData.error || `Authentication failed: Missing headers`;
             throw new Error(errorMessage);
         }
 
         try {
             const userId = getUserId();
             const sessionResponse = await createSessionFn(retryOnFailure);
-            await securityService.storeSession(sessionResponse, userId);
+            if (sessionResponse) {
+                await securityService.storeSession(sessionResponse, userId);
+            }
 
             return await requestFn(endpoint, method, body, requiresAuth, options);
-        } catch (sessionError: any) {
+        } catch (sessionError: unknown) {
             logger.warn('failed to create session for missing headers retry', { error: sessionError });
-            if (sessionError.sessionError?.mfaRequired) {
+            if (isSessionErrorMfaRequired(sessionError)) {
+                const rec = isRecord(sessionError) ? sessionError : null;
                 throw new AuthFlowError('MFA is required to continue', {
-                    sessionError: sessionError.sessionError,
-                    status: sessionError.status,
+                    sessionError: (rec?.sessionError ?? undefined) as AuthErrorResponse | undefined,
+                    status: rec?.status as number | undefined,
                 });
             }
             throw new AuthFlowError('Authentication headers are missing', {
@@ -110,13 +117,15 @@ export class MfaErrorHandler {
     /**
      * Handle rate limit errors
      */
-    static async handleRateLimitError(errorData: any): Promise<never> {
-        const retryAfterSeconds = Number(errorData.retryAfter);
+    static async handleRateLimitError(errorData: unknown): Promise<never> {
+        const rec = isRecord(errorData) ? errorData : null;
+        const retryAfterSeconds = Number(rec?.retryAfter);
         const retryAfter =
             Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
                 ? retryAfterSeconds
                 : undefined;
-        const baseMessage = errorData.error || 'Too many requests. Please try again later.';
+        const rawMessage = rec?.error;
+        const baseMessage = rawMessage ? String(rawMessage) : 'Too many requests. Please try again later.';
         const message = retryAfter
             ? `${baseMessage} Please try again in ${retryAfter} seconds.`
             : baseMessage;

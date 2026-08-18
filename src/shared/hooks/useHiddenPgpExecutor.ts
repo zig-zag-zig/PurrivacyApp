@@ -1,14 +1,21 @@
 import { RefObject, useCallback, useEffect, useRef } from 'react';
-import type { WebViewMessageEvent } from 'react-native-webview';
-import { WebView } from 'react-native-webview';
+import type { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 import type { PGPExecutor } from '../../services/pgpCryptoService';
 import { logger } from '../../utils/logger';
+import {
+    isPgpOperationResultValid,
+    parsePgpEnvelope,
+    PgpOperationName,
+    PgpOperationResponse,
+    PgpRequestMap,
+} from '../../services/pgpProtocol';
 
 type PendingOperation = {
-    resolve: (value: any) => void;
+    resolve: (value: unknown) => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
+    operation: PgpOperationName;
 };
 
 export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
@@ -23,17 +30,17 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
         pending.current.clear();
     }, []);
 
-    const executePGPOperation: PGPExecutor['executePGPOperation'] = useCallback((operation, data) => {
-        return new Promise((resolve, reject) => {
+    const executePGPOperation: PGPExecutor['executePGPOperation'] = useCallback(<T extends PgpOperationName>(operation: T, data: PgpRequestMap[T]['data']) => {
+        return new Promise<PgpOperationResponse<T>>((resolve, reject) => {
             const id = opId.current++;
 
             // Compute per-operation timeout based on RSA key size
             let timeoutMs = 30000; // default
-            if (operation === 'generateKey' && data?.rsaBits) {
-                const bits = data.rsaBits;
-                if (bits >= 4096) timeoutMs = 180000;
-                else if (bits >= 3072) timeoutMs = 90000;
-                else if (bits >= 2048) timeoutMs = 45000;
+            if (operation === 'generateKeyPair') {
+                const bits = (data as PgpRequestMap['generateKeyPair']['data'] | undefined)?.bitStrength;
+                if (bits !== undefined && bits >= 4096) timeoutMs = 180000;
+                else if (bits !== undefined && bits >= 3072) timeoutMs = 90000;
+                else if (bits !== undefined && bits >= 2048) timeoutMs = 45000;
             }
 
             const timer = setTimeout(() => {
@@ -44,9 +51,10 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
             }, timeoutMs);
 
             pending.current.set(id, {
-                resolve,
+                resolve: value => resolve(value as PgpOperationResponse<T>),
                 reject,
                 timer,
+                operation,
             });
 
             const payload = { operation, data, id };
@@ -87,18 +95,38 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
     }, [webViewRef]);
 
     const onMessage = useCallback((event: WebViewMessageEvent) => {
+        let parsed: ReturnType<typeof parsePgpEnvelope>;
         try {
-            const msg = JSON.parse(event.nativeEvent.data);
-            const { success, result, error, id } = msg;
-            const operation = pending.current.get(id);
-            if (!operation) return;
-
-            pending.current.delete(id);
-            clearTimeout(operation.timer);
-            success ? operation.resolve(result) : operation.reject(new Error(error));
+            parsed = parsePgpEnvelope(JSON.parse(event.nativeEvent.data));
         } catch (error) {
             logger.warn('pgp webview message parse failed', { error });
+            return;
         }
+
+        if (!parsed) {
+            logger.warn('pgp webview message rejected', { data: event.nativeEvent.data });
+            return;
+        }
+
+        const operation = pending.current.get(parsed.id);
+        if (!operation) return;
+
+        pending.current.delete(parsed.id);
+        clearTimeout(operation.timer);
+
+        if (!parsed.success) {
+            operation.reject(new Error(parsed.error));
+            return;
+        }
+
+        // Validate the result against the operation's response contract
+        // before resolving: the WebView is a high-value trust boundary.
+        if (!isPgpOperationResultValid(operation.operation, parsed.result)) {
+            operation.reject(new Error(`Invalid result for PGP operation ${operation.operation}`));
+            return;
+        }
+
+        operation.resolve(parsed.result);
     }, []);
 
     return {

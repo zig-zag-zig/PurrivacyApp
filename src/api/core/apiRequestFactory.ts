@@ -1,5 +1,6 @@
 import { logger } from '../../utils/logger';
 import { ApiRequestError } from '../apiError';
+import type { SessionResponse } from '../../types/types';
 import {
     RequestOptions,
     buildAuthHeaders,
@@ -14,16 +15,16 @@ type CreateSessionFn = (
     retryOnFailure: boolean,
     mfaCode?: string,
     forceNewSession?: boolean,
-) => Promise<any>;
+) => Promise<SessionResponse | null>;
 
 export type ApiRequestFn = (
     endpoint: string,
     method: string,
-    body?: any,
+    body?: unknown,
     requiresAuth?: boolean,
     options?: RequestOptions,
     retryOnFailure?: boolean,
-) => Promise<any>;
+) => Promise<unknown>;
 
 export const createApiRequester = (createSession: CreateSessionFn): ApiRequestFn => {
     const request: ApiRequestFn = async (

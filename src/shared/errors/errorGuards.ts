@@ -13,52 +13,88 @@
  *   `isMfaRequiredAuthError` (auth, wider: checks both)
  * - `isRateLimitError` (shared) → used directly by all consumers
  * - `isWrongMfaCode` (shared) → used directly by all consumers
+ *
+ * All guards accept `unknown` (e.g. the caught value of `catch (error)`) and
+ * never throw: non-object values simply carry no flags. Property reads use
+ * truthiness, mirroring the pre-typing behavior of `error?.flag` checks.
  */
 
+/**
+ * True when the value is a non-null object (arrays included, matching the
+ * `typeof value === 'object' && value !== null` checks used historically).
+ * Use in condition position: `isRecord(v) ? v : null`.
+ */
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
 /** True when the error represents a rate-limit condition. */
-export const isRateLimitError = (error: any): boolean => {
+export const isRateLimitError = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    const session = rec && isRecord(rec.sessionError) ? rec.sessionError : null;
     return Boolean(
-        error?.rateLimited ||
-        error?.status === 429 ||
-        error?.retryAfter ||
-        error?.sessionError?.rateLimited ||
-        error?.sessionError?.status === 429,
+        rec?.rateLimited ||
+        rec?.status === 429 ||
+        rec?.retryAfter ||
+        session?.rateLimited ||
+        session?.status === 429,
     );
 };
 
 /** True when the error indicates a refresh token failure that requires sign-out. */
-export const hasRefreshTokenFailure = (error: any): boolean => {
-    const sessionError = error?.sessionError;
+export const hasRefreshTokenFailure = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    const session = rec && isRecord(rec.sessionError) ? rec.sessionError : null;
     return Boolean(
-        error?.requiresSignOut ||
-        error?.refreshTokenMissing ||
-        error?.refreshTokenInvalid ||
-        error?.refreshTokenExpired ||
-        error?.refreshTokenReuse ||
-        sessionError?.refreshTokenMissing ||
-        sessionError?.refreshTokenInvalid ||
-        sessionError?.refreshTokenExpired ||
-        sessionError?.refreshTokenReuse,
+        rec?.requiresSignOut ||
+        rec?.refreshTokenMissing ||
+        rec?.refreshTokenInvalid ||
+        rec?.refreshTokenExpired ||
+        rec?.refreshTokenReuse ||
+        session?.refreshTokenMissing ||
+        session?.refreshTokenInvalid ||
+        session?.refreshTokenExpired ||
+        session?.refreshTokenReuse,
     );
 };
 
 /** True when the error indicates MFA is required. */
-export const isMfaRequired = (error: any): boolean => {
-    const sessionError = error?.sessionError ?? error;
+export const isMfaRequired = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    if (!rec) {
+        return false;
+    }
+    const session = isRecord(rec.sessionError) ? rec.sessionError : rec;
     return Boolean(
-        error?.mfaRequired ||
-        error?.mfaRequiredSensitive ||
-        sessionError?.mfaRequired ||
-        sessionError?.mfaRequiredSensitive,
+        rec.mfaRequired ||
+        rec.mfaRequiredSensitive ||
+        session.mfaRequired ||
+        session.mfaRequiredSensitive,
     );
 };
 
+/**
+ * Narrow check used by the MFA missing-headers retry path: only the nested
+ * `sessionError.mfaRequired` flag triggers the "MFA is required to continue"
+ * flow. Deliberately narrower than `isMfaRequired`.
+ */
+export const isSessionErrorMfaRequired = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    const session = rec && isRecord(rec.sessionError) ? rec.sessionError : null;
+    return Boolean(session?.mfaRequired);
+};
+
 /** True when the error indicates a wrong MFA code was submitted. */
-export const isWrongMfaCode = (error: any): boolean => {
-    return Boolean(error?.wrongMfaCode || error?.sessionError?.wrongMfaCode);
+export const isWrongMfaCode = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    if (!rec) {
+        return false;
+    }
+    const session = isRecord(rec.sessionError) ? rec.sessionError : null;
+    return Boolean(rec.wrongMfaCode || session?.wrongMfaCode);
 };
 
 /** True when the error explicitly requires a sign-out. */
-export const requiresSignOut = (error: any): boolean => {
-    return Boolean(error?.requiresSignOut);
+export const requiresSignOut = (error: unknown): boolean => {
+    const rec = isRecord(error) ? error : null;
+    return Boolean(rec?.requiresSignOut);
 };

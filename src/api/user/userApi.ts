@@ -10,9 +10,10 @@ import type { ApiRequestFn } from '../core/apiRequestFactory';
 import { getApiRuntime } from '../runtime';
 import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
+import { isJsonObject } from '../request/errorData';
 import { parseResponseBody } from '../request/parseResponseBody';
 
-async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<any> {
+async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<UserEncrypted> {
   const currentUser = getApiRuntime().identity.getUser();
   const token = await currentUser?.getIdToken(true);
   if (!token) {
@@ -35,17 +36,20 @@ async function createUserWithFirebaseAuth(user: UserCreatePayload): Promise<any>
     });
   }
 
-  const data = await parseResponseBody(response);
+  const data: unknown = await parseResponseBody(response);
   const requestId = response.headers.get('x-request-id');
-  if (requestId) {
+  if (requestId && isJsonObject(data)) {
     data.requestId = data.requestId || requestId;
   }
 
   if (!response.ok) {
-    throw new ApiRequestError(data.error || `Request failed with status ${response.status}`, response.status, data);
+    const errorBody = isJsonObject(data) ? data : null;
+    const rawMessage = errorBody?.error;
+    const message = rawMessage ? String(rawMessage) : `Request failed with status ${response.status}`;
+    throw new ApiRequestError(message, response.status, isJsonObject(data) ? data : {});
   }
 
-  return data;
+  return data as UserEncrypted;
 }
 
 export function createUserApi(request: ApiRequestFn) {
@@ -55,15 +59,15 @@ export function createUserApi(request: ApiRequestFn) {
     },
 
     getKeyRecords(): Promise<UserKeyRecordsResponse> {
-      return request('/user/key-records', 'GET', undefined, true);
+      return request('/user/key-records', 'GET', undefined, true) as Promise<UserKeyRecordsResponse>;
     },
 
     addKeyRecord(key: EncryptionBase): Promise<EncryptedKeyRecordWithId> {
-      return request('/user/key-records', 'POST', { key }, true);
+      return request('/user/key-records', 'POST', { key }, true) as Promise<EncryptedKeyRecordWithId>;
     },
 
     updateKeyRecord(recordId: string, key: EncryptionBase): Promise<EncryptedKeyRecordWithId> {
-      return request(`/user/key-records/${encodeURIComponent(recordId)}`, 'PUT', { key }, true);
+      return request(`/user/key-records/${encodeURIComponent(recordId)}`, 'PUT', { key }, true) as Promise<EncryptedKeyRecordWithId>;
     },
 
     async deleteKeyRecord(recordId: string): Promise<void> {
@@ -76,9 +80,9 @@ export function createUserApi(request: ApiRequestFn) {
 
     async get(): Promise<UserEncrypted | null> {
       try {
-        return await request('/user', 'GET', undefined, true);
+        return (await request('/user', 'GET', undefined, true)) as UserEncrypted;
       } catch (error) {
-        if ((error as any)?.status === 404) {
+        if (isJsonObject(error) && error.status === 404) {
           return null;
         }
         throw error;

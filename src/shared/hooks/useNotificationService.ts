@@ -1,104 +1,137 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect } from 'react';
-import { EventPayload, EventService, isAppEventName } from '../../services/eventService';
-import type { AppEventPayloadMap } from '../../services/eventService';
+import { EventService, isAppEventName } from '../../services/eventService';
 import * as Device from 'expo-device';
 import { logger } from '../../utils/logger';
+import {
+    normalizeMfaStatePayload,
+    parseClearMfaCodePayload,
+    parseCloseMfaModalPayload,
+    parseNewRecoveryCodesPayload,
+    parseNotificationData,
+    parsePassphraseDeletedPayload,
+    parsePassphraseStorageChangedPayload,
+    parsePassphraseSyncedPayload,
+} from './notificationEventParsing';
 
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
-const normalizeMfaStatePayload = (payload: any): AppEventPayloadMap['mfaState'] | undefined => {
-  const mfaState = payload?.mfaState ?? payload;
-  if (typeof mfaState?.mfaEnabled !== 'boolean' || typeof mfaState?.mfaTrusted !== 'boolean') {
-    return undefined;
-  }
-
-  return {
-    mfaState: {
-      mfaEnabled: mfaState.mfaEnabled,
-      mfaTrusted: mfaState.mfaTrusted,
-    },
-    source: 'remoteNotification',
-  };
-};
-
+/**
+ * Dispatches a remote-notification event. The event name must be known and
+ * every payload is validated by the per-event guards in
+ * `notificationEventParsing`; malformed payloads are dropped.
+ */
 const emitNotificationEvent = (eventName: unknown, payload: unknown): void => {
-  if (typeof eventName !== 'string' || !isAppEventName(eventName)) {
-    return;
-  }
-
-  if (eventName === 'mfaState') {
-    const normalizedPayload = normalizeMfaStatePayload(payload);
-    if (normalizedPayload) {
-      EventService.addEvent(eventName, normalizedPayload);
+    if (typeof eventName !== 'string' || !isAppEventName(eventName)) {
+        return;
     }
-    return;
-  }
 
-  EventService.addEvent(eventName, payload as never);
+    switch (eventName) {
+        case 'clearMfaCode': {
+            const parsed = parseClearMfaCodePayload(payload);
+            if (parsed) {
+                EventService.addEvent('clearMfaCode', parsed);
+            }
+            return;
+        }
+        case 'closeMfaModal': {
+            const parsed = parseCloseMfaModalPayload(payload);
+            if (parsed) {
+                EventService.addEvent('closeMfaModal', parsed);
+            }
+            return;
+        }
+        case 'mfaState': {
+            const parsed = normalizeMfaStatePayload(payload);
+            if (parsed) {
+                EventService.addEvent('mfaState', parsed);
+            }
+            return;
+        }
+        case 'newRecoveryCodes': {
+            const parsed = parseNewRecoveryCodesPayload(payload);
+            if (parsed) {
+                EventService.addEvent('newRecoveryCodes', parsed);
+            }
+            return;
+        }
+        case 'passphraseStorageChanged': {
+            const parsed = parsePassphraseStorageChangedPayload(payload);
+            if (parsed) {
+                EventService.addEvent('passphraseStorageChanged', parsed);
+            }
+            return;
+        }
+        case 'passphraseSynced': {
+            const parsed = parsePassphraseSyncedPayload(payload);
+            if (parsed) {
+                EventService.addEvent('passphraseSynced', parsed);
+            }
+            return;
+        }
+        case 'passphraseDeleted': {
+            const parsed = parsePassphraseDeletedPayload(payload);
+            if (parsed) {
+                EventService.addEvent('passphraseDeleted', parsed);
+            }
+            return;
+        }
+        case 'devTempKeys':
+        case 'signOut':
+        case 'user':
+            // Payload-less events by contract; any push payload is dropped.
+            EventService.addEvent(eventName, undefined);
+            return;
+    }
 };
 
-const parseNotificationData = (data: any): any => {
-  const innerData = data?.data || {};
-  const payloadString = innerData.dataString || innerData.body;
-  if (!payloadString) {
-    return innerData;
-  }
+TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }: { data: unknown, error: unknown }) => {
+    if (error) {
+        logger.warn('background notification task failed', { error });
+        return;
+    }
 
-  try {
-    return JSON.parse(payloadString);
-  } catch {
-    return innerData;
-  }
-};
-
-TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }: { data: any, error: any }) => {
-  if (error) {
-    logger.warn('background notification task failed', { error });
-    return;
-  }
-
-  const eventData = parseNotificationData(data);
-  emitNotificationEvent(eventData.eventName, eventData.payload);
+    const eventData = parseNotificationData(data);
+    emitNotificationEvent(eventData.eventName, eventData.payload);
 });
 
 export const useNotificationService = ({ enabled }: { enabled: boolean }) => {
-  const createNotificationChannel = async () => {
-    if (Device.osName === 'Android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    // Register background task
-    const registerTask = () => {
-      try {
-        Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK)
-          .catch(error => logger.warn('notification task registration failed', { error }));
-      } catch (error) {
-        logger.warn('background notification task registration failed', { error });
-      }
+    const createNotificationChannel = async () => {
+        if (Device.osName === 'Android') {
+            await Notifications.setNotificationChannelAsync('default', {
+                name: 'Default',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+            });
+        }
     };
 
-    createNotificationChannel();
+    useEffect(() => {
+        if (!enabled) return;
 
-    // Foreground listener
-    const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
-      const { data } = notification.request.content;
-      emitNotificationEvent(data?.eventName, data?.payload);
-    });
+        // Register background task
+        const registerTask = () => {
+            try {
+                Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK)
+                    .catch(error => logger.warn('notification task registration failed', { error }));
+            } catch (error) {
+                logger.warn('background notification task registration failed', { error });
+            }
+        };
 
-    registerTask();
+        createNotificationChannel();
 
-    return () => {
-      foregroundListener.remove();
-    };
-  }, [enabled]);
+        // Foreground listener
+        const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
+            const { data } = notification.request.content;
+            emitNotificationEvent(data?.eventName, data?.payload);
+        });
+
+        registerTask();
+
+        return () => {
+            foregroundListener.remove();
+        };
+    }, [enabled]);
 };

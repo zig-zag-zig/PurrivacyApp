@@ -2,6 +2,8 @@ import { getApiRuntime } from '../runtime';
 import { EventService } from '../../services/eventService';
 import { ApiRequestError } from '../apiError';
 import { AuthFlowError } from '../auth/authFlowError';
+import { isApiErrorData, isJsonObject } from './errorData';
+import type { AuthErrorResponse } from '../../types/types';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
 
 const signOut = (): never => {
@@ -22,23 +24,29 @@ const AUTH_INVALIDATING_ERROR_FLAGS = [
     'accessTokenExpired',
 ];
 
-const hasAuthInvalidatingError = (errorData: any): boolean => (
-    AUTH_INVALIDATING_ERROR_FLAGS.some(error => errorData?.[error] === true)
-);
+const hasAuthInvalidatingError = (errorData: unknown): boolean => {
+    const error = isJsonObject(errorData) ? errorData : null;
+    return AUTH_INVALIDATING_ERROR_FLAGS.some(flag => error?.[flag] === true);
+};
 
 export async function handleHttpError(
     status: number,
-    errorData: any,
+    errorData: unknown,
     endpoint: string,
     method: string,
-    body: any,
+    body: unknown,
     requiresAuth: boolean,
     retryOnFailure: boolean,
     options: RequestOptions | undefined,
     requestFn: RequestFn,
     createSessionFn: CreateSessionFn,
-): Promise<any> {
-    if (errorData.wrongMfaCode) {
+): Promise<unknown> {
+    // The backend error body is untrusted: only object payloads carry flags.
+    // Non-object bodies (empty string, array, literal null) carry no flags and
+    // fall through to the generic failure path.
+    const error = isJsonObject(errorData) ? errorData : null;
+
+    if (error?.wrongMfaCode) {
         EventService.addEvent('clearMfaCode', { isWrongMfaCode: true });
     }
 
@@ -47,35 +55,36 @@ export async function handleHttpError(
 
     if (isRefresh) {
         if (
-            errorData.mfaRequired ||
-            errorData.refreshTokenMissing ||
-            errorData.refreshTokenInvalid ||
-            errorData.refreshTokenExpired ||
-            errorData.refreshTokenReuse
+            error?.mfaRequired ||
+            error?.refreshTokenMissing ||
+            error?.refreshTokenInvalid ||
+            error?.refreshTokenExpired ||
+            error?.refreshTokenReuse
         ) {
-            throw new AuthFlowError('Refresh token error', { sessionError: errorData, status: status ?? 0 });
+            throw new AuthFlowError('Refresh token error', { sessionError: errorData as AuthErrorResponse | undefined, status: status ?? 0 });
         }
     }
 
-    if (errorData.wrongMfaCode && getApiRuntime().mfa.getIsInMfaHandler()) {
+    if (error?.wrongMfaCode && getApiRuntime().mfa.getIsInMfaHandler()) {
         throw new AuthFlowError('Wrong MFA code', {
             wrongMfaCode: true,
             sessionError: {
-                mfaRequired: errorData.mfaRequired,
-                mfaRequiredSensitive: errorData.mfaRequiredSensitive,
+                mfaRequired: error?.mfaRequired as boolean | undefined,
+                mfaRequiredSensitive: error?.mfaRequiredSensitive as boolean | undefined,
             },
             status: status ?? 0,
         });
     }
 
     if (status === 429) {
-        await getApiRuntime().mfa.handleRateLimitError(errorData);
+        // Guarded: a non-object 429 body is treated as having no retry info.
+        await getApiRuntime().mfa.handleRateLimitError(isApiErrorData(errorData) ? errorData : {});
     }
 
-    if (retryOnFailure && !errorData.wrongMfaCode) {
-        if (errorData.mfaRequiredSensitive || (errorData.mfaRequired && isSession)) {
+    if (retryOnFailure && !error?.wrongMfaCode) {
+        if (error?.mfaRequiredSensitive || (error?.mfaRequired && isSession)) {
             if (requiresAuth) {
-                if (errorData.mfaRequiredSensitive) {
+                if (error?.mfaRequiredSensitive) {
                     return await getApiRuntime().mfa.handleSensitiveMfaError(
                         endpoint, method, body, requiresAuth, retryOnFailure,
                         options || {}, requestFn,
@@ -88,14 +97,14 @@ export async function handleHttpError(
                 );
             }
 
-            throw new AuthFlowError('MFA required but not authenticated', { sessionError: errorData, status: status ?? 0 });
+            throw new AuthFlowError('MFA required but not authenticated', { sessionError: errorData as AuthErrorResponse | undefined, status: status ?? 0 });
         }
 
         if (
             requiresAuth &&
             !isSession &&
             !isRefresh &&
-            (errorData.accessTokenExpired || errorData.accessTokenInvalid || errorData.sessionExpired || errorData.sessionInvalid)
+            (error?.accessTokenExpired || error?.accessTokenInvalid || error?.sessionExpired || error?.sessionInvalid)
         ) {
             const session = await createSessionFn(true);
             if (session?.accessToken) {
@@ -103,29 +112,32 @@ export async function handleHttpError(
             }
         }
 
-        if (hasAuthInvalidatingError(errorData) || (errorData.mfaRequired && !isSession)) {
+        if (hasAuthInvalidatingError(errorData) || (error?.mfaRequired && !isSession)) {
             signOut();
         }
 
         if (
-            (errorData.sessionHeaderMissing || errorData.accessTokenInvalid || errorData.accessTokenExpired) &&
+            (error?.sessionHeaderMissing || error?.accessTokenInvalid || error?.accessTokenExpired) &&
             endpoint !== '/auth/session'
         ) {
             return await getApiRuntime().mfa.handleMissingHeadersError(
-                endpoint, method, body, requiresAuth, retryOnFailure, options || {}, errorData, requestFn, createSessionFn,
+                endpoint, method, body, requiresAuth, retryOnFailure, options || {},
+                isApiErrorData(errorData) ? errorData : {}, requestFn, createSessionFn,
             );
         }
     }
 
-    if (!retryOnFailure && !errorData.wrongMfaCode) {
-        if (isSession && errorData.mfaRequired) {
-            throw new AuthFlowError('MFA required for session', { sessionError: errorData, status: status ?? 0 });
+    if (!retryOnFailure && !error?.wrongMfaCode) {
+        if (isSession && error?.mfaRequired) {
+            throw new AuthFlowError('MFA required for session', { sessionError: errorData as AuthErrorResponse | undefined, status: status ?? 0 });
         }
 
-        if (hasAuthInvalidatingError(errorData) || (errorData.mfaRequired && !isSession)) {
+        if (hasAuthInvalidatingError(errorData) || (error?.mfaRequired && !isSession)) {
             signOut();
         }
     }
 
-    throw new ApiRequestError(errorData.error || `Request failed with status ${status}`, status, errorData);
+    const rawMessage = error?.error;
+    const message = rawMessage ? String(rawMessage) : `Request failed with status ${status}`;
+    throw new ApiRequestError(message, status, errorData as Record<string, unknown>);
 }

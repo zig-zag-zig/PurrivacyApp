@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { ApiRuntime } from '../runtime';
+import type { SessionResponse } from '../../types/types';
 
 const eventServiceMock = vi.hoisted(() => ({
   addEvent: vi.fn(),
@@ -135,7 +136,7 @@ describe('handleHttpError', () => {
   });
 
   it('refreshes session on accessTokenExpired with retry', async () => {
-    const sessionResponse = { accessToken: 'new-at' };
+    const sessionResponse = { accessToken: 'new-at' } as SessionResponse;
     const createSession = vi.fn(async () => sessionResponse);
     const requestFn = vi.fn(async () => ({ result: 'ok' }));
 
@@ -204,6 +205,34 @@ describe('handleHttpError', () => {
       name: 'AuthFlowError',
       sessionError: { mfaRequired: true },
       status: 403,
+    });
+  });
+
+  it('treats non-object error bodies as flagless and throws a generic error', async () => {
+    await expect(
+      handleHttpError(500, 'boom', '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 500,
+    });
+  });
+
+  it('does not crash on null error bodies', async () => {
+    await expect(
+      handleHttpError(400, null, '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 400,
+    });
+    expect(eventServiceMock.addEvent).not.toHaveBeenCalledWith('signOut');
+  });
+
+  it('does not crash on array error bodies', async () => {
+    await expect(
+      handleHttpError(500, [{ error: 'x' }], '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 500,
     });
   });
 

@@ -96,20 +96,20 @@ export class SessionManager {
             includeDeviceId: true,
         };
 
-        const body: any = {};
+        const body: { mfaCode?: string } = {};
         if (mfaCode !== undefined) {
             body.mfaCode = mfaCode;
         }
 
         try {
-            const response = await this.request('/auth/session', 'POST', body, true, options, retryOnFailure);
+            const response = (await this.request('/auth/session', 'POST', body, true, options, retryOnFailure)) as Partial<SessionResponse>;
             if (response.accessToken) {
                 const userId = getApiRuntime().identity.getUserId();
                 await this.storeSessionResponse(response as SessionResponse, userId);
                 this.forceFreshSessionAfterRemoteMfaState = false;
             }
             return response as SessionResponse;
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (isTerminalStoredSessionError(error)) {
                 try {
                     await this.clearBackendSession(getApiRuntime().identity.getUserId());
@@ -193,7 +193,7 @@ export class SessionManager {
 
             try {
                 return await this.refreshSession();
-            } catch (refreshError: any) {
+            } catch (refreshError: unknown) {
                 if (isStoredSessionMfaRequired(refreshError)) {
                     this.accessTokens.clear();
                     throw refreshError;
@@ -277,7 +277,7 @@ export class SessionManager {
             (retryOnFailure: boolean, mfaCode?: string) => (
                 this.createSession(retryOnFailure, mfaCode)
             ),
-        );
+        ) as SessionResponse;
 
         if (response.accessToken) {
             await this.storeSessionResponse(response as SessionResponse, userId);

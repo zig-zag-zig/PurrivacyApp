@@ -20,3 +20,13 @@ export type RecoveryCodesModalOptions = {
 export type MfaModalResult = {
     code: string | null;
 };
+
+/**
+ * Discriminated union describing every modal the ModalProvider can display.
+ * `type` drives rendering and back-press handling; `options` carries the
+ * per-modal props (absent for payload-less modals).
+ */
+export type ModalRequest =
+    | { type: 'mfa'; options: MfaModalOptions }
+    | { type: 'recoveryCodes'; options: RecoveryCodesModalOptions }
+    | { type: 'passphraseStorageConsent' };
