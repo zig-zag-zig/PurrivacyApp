@@ -1,18 +1,25 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { User } from 'firebase/auth';
 import { UserAuthService } from '../services/userAuthService';
 import { UserDecrypted } from '../../../types/types';
 import { AuthService } from '../services/authService';
 import { logger } from '../../../utils/logger';
+import type { AuthDispatch } from '../state/authStateMachine';
 
+/**
+ * Decrypted-user loading with lock/generation invalidation.
+ *
+ * `user`, `pendingPassword` and the committed `userDecrypted` value are owned
+ * by the auth state machine; this hook performs the async load work and
+ * dispatches `USER_DECRYPTED_CHANGED` / `PENDING_PASSWORD_CHANGED` events.
+ */
 export const useUserLoading = (
     user: User | null,
+    pendingPassword: string | null,
     userRef: React.RefObject<User | null>,
     runLoadUserRef: React.RefObject<boolean>,
+    dispatch: AuthDispatch,
 ) => {
-    const [userDecrypted, setUserDecrypted] = useState<UserDecrypted | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState(false);
-    const [pendingPassword, setPendingPassword] = useState<string | null>(null);
     /** Bumps on lock / invalidation so late loadUser results never commit decrypted state. */
     const loadGenerationRef = useRef(0);
 
@@ -47,10 +54,10 @@ export const useUserLoading = (
                 && runLoadUserRef.current
                 && Boolean(userRef.current);
             if (stillValid) {
-                setUserDecrypted(decryptedUser);
+                dispatch({ type: 'USER_DECRYPTED_CHANGED', userDecrypted: decryptedUser });
             }
         }
-    }, [runLoadUserRef, userRef]);
+    }, [runLoadUserRef, userRef, dispatch]);
 
     // Handle pending password effect
     useEffect(() => {
@@ -89,7 +96,7 @@ export const useUserLoading = (
                 logger.warn('failed to unlock user after sign-in', { error });
             } finally {
                 if (success || retryCount >= MAX_RETRIES) {
-                    setPendingPassword(null);
+                    dispatch({ type: 'PENDING_PASSWORD_CHANGED', password: null });
                     if (success) {
                         runLoadUserRef.current = true;
                         await loadUser();
@@ -103,15 +110,9 @@ export const useUserLoading = (
             cancelled = true;
             if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         };
-    }, [user, pendingPassword]);
+    }, [user, pendingPassword, dispatch, loadUser, runLoadUserRef]);
 
     return {
-        userDecrypted,
-        isAuthLoading,
-        pendingPassword,
-        setUserDecrypted,
-        setIsAuthLoading,
-        setPendingPassword,
         loadUser,
         invalidateLoads,
     };

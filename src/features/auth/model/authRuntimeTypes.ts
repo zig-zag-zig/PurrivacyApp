@@ -1,10 +1,14 @@
 import type { RefObject } from 'react';
 import type { User } from 'firebase/auth';
 
-import type { LastSignedInUser, UserDecrypted } from '../../../types/types';
-
-type AuthStateSetter<T> = (value: T) => void;
-
+/**
+ * Runtime intent/latch refs used by async auth flows.
+ *
+ * These are *not* UI state: they gate in-flight operations and persist across
+ * renders (sign-in intent, session-creation guards, last-signed-in
+ * persistence suppression). UI state is owned by the auth state machine
+ * (src/features/auth/state/authStateMachine.ts).
+ */
 export type AuthRuntimeRefs = {
   forceNewSessionOnNextAuthRef: RefObject<boolean>;
   isGettingSessionRef: RefObject<boolean>;
@@ -18,20 +22,4 @@ export type AuthRuntimeRefs = {
   suppressLastSignedInUserPersistRef: RefObject<boolean>;
   userInitAuthRef: RefObject<boolean>;
   userRef: RefObject<User | null>;
-};
-
-export type AuthStateSetters = {
-  setAuthCompleted: AuthStateSetter<boolean>;
-  setFbUser: AuthStateSetter<User | null>;
-  setIsAuthLoading: AuthStateSetter<boolean>;
-  setIsBiometricAvailable: AuthStateSetter<boolean>;
-  setIsBiometricEnabled: AuthStateSetter<boolean>;
-  setIsCheckingInactivity: AuthStateSetter<boolean>;
-  setIsLocalSessionLocked: AuthStateSetter<boolean>;
-  setLastSignedInUser: AuthStateSetter<LastSignedInUser | null>;
-  setLastUsedBiometricSignIn: AuthStateSetter<boolean>;
-  setPendingPassword: AuthStateSetter<string | null>;
-  setSessionAuthenticated: AuthStateSetter<boolean>;
-  setUser: AuthStateSetter<User | null>;
-  setUserDecrypted: AuthStateSetter<UserDecrypted | null>;
 };

@@ -9,10 +9,10 @@ import { BiometricAuthService } from '../../security/services/biometricAuthServi
 import { getUser } from '../domain/authUtils';
 import { getUsernameFromUser } from '../domain/usernameIdentity';
 import {
-  completeAuthenticatedUi,
   finishAuthenticatedSession,
 } from '../services/sessionAuthenticationFlow';
-import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
+import type { AuthRuntimeRefs } from '../model/authRuntimeTypes';
+import type { AuthDispatch } from '../state/authStateMachine';
 
 const AUTH_MFA_HOME_HANDOFF_DELAY_MS = 75;
 
@@ -21,18 +21,6 @@ type AuthSessionLifecycleRefs = Pick<
   | 'pendingPasswordRef'
   | 'runLoadUserRef'
   | 'shouldPromptBiometricRef'
->;
-
-type AuthSessionLifecycleSetters = Pick<
-  AuthStateSetters,
-  | 'setAuthCompleted'
-  | 'setIsAuthLoading'
-  | 'setIsBiometricAvailable'
-  | 'setIsBiometricEnabled'
-  | 'setIsCheckingInactivity'
-  | 'setIsLocalSessionLocked'
-  | 'setLastUsedBiometricSignIn'
-  | 'setUser'
 >;
 
 type UseAuthSessionLifecycleParams = {
@@ -48,8 +36,10 @@ type UseAuthSessionLifecycleParams = {
     loadUser: () => Promise<UserDecrypted | null>;
     lock: () => Promise<void>;
     promptBiometricWhenDekIsReady: (currentUser: User) => Promise<void>;
+    setBiometricAvailability: (available: boolean) => void;
+    setBiometricEnabled: (enabled: boolean) => void;
   };
-  setters: AuthSessionLifecycleSetters;
+  dispatch: AuthDispatch;
 };
 
 export function useAuthSessionLifecycle({
@@ -60,38 +50,28 @@ export function useAuthSessionLifecycle({
   isAuthLoading,
   refs,
   services,
-  setters,
+  dispatch,
 }: UseAuthSessionLifecycleParams): void {
   const {
-  shouldPromptBiometricRef,
-  runLoadUserRef,
-  pendingPasswordRef,
+    shouldPromptBiometricRef,
+    runLoadUserRef,
+    pendingPasswordRef,
   } = refs;
   const {
-  lock,
-  loadUser,
-  promptBiometricWhenDekIsReady,
-  initializeBiometricState,
-  createSession,
+    lock,
+    loadUser,
+    promptBiometricWhenDekIsReady,
+    initializeBiometricState,
+    createSession,
+    setBiometricAvailability,
+    setBiometricEnabled,
   } = services;
-  const {
-  setUser,
-  setIsLocalSessionLocked,
-  setIsBiometricAvailable,
-  setIsBiometricEnabled,
-  setIsAuthLoading,
-  setIsCheckingInactivity,
-  setAuthCompleted,
-  setLastUsedBiometricSignIn,
-  } = setters;
   const { registerForPushNotificationsAsync } = useRegisterForPushNotifications();
 
   useEffect(() => {
     if (sessionAuthenticated && fbUser) {
       const shouldPromptBiometric = shouldPromptBiometricRef.current;
 
-      setIsLocalSessionLocked(false);
-      setUser(fbUser);
       EventService.addEvent('closeMfaModal', { delayMs: AUTH_MFA_HOME_HANDOFF_DELAY_MS });
       finishAuthenticatedSession({
         currentUser: fbUser,
@@ -103,12 +83,24 @@ export function useAuthSessionLifecycle({
         promptBiometricWhenDekIsReady,
         initializeBiometricState,
         registerForPushNotificationsAsync,
-        setIsBiometricAvailable,
-        setIsBiometricEnabled,
-        setIsAuthLoading,
-        setIsCheckingInactivity,
-        setAuthCompleted,
+        setIsBiometricAvailable: setBiometricAvailability,
+        setIsBiometricEnabled: setBiometricEnabled,
+        setIsAuthLoading: (value) => {
+          dispatch(value ? { type: 'LOADING_STARTED' } : { type: 'LOADING_FINISHED' });
+        },
+        setIsCheckingInactivity: (checking) => {
+          dispatch({ type: 'CHECKING_INACTIVITY', checking });
+        },
+        setAuthCompleted: () => {
+          dispatch({ type: 'AUTH_UI_SETTLED' });
+        },
       })
+        .then(() => {
+          // Session setup finished (or locked internally): signal UI readiness.
+          // The reducer only honours this from eligible phases, so a lock
+          // taken inside finishAuthenticatedSession cannot be undone.
+          dispatch({ type: 'AUTHENTICATED_UI_READY' });
+        })
         .catch(async (error) => {
           logger.warn('failed to finish authenticated session setup', { error });
           // Ensure terminal transition so flags do not remain stuck.
@@ -118,23 +110,19 @@ export function useAuthSessionLifecycle({
             await lock();
           } catch {
             // If lock itself throws, settle flags directly to prevent infinite spinner.
-            setIsAuthLoading(false);
-            setIsCheckingInactivity(false);
-            setAuthCompleted(true);
+            dispatch({ type: 'LOADING_FINISHED' });
+            dispatch({ type: 'CHECKING_INACTIVITY', checking: false });
+            dispatch({ type: 'AUTH_UI_SETTLED' });
           }
-        })
+        });
     }
   }, [sessionAuthenticated, fbUser]);
 
   useEffect(() => {
     if (sessionAuthenticated && user && userDecrypted && isAuthLoading) {
-      completeAuthenticatedUi({
-        setIsAuthLoading,
-        setIsCheckingInactivity,
-        setAuthCompleted,
-      });
+      dispatch({ type: 'AUTHENTICATED_UI_READY' });
     }
-  }, [sessionAuthenticated, user, userDecrypted, isAuthLoading]);
+  }, [sessionAuthenticated, user, userDecrypted, isAuthLoading, dispatch]);
 
   useEffect(() => {
     const sessionCreationAfterFirebaseAuth = async () => {
@@ -144,17 +132,18 @@ export function useAuthSessionLifecycle({
         }
 
         try {
-          setLastUsedBiometricSignIn(
-            await BiometricAuthService.getLastUsedBiometricSignIn(getUsernameFromUser(fbUser) || ''),
-          );
+          dispatch({
+            type: 'BIOMETRIC_SIGN_IN_MARKED',
+            used: await BiometricAuthService.getLastUsedBiometricSignIn(getUsernameFromUser(fbUser) || ''),
+          });
           await createSession();
         } catch (error) {
-          setIsCheckingInactivity(false);
-          setAuthCompleted(true);
+          dispatch({ type: 'CHECKING_INACTIVITY', checking: false });
+          dispatch({ type: 'AUTH_UI_SETTLED' });
           logger.warn('failed to create session after firebase authentication', { error });
         }
       }
     };
     sessionCreationAfterFirebaseAuth();
-  }, [fbUser]);
+  }, [fbUser, createSession, dispatch]);
 }
