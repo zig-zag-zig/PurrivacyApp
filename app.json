@@ -1,6 +1,6 @@
 {
   "expo": {
-    "sdkVersion": "56.0.0",
+    "sdkVersion": "57.0.0",
     "name": "Purrivacy",
     "slug": "pgp-frontend",
     "version": "1.0.8",
