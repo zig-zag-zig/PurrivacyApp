@@ -36,7 +36,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
 
     const copyAllCodes = () => {
         const allCodes = recoveryCodes.join('\n');
-        void secureCopy(allCodes);
+        void secureCopy(allCodes, { sensitivity: 'high' });
         setCopied(true);
         setCopyFeedbackVisible(true);
         if (copyFeedbackTimeoutRef.current) {

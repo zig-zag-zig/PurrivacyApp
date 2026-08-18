@@ -71,7 +71,7 @@ export const MfaSetupScreen = () => {
         }
 
         try {
-            void secureCopy(setupData.secret);
+            void secureCopy(setupData.secret, { sensitivity: 'high' });
             setCopied(true);
             if (copyFeedbackTimeoutRef.current) {
                 clearTimeout(copyFeedbackTimeoutRef.current);

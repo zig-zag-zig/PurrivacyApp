@@ -34,7 +34,7 @@ export const SeedVerification: React.FC<SeedVerificationProps> = ({
     const { showToast } = useToast();
 
     const handleCopySeed = () => {
-        void secureCopy(seed);
+        void secureCopy(seed, { sensitivity: 'high' });
         showToast('Seed copied to clipboard', 'success');
 
         setCopied(true);

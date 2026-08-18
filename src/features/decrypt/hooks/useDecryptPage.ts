@@ -169,7 +169,7 @@ export function useDecryptPage() {
   };
 
   const handleCopy = () => {
-    void secureCopy(state.decryptedContent);
+    void secureCopy(state.decryptedContent, { sensitivity: 'medium' });
     showToast(SUCCESS_MESSAGES.DECRYPTED_COPIED, 'success');
   };
 

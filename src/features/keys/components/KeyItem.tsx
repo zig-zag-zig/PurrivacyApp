@@ -43,6 +43,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const [changingPassword, setChangingPassword] = useState(false);
     const [changingDate, setChangingDate] = useState(false);
     const [privateKeyVisible, setPrivateKeyVisible] = useState(false);
+    const [copyConfirmVisible, setCopyConfirmVisible] = useState(false);
     const [privateKeyAccountPassword, setPrivateKeyAccountPassword] = useState('');
     const [privateKeyRevealError, setPrivateKeyRevealError] = useState('');
     const [privateKeyRevealLoading, setPrivateKeyRevealLoading] = useState<PrivateKeyRevealLoading>(null);
@@ -93,7 +94,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
 
     const handleCopyPublicKey = () => {
         Keyboard.dismiss();
-        void secureCopy(pgpKey.publicKey || '');
+        void secureCopy(pgpKey.publicKey || '', { sensitivity: 'low' });
         publicKeyCopyFeedback.markCopied();
         showToast(SUCCESS_MESSAGES.PUBLIC_KEY_COPIED, 'success');
     };
@@ -142,7 +143,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         setPrivateKeyRevealLoading('biometric');
 
         try {
-            const authenticated = await securityService.authenticateBiometric('Unlock private key');
+            const authenticated = await securityService.authenticateForSecretReveal('Unlock private key');
             if (authenticated) {
                 handlePrivateKeyRevealSuccess();
             } else {
@@ -160,7 +161,14 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
     const handleCopyPrivateKey = () => {
         if (!privateKeyVisible || !pgpKey.privateKey) return;
         Keyboard.dismiss();
-        void secureCopy(pgpKey.privateKey);
+        // Highest-secret copy requires explicit confirmation (APP-SEC-005).
+        setCopyConfirmVisible(true);
+    };
+
+    const confirmCopyPrivateKey = () => {
+        setCopyConfirmVisible(false);
+        if (!pgpKey.privateKey) return;
+        void secureCopy(pgpKey.privateKey, { sensitivity: 'high' });
         privateKeyCopyFeedback.markCopied();
         showToast('Private key copied', 'success');
     };
@@ -325,6 +333,16 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                     </View>
                 </View>
             )}
+            <ConfirmationDialog
+                visible={copyConfirmVisible}
+                title="Copy private key?"
+                message="Your private key will be copied to the clipboard, which other apps can read. It will be wiped automatically after 20 seconds."
+                itemType="key"
+                itemName={keyTitle}
+                confirmLabel="Copy"
+                onConfirm={confirmCopyPrivateKey}
+                onCancel={() => setCopyConfirmVisible(false)}
+            />
             <ConfirmationDialog
                 visible={confirmVisible}
                 title="Delete Key"

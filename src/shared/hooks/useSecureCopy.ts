@@ -1,80 +1,57 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { Platform, NativeModules, AppState, AppStateStatus } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import {
+    createSecureClipboardController,
+    SecureClipboardNativeModule,
+    SecureCopyOptions,
+} from '../clipboard/secureClipboardController';
 
-interface SecureClipboardSpec {
-    copySecure(text: string): void;
-    clearClipboard(): void;
-}
-const SecureClipboardModule = NativeModules.SecureClipboard as SecureClipboardSpec | undefined;
+const SecureClipboardModule = NativeModules.SecureClipboard as SecureClipboardNativeModule | undefined;
 
-const CLIPBOARD_TTL_MS = 180000; // 3 Minutes
+export { SecureCopyOptions };
 
+/**
+ * Secure clipboard copy with per-sensitivity TTLs (APP-SEC-005).
+ *
+ * `secureCopy(text, { sensitivity })` defaults to `'high'` (20s) when no class
+ * is specified. The wipe is conditional: it only clears the clipboard if it
+ * still holds the value we copied, so a newer user copy is never clobbered.
+ */
 export function useSecureCopy() {
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const expectedClearTimeRef = useRef<number | null>(null);
-
-    const wipeClipboard = useCallback(async () => {
-        try {
-            if (Platform.OS === 'android' && SecureClipboardModule) {
-                SecureClipboardModule.clearClipboard();
-            } else {
-                await Clipboard.setStringAsync('');
-            }
-        } catch (error) {
-            console.warn('[useSecureCopy] Failed to clear clipboard:', error);
-        }
-
-        expectedClearTimeRef.current = null;
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
-    }, []);
+    const controllerRef = useRef<ReturnType<typeof createSecureClipboardController> | null>(null);
+    if (controllerRef.current === null) {
+        controllerRef.current = createSecureClipboardController({
+            platformOS: Platform.OS,
+            nativeModule: SecureClipboardModule,
+            clipboard: Clipboard,
+        });
+    }
+    const controller = controllerRef.current;
 
     // AppState Watcher: Wipes if TTL expires while app is backgrounded
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-            if (nextAppState === 'active' && expectedClearTimeRef.current) {
-                if (Date.now() >= expectedClearTimeRef.current) {
-                    wipeClipboard();
-                }
-            }
+            controller.onAppStateChange(nextAppState);
         });
 
         return () => {
             subscription.remove();
-            // NOTE: We intentionally DO NOT wipe on unmount here. 
-            // If a user copies a key and navigates to another app to paste it, 
+            // NOTE: We intentionally DO NOT wipe on unmount here.
+            // If a user copies a key and navigates to another app to paste it,
             // the clipboard must survive the navigation. The TTL handles the cleanup.
         };
-    }, [wipeClipboard]);
+    }, [controller]);
 
-    const secureCopy = useCallback(async (text: string) => {
-        if (!text) return;
+    const secureCopy = useCallback(
+        (text: string, options?: SecureCopyOptions) => controller.secureCopy(text, options),
+        [controller],
+    );
 
-        // Clear any existing TTL timer
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
-
-        try {
-            if (Platform.OS === 'android' && SecureClipboardModule) {
-                // Uses Native Module to apply EXTRA_IS_SENSITIVE flag
-                SecureClipboardModule.copySecure(text);
-            } else {
-                await Clipboard.setStringAsync(text);
-            }
-        } catch (error) {
-            console.warn('[useSecureCopy] Failed to copy:', error);
-            return;
-        }
-
-        // Start 3-minute TTL wipe
-        expectedClearTimeRef.current = Date.now() + CLIPBOARD_TTL_MS;
-        timerRef.current = setTimeout(wipeClipboard, CLIPBOARD_TTL_MS);
-    }, [wipeClipboard]);
+    const wipeClipboard = useCallback(
+        () => controller.wipeClipboard(),
+        [controller],
+    );
 
     return { secureCopy, wipeClipboard };
 }

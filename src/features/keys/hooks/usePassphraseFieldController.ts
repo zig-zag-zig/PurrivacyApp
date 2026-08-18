@@ -358,7 +358,7 @@ export function usePassphraseFieldController({
     const handleCopyGeneratedPassphrase = useCallback(() => {
         if (!generatedPassphrase) return;
         markBannerInteraction();
-        void secureCopy(generatedPassphrase);
+        void secureCopy(generatedPassphrase, { sensitivity: 'high' });
     }, [generatedPassphrase, markBannerInteraction, secureCopy]);
 
     const handleInputWrapperRef = useCallback((node: View | null) => {
