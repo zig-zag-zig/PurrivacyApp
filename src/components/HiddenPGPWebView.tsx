@@ -246,7 +246,7 @@ const PGP_HTML = `
               const privateKeyIsUnlocked = typeof key.isDecrypted !== 'function' ? undefined : key.isDecrypted() !== null ? key.isDecrypted() : undefined;
               result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked };
             } catch (err) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err as { message?: unknown })?.message ?? err), id }));
+              window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
               return;
             }
             break;
@@ -338,7 +338,7 @@ const PGP_HTML = `
 
         window.ReactNativeWebView.postMessage(JSON.stringify({ success: true, result, id }));
       } catch (err) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err as { message?: unknown })?.message ?? err), id }));
+        window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
       }
     };
 
