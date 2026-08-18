@@ -84,9 +84,9 @@
     "dotenv": "^16.6.1",
     "firebase-tools": "^15.24.0",
     "knip": "^5.73.4",
+    "react-test-renderer": "^19.2.3",
     "typescript": "~6.0.3",
     "vitest": "^4.1.7"
   },
   "private": true
 }
-
