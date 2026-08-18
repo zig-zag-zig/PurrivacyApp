@@ -1,16 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React from 'react';
 import { View, TextInput, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { CustomText } from '../../../components/CustomText';
-import { getDisplayName } from '../domain/displayNameUtils';
-import { KeyList } from './KeyList';
-import { KeyPair } from '../../../types/types';
-import { theme } from '../../../styles/theme';
-import { sortKeysByPopularity, sortKeysAlphabetically } from '../domain/popularityStorage';
-import { commonStyles } from '../../../styles/commonStyles';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { ModalToastHost } from '../../../components/ModalToastHost';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyMetadataPills } from './KeyMetadataPills';
+import Icon from '@expo/vector-icons/MaterialIcons';
+
+import { CustomText } from '../../../components/CustomText';
+import { ModalToastHost } from '../../../components/ModalToastHost';
+import { theme } from '../../../styles/theme';
+import { KeyPair } from '../../../types/types';
+import { KeyList } from './KeyList';
+import { KeySelectionDetails } from './keySelectionModal/KeySelectionDetails';
+import { useKeySelectionList } from './keySelectionModal/useKeySelectionList';
 
 interface KeySelectionModalProps {
     visible: boolean;
@@ -23,6 +22,10 @@ interface KeySelectionModalProps {
     popularityMap: Record<string, number>;
 }
 
+/**
+ * Modal chrome only (APP-ARCH-002): search/sort state and key ordering live in
+ * useKeySelectionList; the expanded row details live in KeySelectionDetails.
+ */
 export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
     visible,
     onClose,
@@ -34,106 +37,25 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
     popularityMap,
 }) => {
     const insets = useSafeAreaInsets();
-    const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState<'popularity' | 'alphabetical'>('popularity');
-    const [alphabeticalDirection, setAlphabeticalDirection] = useState<'asc' | 'desc'>('asc');
-    const [popularitySnapshot, setPopularitySnapshot] = useState<Record<string, number> | null>(null);
+    const {
+        searchQuery,
+        setSearchQuery,
+        displayKeys,
+        popularityActive,
+        alphabeticalActive,
+        popularityColor,
+        alphabeticalColor,
+        alphabeticalDirection,
+        alphabeticalArrowIcon,
+        handlePopularityPress,
+        handleAlphabeticalPress,
+        resetListState,
+    } = useKeySelectionList({ keys, displaySelectedKeys, popularityMap });
 
     const resetAndClose = () => {
         onClose();
-        setSearchQuery('');
-        setSortBy('popularity');
-        setAlphabeticalDirection('asc');
+        resetListState();
     };
-
-    useEffect(() => {
-        if (searchQuery.trim()) {
-            setPopularitySnapshot({ ...popularityMap });
-        } else {
-            setPopularitySnapshot(null);
-        }
-    }, [searchQuery]);
-
-    const handlePopularityPress = () => {
-        setSortBy('popularity');
-    };
-
-    const handleAlphabeticalPress = () => {
-        if (sortBy !== 'alphabetical') {
-            setSortBy('alphabetical');
-            setAlphabeticalDirection('asc');
-        } else {
-            setAlphabeticalDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-        }
-    };
-
-    // Filter keys by search query (search in userId)
-    const filteredKeys = useMemo(() => {
-        if (!searchQuery.trim()) return keys;
-        const query = searchQuery.trim().toLowerCase();
-        return keys.filter(key => key.userId.toLowerCase().includes(query));
-    }, [keys, searchQuery]);
-
-    // Determine sort order: if searching, sort by popularity only; otherwise use chosen sortBy
-    const effectiveSortOrder = searchQuery.trim() ? 'popularity' : sortBy;
-
-    // Sort all filtered keys (no separation of selected/unselected when searching)
-    const sortedKeys = useMemo(() => {
-        const currentPopularityMap = popularitySnapshot ?? popularityMap;
-        if (searchQuery.trim()) {
-            // When searching, sort by popularity only (as per effectiveSortOrder)
-            if (effectiveSortOrder === 'popularity') {
-                return sortKeysByPopularity(filteredKeys, currentPopularityMap);
-            } else {
-                return sortKeysAlphabetically(filteredKeys, alphabeticalDirection);
-            }
-        } else {
-            // Separate selected and unselected, sort each group by chosen order
-            const selectedKeysList = filteredKeys.filter(key => displaySelectedKeys[key.fingerprint]);
-            const unselectedKeysList = filteredKeys.filter(key => !displaySelectedKeys[key.fingerprint]);
-
-            const sortKeys = (keysToSort: KeyPair[]) => {
-                if (effectiveSortOrder === 'popularity') {
-                    return sortKeysByPopularity(keysToSort, currentPopularityMap);
-                } else {
-                    return sortKeysAlphabetically(keysToSort, alphabeticalDirection);
-                }
-            };
-
-            const sortedSelected = sortKeys(selectedKeysList);
-            const sortedUnselected = sortKeys(unselectedKeysList);
-
-            return [...sortedSelected, ...sortedUnselected];
-        }
-    }, [filteredKeys, effectiveSortOrder, popularityMap, popularitySnapshot, alphabeticalDirection, searchQuery, displaySelectedKeys]);
-
-    const displayKeys = sortedKeys;
-    const popularityActive = sortBy === 'popularity';
-    const alphabeticalActive = sortBy === 'alphabetical';
-    const popularityColor = popularityActive ? theme.colors.onPrimary : theme.colors.textSecondary;
-    const alphabeticalColor = alphabeticalActive ? theme.colors.onPrimary : theme.colors.textSecondary;
-    const alphabeticalArrowIcon = alphabeticalDirection === 'asc' ? 'arrow-upward' : 'arrow-downward';
-
-    const renderKeyDetails = (key: KeyPair) => (
-        <View style={styles.detailsContainer}>
-            <View style={styles.detailsHeader}>
-                <CustomText style={styles.detailsTitle} numberOfLines={1}>
-                    {getDisplayName(key.userId) || key.userId.trim() || 'Unnamed Key'}
-                </CustomText>
-                <View style={styles.detailsAction}>
-                    {key.isDefault ? (
-                        <View style={commonStyles.iconButton} accessibilityLabel="Default key">
-                            <Icon name="star" size={24} color={theme.colors.primary} />
-                        </View>
-                    ) : null}
-                </View>
-            </View>
-            <KeyMetadataPills
-                keyPair={key}
-                selected={Boolean(visualSelectedKeys[key.fingerprint])}
-            />
-        </View>
-    );
 
     return (
         <Modal
@@ -267,7 +189,12 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                                 selectedKeys={[visualSelectedKeys]}
                                 onToggleKey={onToggleKey}
                                 onLongPressKey={onLongPressKey}
-                                renderExtra={searchQuery.trim() ? renderKeyDetails : undefined}
+                                renderExtra={searchQuery.trim() ? (key) => (
+                                    <KeySelectionDetails
+                                        keyPair={key}
+                                        selected={Boolean(visualSelectedKeys[key.fingerprint])}
+                                    />
+                                ) : undefined}
                             />
                         )}
                     </ScrollView>
@@ -411,30 +338,6 @@ const styles = StyleSheet.create({
     },
     keyListContent: {
         paddingBottom: theme.spacing.lg,
-    },
-    detailsContainer: {
-        gap: theme.spacing.sm,
-        minWidth: 0,
-        paddingHorizontal: theme.spacing.xs,
-        paddingVertical: theme.spacing.xs,
-    },
-    detailsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm,
-    },
-    detailsTitle: {
-        ...commonStyles.textBody,
-        flex: 1,
-        minWidth: 0,
-        color: theme.colors.text,
-        fontWeight: '600',
-        fontSize: 16,
-    },
-    detailsAction: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: 40,
     },
     noResultsContainer: {
         flex: 1,
