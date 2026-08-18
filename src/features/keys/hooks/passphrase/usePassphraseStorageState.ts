@@ -53,20 +53,21 @@ export function usePassphraseStorageState({
         }
 
         try {
+            // Decrypt/encrypt screens pass bannerMode='stored' and a stored
+            // passphrase value; when the user is actively using the key,
+            // autofill the stored passphrase even if the device-local flag was
+            // cleared (e.g. app-data reset) - the flag gates the banner UX on
+            // the key screen, not the stored value itself.
             const enabled = await securityService.isPassphraseStorageEnabled(user.uid);
             setStorageEnabled(enabled);
 
-            if (!enabled) {
-                if (!userEditedRef.current && storedPassphrase && currentValueRef.current === storedPassphrase) {
-                    commitPassphraseRef.current('');
-                }
-                setStoredPassphrase(null);
+            const stored = storedPassphraseValue ?? null;
+            setStoredPassphrase(stored);
+
+            if (!enabled && !stored) {
                 setStorageEnabled(false);
                 return;
             }
-
-            const stored = storedPassphraseValue ?? null;
-            setStoredPassphrase(stored);
 
             if (
                 stored

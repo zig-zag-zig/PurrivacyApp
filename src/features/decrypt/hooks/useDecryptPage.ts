@@ -11,7 +11,7 @@ import { useResetStateOnBlurSuccess } from '../../../shared/hooks/useResetStateO
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
 import { getDefaultSelectedPrivateKey } from '../../keys/domain/keyUtils';
-import { validateArmor } from '../../keys/domain/pgpValidation';
+import { normalizeArmor, validateArmor } from '../../keys/domain/pgpValidation';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import {
   getFirstSelectedKeyId,
@@ -91,10 +91,13 @@ export function useDecryptPage() {
     const publicKeyId = getFirstSelectedKeyId(state.selectedPublicKeys);
     const publicKeyArmored = publicKeyId ? state.selectedPublicKeys[publicKeyId] : undefined;
     const encryptedContent = state.encryptedContent.trim();
+    // Re-armor collapsed pastes (line breaks removed by mail/SMS clients or
+    // automation) so both validation and OpenPGP parsing succeed.
+    const normalizedEncryptedContent = normalizeArmor(encryptedContent, 'MESSAGE') ?? encryptedContent;
     const detachedSignature = state.signature.trim();
 
-    if (encryptedContent !== state.encryptedContent) {
-      dispatch({ type: 'encryptedContentChanged', content: encryptedContent });
+    if (normalizedEncryptedContent !== state.encryptedContent) {
+      dispatch({ type: 'encryptedContentChanged', content: normalizedEncryptedContent });
     }
     if (detachedSignature !== state.signature) {
       dispatch({ type: 'signatureChanged', signature: detachedSignature });
@@ -120,7 +123,7 @@ export function useDecryptPage() {
       }
 
       const result = await pgpCryptoService.decryptMessage(
-        encryptedContent,
+        normalizedEncryptedContent,
         state.selectedPrivateKey[privateKeyId || ''],
         state.passphrase,
         hasSelectedKeys(state.selectedPublicKeys) ? publicKeyArmored : undefined,

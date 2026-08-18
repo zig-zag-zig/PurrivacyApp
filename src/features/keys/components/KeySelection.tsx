@@ -27,6 +27,7 @@ interface KeySelectionProps {
     signMessage?: boolean;
     setSignMessage?: React.Dispatch<React.SetStateAction<boolean>>;
     showSignMessageSwitch?: boolean;
+    passphraseBannerMode?: 'stored' | 'generate' | 'none';
     testIDPrefix?: string;
 }
 
@@ -48,6 +49,7 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
     signMessage,
     setSignMessage,
     showSignMessageSwitch = false,
+    passphraseBannerMode,
     testIDPrefix,
 }) => {
     const { user } = useAuth();
@@ -242,6 +244,7 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
                                         onPassphraseChange={onPassphraseChange}
                                         hidden={key.privateKeyIsUnlocked}
                                         storedPassphraseValue={key.privateKeyPassphrase}
+                                        bannerMode={passphraseBannerMode}
                                     />
 
                                 }

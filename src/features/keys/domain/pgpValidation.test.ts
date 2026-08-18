@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateArmor, identifyKeyType } from './pgpValidation';
+import { validateArmor, identifyKeyType, normalizeArmor } from './pgpValidation';
 
 const makeValidArmor = (type: string, minLength = 24) => {
     const base64Data = 'A'.repeat(minLength);
     return `-----BEGIN PGP ${type}-----\n\n${base64Data}\n-----END PGP ${type}-----`;
 };
+
+const makeArmorWithChecksum = (type: string) => `-----BEGIN PGP ${type}-----\n\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n=eWzB\n-----END PGP ${type}-----`;
 
 describe('validateArmor', () => {
     it('returns true for valid public key', () => {
@@ -26,6 +28,41 @@ describe('validateArmor', () => {
 
     it('returns false for wrong markers', () => {
         expect(validateArmor(makeValidArmor('MESSAGE'), 'PUBLIC KEY BLOCK')).toBe(false);
+    });
+
+    it('accepts collapsed single-line armor with a fused CRC checksum', () => {
+        // The paste path (and some mail clients) strips newlines, fusing the
+        // base64 body, its '==' padding and the '=eWzB' checksum into one line.
+        const collapsed = makeArmorWithChecksum('MESSAGE').replace(/\n/g, '');
+        expect(collapsed.includes('===eWzB')).toBe(true);
+        expect(validateArmor(collapsed, 'MESSAGE')).toBe(true);
+    });
+
+    it('accepts collapsed armor without a checksum line', () => {
+        const collapsed = makeValidArmor('MESSAGE').replace(/\n/g, '');
+        expect(validateArmor(collapsed, 'MESSAGE')).toBe(true);
+    });
+
+    it('normalizeArmor rebuilds canonical multi-line armor from collapsed input', () => {
+        const collapsed = makeArmorWithChecksum('MESSAGE').replace(/\n/g, '');
+        const normalized = normalizeArmor(collapsed, 'MESSAGE');
+        expect(normalized).not.toBeNull();
+        expect(normalized!.startsWith('-----BEGIN PGP MESSAGE-----\n\n')).toBe(true);
+        expect(normalized!.endsWith('\n=eWzB\n-----END PGP MESSAGE-----')).toBe(true);
+        // Body is wrapped at 64 columns.
+        const bodyLine = normalized!.split('\n')[2];
+        expect(bodyLine.length).toBe(64);
+    });
+
+    it('normalizeArmor returns null for non-matching block types', () => {
+        expect(normalizeArmor(makeValidArmor('MESSAGE'), 'PUBLIC KEY BLOCK')).toBeNull();
+    });
+
+    it('normalizeArmor leaves canonical armor intact', () => {
+        const canonical = makeArmorWithChecksum('MESSAGE');
+        const normalized = normalizeArmor(canonical, 'MESSAGE');
+        expect(normalized).not.toBeNull();
+        expect(normalized!.replace(/\s+/g, '')).toBe(canonical.replace(/\s+/g, ''));
     });
 });
 
