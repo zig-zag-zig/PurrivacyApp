@@ -58,17 +58,20 @@ Still outstanding (device lane, run separately):
 
 ## Production audit triage (`npm audit --omit=dev`)
 
-Post-upgrade: **15 high** (same count as the SDK 56 aligned baseline; composition
-unchanged except `react-native-screens` which left the report on SDK 56 alignment).
-No new findings introduced by the upgrade. Verdicts:
+Post-upgrade + non-breaking `npm audit fix`: **11 high, 0 critical** (down from 15;
+`brace-expansion`, `js-yaml`, `postcss`, `nanoid` cleared by the fix pass on
+2026-08-18 — nanoid left the report entirely). All 11 remaining findings are
+one interconnected build-toolchain chain rooted in `image-size`; nothing
+runtime-reachable remains. Verdicts:
 
 | Finding | Where it lives | Verdict |
 | --- | --- | --- |
 | `react-native` (0.86.2) | RN core | **build-toolchain-chain** — flagged via `@react-native/community-cli-plugin` (→ vulnerable `metro`) and a circular `@react-native/virtualized-lists` ↔ `react-native` chain; **no direct advisory on RN core**. The SDK 56 doc's claim that "SDK 57 fixes this" was wrong: 0.86.2 is still flagged and the only `fixAvailable` is a nonsensical downgrade to 0.72.17. Accepted; revisit when upstream narrows the advisory ranges. |
 | `@react-native/virtualized-lists` | RN runtime pkg (FlatList) | **build-toolchain-chain** — flagged only for depending on vulnerable `react-native` (circular with the row above); no direct advisory. Accepted. |
 | `@react-native/community-cli-plugin` | RN CLI (dev/build) | **build-toolchain-only** — flagged for depending on vulnerable `metro`. |
-| `nanoid` (3.3.12) | `@react-navigation/routers@7.6.0` (runtime id generation) + `postcss` (build) | **runtime-reachable in theory, not exploitable in practice** — advisories cover generators called with size 0/negative; react-navigation calls `nanoid()` with default size. Fix is nanoid 5 (ESM-only, breaking for CJS react-navigation) → override high-risk. Accepted, unchanged by SDK 57. |
+| ~~`nanoid`~~ | resolved by `npm audit fix` pass | **cleared 2026-08-18** — non-breaking transitive bump removed it from the report. |
 | `expo` | expo package | **build-toolchain-only** — flagged solely for depending on `@expo/cli`/`@expo/metro`; not in app bundle. |
+| `metro` / `metro-config` / `metro-transform-worker` / `@expo/metro` / `@expo/metro-config` / `@expo/cli` | Metro bundler (dev/build) | **build-toolchain-only** — flagged through `image-size@1.2.1` parser-DoS advisories (ICNS / JXL-HEIF infinite loops, GHSA ranges `<=2.0.2`). Not in the app bundle; exploitation requires committing a malicious image asset into the repo's build. **No patched release exists** (latest image-size is 2.0.2, still in the vulnerable range; verified 2026-08-18), and npm's only `fixAvailable` is a nonsensical `expo@53.0.27` downgrade. Re-check quarterly or on the next image-size release; an override is pointless until a patched version ships. |
 | `@expo/cli` | Expo CLI (dev/build) | **build-toolchain-only** |
 | `@expo/metro` | Bundler (dev/build) | **build-toolchain-only** |
 | `@expo/metro-config` | Bundler config (dev/build) | **build-toolchain-only** |
