@@ -6,6 +6,7 @@ global.Buffer = Buffer;
 // Configure API runtime ports before any module accesses them
 import { configureAppApiRuntime } from './src/app/configureApiRuntime';
 configureAppApiRuntime();
+import { useEffect } from 'react';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +14,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider, useAuth } from './src/features/auth/state/AuthContext';
 import { StackNavigator } from './src/app/navigation/StackNavigator';
 import { resetSessionTimer } from './src/features/security/services/activityService';
+import { pendingSignupSession } from './src/features/auth/services/pendingSignupSession';
 import { theme } from './src/styles/theme';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from './src/app/state/ToastContext';
@@ -45,9 +47,17 @@ const navigationTheme = {
 };
 
 const AppContent = () => {
-    const { lock, authCompleted, user, isCheckingInactivity, userDecrypted } = useAuth();
+    const { lock, authCompleted, user, isCheckingInactivity, userDecrypted, appStateIsBackground } = useAuth();
     const { webViewRef, onReload, reloadWebView } = useWebViewPGP();
     const showStartupLoading = !authCompleted;
+
+    // APP-SEC-007: signup secrets live only in the in-process session; discard
+    // them when the app backgrounds so they never outlive the signup flow.
+    useEffect(() => {
+        if (appStateIsBackground) {
+            pendingSignupSession.clear();
+        }
+    }, [appStateIsBackground]);
     useGlobalSpinner(showStartupLoading || (authCompleted && isCheckingInactivity));
     usePassphraseStorageAutoSync(userDecrypted);
     useStartupUpdateCheck(authCompleted);

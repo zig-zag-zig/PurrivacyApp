@@ -137,11 +137,16 @@ class AutofillCommitModule(reactContext: ReactApplicationContext) : ReactContext
             val iv = cipher.iv
 
             val prefs = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit()
+            val wrote = prefs.edit()
                 .putString(KEY_CIPHERTEXT, Base64.encodeToString(ciphertext, Base64.NO_WRAP))
                 .putString(KEY_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
                 .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + ENVELOPE_TTL_MS)
                 .commit()
+            if (!wrote) {
+                // Fail closed: a failed disk write must not report success,
+                // or the restart would lose the signup silently.
+                throw IllegalStateException("SharedPreferences commit failed")
+            }
 
             promise.resolve(true)
         } catch (e: Exception) {
@@ -207,7 +212,20 @@ class AutofillCommitModule(reactContext: ReactApplicationContext) : ReactContext
             val plaintext = cipher.doFinal(Base64.decode(ciphertextB64, Base64.NO_WRAP))
             deletePendingSignupKey()
 
-            val payload = JSONObject(String(plaintext, Charsets.UTF_8)).getJSONObject("payload")
+            val envelope = JSONObject(String(plaintext, Charsets.UTF_8))
+            // Defense in depth: the inner envelope carries its own expiry and a
+            // nonce; both are checked so a swapped/replayed/old envelope is
+            // rejected even if the outer prefs expiry were bypassed.
+            if (System.currentTimeMillis() >= envelope.optLong("expiresAtEpochMs", 0L)) {
+                promise.resolve(null)
+                return
+            }
+            if (envelope.optString("nonce", "").isEmpty()) {
+                promise.resolve(null)
+                return
+            }
+
+            val payload = envelope.getJSONObject("payload")
             val map = WritableNativeMap()
             map.putString("seed", payload.optString("seed", ""))
             map.putString("username", payload.optString("username", ""))

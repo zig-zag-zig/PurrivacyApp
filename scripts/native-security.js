@@ -167,14 +167,12 @@ function withNativeSecurity(config) {
     }]);
 
     config = withDangerousMod(config, ['android', (config) => {
-        try {
-            patchAndroidMainActivity(
-                config.modRequest.projectRoot,
-                getAndroidPackageName(config)
-            );
-        } catch (e) {
-            console.error('[native-security-plugin] Failed to patch MainActivity.kt:', e);
-        }
+        // Security control (FLAG_SECURE): fail closed. A patch failure must
+        // abort prebuild rather than silently ship unsecured windows.
+        patchAndroidMainActivity(
+            config.modRequest.projectRoot,
+            getAndroidPackageName(config)
+        );
 
         return config;
     }]);

@@ -110,6 +110,9 @@ function requireSha256(raw: Record<string, unknown>): string {
 }
 
 function requireHttpsGitHubUrl(raw: Record<string, unknown>): string {
+  // NOTE (ops): sign the literal GitHub `browser_download_url`. The signature
+  // covers the URL exactly as normalized here (new URL(...).toString()); a
+  // differently-encoded but equivalent URL fails verification by design.
   const value = requireString(raw, 'apkUrl');
   let parsed: URL;
   try {

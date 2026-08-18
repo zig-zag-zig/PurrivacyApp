@@ -90,6 +90,12 @@ Upload the generated `update-manifest.json` next to the APK in the GitHub
 release. The private key (`scripts/release-signing/`) must never be committed
 or embedded in the app.
 
+**Ops note:** the signature covers `apkUrl` exactly as the app normalizes it
+(WHATWG `new URL(...).toString()`). Always sign the literal
+`browser_download_url` value from the GitHub release asset — do not retype,
+re-case, or percent-encode it differently, or verification will fail (and the
+update will safely fall back to the browser).
+
 **Production requirement:** the pinned key is a development keypair. The
 release owner must regenerate a fresh keypair (`update-signing-keygen.cjs`)
 and re-pin the new public key in `updateSigning.ts` before the next production
