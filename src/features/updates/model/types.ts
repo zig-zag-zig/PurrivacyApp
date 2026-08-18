@@ -1,3 +1,5 @@
+import type { UpdateManifest } from '../services/updateManifest';
+
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'current' | 'not_found' | 'error';
 
 type UpdateDownloadStage =
@@ -25,6 +27,8 @@ export type AppRelease = {
   assetDownloadUrl: string | null;
   assetSizeBytes: number | null;
   canInstallInApp: boolean;
+  /** Verified signed update manifest; non-null only when in-app install is allowed. */
+  signedManifest: UpdateManifest | null;
 };
 
 export type UpdateCheckResult = {

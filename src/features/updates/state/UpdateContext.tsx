@@ -45,6 +45,10 @@ function getErrorMessage(error: unknown): string {
     return 'Update download was cancelled.';
   }
 
+  if (error instanceof Error && /could not be verified|checksum does not match|size mismatch/i.test(error.message)) {
+    return 'Update could not be verified and was not installed.';
+  }
+
   return UPDATE_COPY.checkFailed;
 }
 

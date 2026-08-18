@@ -19,7 +19,6 @@ import {
     parseApiVersion,
     parseOptionalGitHubRepoUrl,
     parseOptionalFirebaseProjectId,
-    parseOptionalString,
 } from './env';
 
 describe('parseNumberEnv', () => {
@@ -243,23 +242,5 @@ describe('parseOptionalFirebaseProjectId', () => {
         expect(() => parseOptionalFirebaseProjectId('ab', 'development')).toThrow(
             'valid Firebase project id',
         );
-    });
-});
-
-describe('parseOptionalString', () => {
-    it('returns trimmed value for non-empty string', () => {
-        expect(parseOptionalString('  hello  ')).toBe('hello');
-    });
-
-    it('returns null for undefined', () => {
-        expect(parseOptionalString(undefined)).toBeNull();
-    });
-
-    it('returns null for empty string', () => {
-        expect(parseOptionalString('')).toBeNull();
-    });
-
-    it('returns null for whitespace-only string', () => {
-        expect(parseOptionalString('   ')).toBeNull();
     });
 });
