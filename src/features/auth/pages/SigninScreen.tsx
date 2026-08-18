@@ -4,6 +4,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { consumePendingSignup } from '../../../native/autofillCommit';
+import { pendingSignupSession } from '../services/pendingSignupSession';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useAuth } from '../state/AuthContext';
@@ -49,11 +50,13 @@ export const SigninScreen = () => {
     useEffect(() => {
         consumePendingSignup().then((data) => {
             if (data) {
-                navigation.navigate('Signup', { username: data.username, password: data.password });
-                navigation.navigate('SignupSeedVerification', data);
+                // Post-restart signup resume: secrets re-enter the in-process
+                // session and navigation carries no secrets (APP-SEC-007).
+                pendingSignupSession.set(data);
+                navigation.navigate('SignupSeedVerification');
             }
         });
-    }, []);
+    }, [navigation]);
 
     useEffect(() => {
         if (isFocused && lastSignedInUser?.username) {

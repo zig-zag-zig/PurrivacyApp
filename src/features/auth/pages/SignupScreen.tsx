@@ -14,7 +14,8 @@ import { useToast } from '../../../app/state/ToastContext';
 import { sanitizeUsernameInput, USERNAME_MAX_LENGTH, validateUsername } from '../domain/usernameIdentity';
 import { ERROR_MESSAGES } from '../../../utils/errorHandling';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
-import { commitAutofill, restartActivity } from '../../../native/autofillCommit';
+import { commitAutofill, isNativeSignupRestartAvailable, persistPendingSignup, restartActivity } from '../../../native/autofillCommit';
+import { pendingSignupSession } from '../services/pendingSignupSession';
 
 export const SignupScreen = () => {
     const [username, setUsername] = useState('');
@@ -41,8 +42,6 @@ export const SignupScreen = () => {
     useEffect(() => {
         if (routeParams?.username) {
             setUsername(sanitizeUsernameInput(routeParams.username));
-            setPassword(routeParams.password || '');
-            setConfirmPassword(routeParams.password || '');
         }
     }, []);
 
@@ -88,8 +87,27 @@ export const SignupScreen = () => {
             }
         } while (!validateMnemonic(generatedSeed));
 
+        const signupPayload = { seed: generatedSeed, username: submittedUsername, password };
+
+        if (isNativeSignupRestartAvailable()) {
+            // The activity restart triggers the Android password-manager save
+            // dialog. Secrets survive via the Keystore-encrypted envelope
+            // (APP-SEC-001) and the in-process session as a fallback.
+            pendingSignupSession.set(signupPayload);
+            commitAutofill();
+            const persisted = await persistPendingSignup(signupPayload);
+            if (persisted) {
+                restartActivity();
+                return;
+            }
+            // Envelope failed: do not restart into a lost signup; verify in place.
+            navigation.navigate('SignupSeedVerification');
+            return;
+        }
+
+        pendingSignupSession.set(signupPayload);
         commitAutofill();
-        restartActivity(generatedSeed, submittedUsername, password);
+        navigation.navigate('SignupSeedVerification');
     };
 
     const onUsernameChange = (text: string) => {
