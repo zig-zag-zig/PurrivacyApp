@@ -60,9 +60,12 @@ const AppContent = () => {
         }
     }, [appStateIsBackground]);
 
-    // APP-SEC-003 (iOS): block screenshots/recording while a user is signed
-    // in. Android is handled globally by FLAG_SECURE at prebuild.
-    useScreenCaptureProtection(Boolean(user));
+    // APP-SEC-003 (iOS): screenshots/recording are blocked for the whole
+    // process lifetime, mirroring Android's global FLAG_SECURE posture.
+    // Global (not user-gated) on purpose: the signup seed display and the
+    // sign-in MFA challenge render while user === null, and a vault app
+    // loses nothing by blocking capture everywhere.
+    useScreenCaptureProtection(true);
     useGlobalSpinner(showStartupLoading || (authCompleted && isCheckingInactivity));
     usePassphraseStorageAutoSync(userDecrypted);
     useStartupUpdateCheck(authCompleted);

@@ -20,8 +20,9 @@ import { usePassphraseFieldFocus } from './passphrase/usePassphraseFieldFocus';
 import { usePassphraseFieldValue } from './passphrase/usePassphraseFieldValue';
 import { usePassphraseGeneratorSettings } from './passphrase/usePassphraseGeneratorSettings';
 import { usePassphraseStorageState } from './passphrase/usePassphraseStorageState';
+import type { PassphraseBannerMode } from '../model/passphraseFieldTypes';
 
-export type PassphraseBannerMode = 'stored' | 'generate' | 'none';
+export type { PassphraseBannerMode } from '../model/passphraseFieldTypes';
 
 type UsePassphraseFieldControllerParams = {
     bannerMode?: PassphraseBannerMode;

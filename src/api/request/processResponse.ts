@@ -68,10 +68,15 @@ export async function processResponse(
     }
 
     // The backend may attach freshly generated recovery codes to any ok
-    // response; only a well-formed string array is trusted as such.
-    if (isJsonObject(data)) {
-        const recoveryCodes = data.newRecoveryCodes;
-        if (Array.isArray(recoveryCodes) && recoveryCodes.every((code): code is string => typeof code === 'string')) {
+    // response; only a well-formed, non-empty string array is trusted as
+    // such (consistent with the strict response parsers).
+    if (isJsonObject(validatedData)) {
+        const recoveryCodes = validatedData.newRecoveryCodes;
+        if (
+            Array.isArray(recoveryCodes)
+            && recoveryCodes.length > 0
+            && recoveryCodes.every((code): code is string => typeof code === 'string' && code.length > 0)
+        ) {
             EventService.addEvent('newRecoveryCodes', { recoveryCodes });
         }
     }

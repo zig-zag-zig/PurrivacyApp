@@ -47,6 +47,7 @@ export const ERROR_MESSAGES = {
     // General
     GENERIC_ERROR: 'An unexpected error occurred',
     NETWORK_ERROR: 'Could not reach the server. Check your connection and try again.',
+    SERVER_RESPONSE_ERROR: 'The server returned an unexpected response. Please try again.',
 } as const;
 
 /**
@@ -153,6 +154,12 @@ const getRateLimitMessage = (error: any): string => {
 export const getUserFacingErrorMessage = (error: any, defaultMessage: string = ERROR_MESSAGES.GENERIC_ERROR): string => {
     if (!error) {
         return defaultMessage;
+    }
+
+    // Malformed server response rejected by the client-side schema parsers.
+    // Checked structurally (ApiSchemaError) to avoid a cross-module import.
+    if (error.name === 'ApiSchemaError') {
+        return ERROR_MESSAGES.SERVER_RESPONSE_ERROR;
     }
 
     const authErrorCode = getAuthErrorCode(error);

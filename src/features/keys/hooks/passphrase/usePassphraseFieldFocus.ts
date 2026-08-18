@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { MutableRefObject } from 'react';
 
 import { suppressNextPassphraseBannerDismiss } from '../../../../services/passphraseBannerEvents';
-import type { PassphraseBannerMode } from '../usePassphraseFieldController';
+import type { PassphraseBannerMode } from '../../model/passphraseFieldTypes';
 
 type UsePassphraseFieldFocusParams = {
     bannerMode: PassphraseBannerMode;

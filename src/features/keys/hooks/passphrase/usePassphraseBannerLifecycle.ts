@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { suppressNextPassphraseBannerDismiss } from '../../../../services/passphraseBannerEvents';
-import type { PassphraseBannerMode } from '../usePassphraseFieldController';
+import type { PassphraseBannerMode } from '../../model/passphraseFieldTypes';
 
 const BANNER_FOCUS_SETTLE_MS = 820;
 

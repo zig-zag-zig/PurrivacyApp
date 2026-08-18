@@ -5,7 +5,7 @@ import type { User } from 'firebase/auth';
 
 import { logger } from '../../../../utils/logger';
 import { securityService } from '../../../security/services/securityService';
-import type { PassphraseBannerMode } from '../usePassphraseFieldController';
+import type { PassphraseBannerMode } from '../../model/passphraseFieldTypes';
 
 type UsePassphraseStorageStateParams = {
     bannerMode: PassphraseBannerMode;
