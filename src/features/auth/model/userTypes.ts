@@ -17,6 +17,8 @@ export type EncryptedKeyRecordWithId = EncryptionBase & {
 
 export interface UserKeyRecordsResponse {
     keys: EncryptedKeyRecordWithId[];
+    /** Opaque cursor for the next page; absent when there are no more. */
+    nextCursor?: string;
 }
 
 export interface RecoveryEncrypted {

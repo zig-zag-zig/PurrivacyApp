@@ -37,8 +37,12 @@ export class ApiClient {
         return getUa().create(user);
     }
 
-    static async getKeyRecords(): Promise<UserKeyRecordsResponse> {
-        return getUa().getKeyRecords();
+    static async getKeyRecords(options?: { limit?: number; cursor?: string; since?: number }): Promise<UserKeyRecordsResponse> {
+        return getUa().getKeyRecords(options);
+    }
+
+    static async fetchAllKeyRecords(options?: { limit?: number; since?: number }): Promise<UserKeyRecordsResponse['keys']> {
+        return getUa().fetchAllKeyRecords(options);
     }
 
     static async addKeyRecord(key: Omit<EncryptedKeyRecordWithId, 'recordId'>): Promise<EncryptedKeyRecordWithId> {

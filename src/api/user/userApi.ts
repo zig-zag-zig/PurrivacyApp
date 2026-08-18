@@ -63,8 +63,44 @@ export function createUserApi(request: ApiRequestFn) {
       return createUserWithFirebaseAuth(user);
     },
 
-    getKeyRecords(): Promise<UserKeyRecordsResponse> {
-      return request('/user/key-records', 'GET', undefined, true) as Promise<UserKeyRecordsResponse>;
+    getKeyRecords(options?: { limit?: number; cursor?: string; since?: number }): Promise<UserKeyRecordsResponse> {
+      const params = new URLSearchParams();
+      if (options?.limit !== undefined) {
+        params.set('limit', String(options.limit));
+      }
+      if (options?.cursor) {
+        params.set('cursor', options.cursor);
+      }
+      if (options?.since !== undefined) {
+        params.set('since', String(options.since));
+      }
+      const query = params.toString();
+      return request(`/user/key-records${query ? `?${query}` : ''}`, 'GET', undefined, true) as Promise<UserKeyRecordsResponse>;
+    },
+
+    /**
+     * Fetches ALL key records, following pagination cursors (the backend pages
+     * at 200 by default, max 500). Without this, accounts with more than one
+     * page silently show only the oldest records.
+     */
+    async fetchAllKeyRecords(
+      options: { limit?: number; since?: number } = {},
+    ): Promise<UserKeyRecordsResponse['keys']> {
+      const PAGE_SIZE = 500;
+      const keys: UserKeyRecordsResponse['keys'] = [];
+      let cursor: string | undefined;
+
+      do {
+        const page = await this.getKeyRecords({
+          limit: options.limit ?? PAGE_SIZE,
+          cursor,
+          since: options.since,
+        });
+        keys.push(...page.keys);
+        cursor = page.nextCursor;
+      } while (cursor !== undefined);
+
+      return keys;
     },
 
     addKeyRecord(key: EncryptionBase): Promise<EncryptedKeyRecordWithId> {

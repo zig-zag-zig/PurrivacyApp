@@ -326,7 +326,10 @@ export function parseUserKeyRecordsResponse(data: unknown, endpoint: string, met
             parseEncryptedKeyRecordValue(entry, endpoint, method, `keys[${index}]`),
         ),
     };
-    logUnknownFields(raw, endpoint, method, ['keys']);
+    if (raw.nextCursor !== undefined) {
+        result.nextCursor = requireString(raw, 'nextCursor', endpoint, method);
+    }
+    logUnknownFields(raw, endpoint, method, ['keys', 'nextCursor']);
     return result;
 }
 

@@ -157,4 +157,19 @@ describe('getUserFacingErrorMessage', () => {
             ERROR_MESSAGES.GENERIC_ERROR,
         );
     });
+
+    it('maps backend 409 key-quota errors to a friendly key-limit message', () => {
+        expect(getUserFacingErrorMessage({ status: 409, errorData: { maxKeys: 1000 } })).toBe(
+            'Key limit reached. You can store up to 1000 keys on your account.',
+        );
+        expect(getUserFacingErrorMessage({ status: 409, errorData: { maxKeys: 'nope' } })).toBe(
+            'Key limit reached. Remove an existing key before adding another.',
+        );
+    });
+
+    it('maps backend 503 rate-limiter-unavailable to a retry message (not auth failure)', () => {
+        expect(getUserFacingErrorMessage({ status: 503 })).toBe(
+            'The service is temporarily unavailable. Please try again shortly.',
+        );
+    });
 });

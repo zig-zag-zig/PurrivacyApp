@@ -171,12 +171,27 @@ export const getUserFacingErrorMessage = (error: any, defaultMessage: string = E
         return ERROR_MESSAGES.NETWORK_ERROR;
     }
 
+    // Backend 503 RateLimitUnavailableError: the shared Redis limiter is
+    // down (fail-closed). Not an auth failure - tell the user to retry.
+    if (error.status === 503) {
+        return 'The service is temporarily unavailable. Please try again shortly.';
+    }
+
     if (error.sessionError?.refreshTokenMissing || error.sessionError?.refreshTokenInvalid || error.sessionError?.refreshTokenExpired) {
         return ERROR_MESSAGES.SESSION_EXPIRED;
     }
 
     if (error.errorData?.wrongMfaCode || error.wrongMfaCode) {
         return 'The MFA code was incorrect. Please try again.';
+    }
+
+    // Backend 409 KeyQuotaExceededError: { maxKeys, error: 'Key record quota exceeded' }
+    if (error.status === 409 && error.errorData?.maxKeys !== undefined) {
+        const maxKeys = Number(error.errorData.maxKeys);
+        if (Number.isFinite(maxKeys) && maxKeys > 0) {
+            return `Key limit reached. You can store up to ${maxKeys} keys on your account.`;
+        }
+        return 'Key limit reached. Remove an existing key before adding another.';
     }
 
     if (error.errorData?.rateLimited || error.rateLimited || error.status === 429 || error.retryAfter) {

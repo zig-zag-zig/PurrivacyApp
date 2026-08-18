@@ -116,11 +116,11 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
     return null;
   }
 
-  const keyRecords = await ApiClient.getKeyRecords();
+  const keyRecords = await ApiClient.fetchAllKeyRecords();
   const dek = await getAvailableDek(userId);
   const decryptedKeys: KeyPairWithRecordId[] = [];
 
-  for (const keyRecord of keyRecords.keys) {
+  for (const keyRecord of keyRecords) {
     const decryptedKey = JSON.parse(
       await AuthService.decrypt(userId, keyRecord.encryptedData, dek, keyRecord.iv, false, keyRecord.tag),
     ) as DecryptedKeyPayload;
