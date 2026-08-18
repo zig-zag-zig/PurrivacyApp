@@ -65,6 +65,7 @@ export const SettingsScreen = () => {
       <SettingsOption
         iconName="security"
         text="Two-Factor Authentication"
+        testID="purrivacy.settings.mfa"
         switchProps={{
           value: settingsPage.mfaState.mfaEnabled,
           onValueChange: settingsPage.onMfaToggle,

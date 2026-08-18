@@ -1,0 +1,36 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: ${E2E_USERNAME}mfanonce
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Sign up + create a key (fresh session => the MFA setup nonce can be minted)
+- runFlow:
+    file: subflows/register-create-key.yaml
+    env:
+      TEST_USERNAME: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+# Navigate to settings and enable MFA (the toggle navigates to MfaSetup,
+# which mints the fresh-auth nonce and calls /mfa/setup with it)
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.mfa"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.mfa"
+# MFA setup screen rendered => mint + setup succeeded (secret + otpauthUrl shown)
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.mfa.setup.screen"
+    timeout: 20000

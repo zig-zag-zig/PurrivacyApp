@@ -103,7 +103,7 @@ export const MfaSetupScreen = () => {
     }
 
     return (
-        <ScreenContainer>
+        <ScreenContainer testID="purrivacy.mfa.setup.screen">
             <CustomText style={[commonStyles.textTitle, styles.title]}>
                 Setup Two-Factor Authentication
             </CustomText>
@@ -170,6 +170,7 @@ export const MfaSetupScreen = () => {
 
             <Button
                 label="Continue to Verification"
+                testID="purrivacy.mfa.setup.enable"
                 onPress={handleVerifyCode}
                 style={styles.continueButton}
                 loading={isLoading}
