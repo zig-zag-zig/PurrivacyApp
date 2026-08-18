@@ -87,3 +87,5 @@ ios/*
 *-debug.log
 coverage/
 .pi*
+# e2e harness temp file
+firebase.json
