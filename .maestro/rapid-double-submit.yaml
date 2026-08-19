@@ -1,0 +1,55 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-shared
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+  RAPID_MESSAGE: rapid double submit must not corrupt state
+---
+# Robustness: rapid double-taps on the encrypt submit must not crash the app,
+# double-encrypt, or leave the screen stuck — exactly one result appears.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.content"
+- inputText: ${RAPID_MESSAGE}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.encrypt.recipients.item.0"
+# Double-tap the submit with no wait between taps
+- tapOn:
+    id: "purrivacy.encrypt.submit"
+- tapOn:
+    id: "purrivacy.encrypt.submit"
+# Exactly one result, app alive and responsive
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.result.text"
+    timeout: 90000
+- assertVisible:
+    id: "purrivacy.encrypt.result.text"

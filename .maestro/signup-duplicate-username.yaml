@@ -1,0 +1,47 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-shared
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Error path: signing up with a username that already exists must fail with a
+# clear error and keep the user on the signup screen (no crash, no partial
+# account state).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.signup"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signup.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signup.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signup.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- tapOn:
+    id: "purrivacy.signup.confirmPassword"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signup.submit"
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.signup.submit"
+    commands:
+      - tapOn:
+          id: "purrivacy.signup.submit"
+# Duplicate account -> clear error toast, still on signup screen
+- extendedWaitUntil:
+    visible: "Could not create account. Please check your details and try again."
+    timeout: 30000
+- assertVisible:
+    id: "purrivacy.signup.username"
+- assertNotVisible:
+    id: "purrivacy.seed.saved"

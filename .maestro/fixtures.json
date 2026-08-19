@@ -5,6 +5,7 @@
   },
   "mfa": {
     "username": "e2e-mfa",
-    "password": "Purrivacy-e2e-password-123"
+    "password": "Purrivacy-e2e-password-123",
+    "recoveryCode": "DRWWRV55JOJH"
   }
 }

@@ -1,0 +1,585 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: ${E2E_USERNAME}sv
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+  WRONG_WORD: wrongword
+---
+# Error path: the signup seed-verification challenge must reject wrong words
+# with an inline error (no account created), then accept the correct words
+# and complete signup — the user is not locked out by the failed attempt.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.signup"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signup.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signup.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signup.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- tapOn:
+    id: "purrivacy.signup.confirmPassword"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signup.submit"
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.signup.submit"
+    commands:
+      - tapOn:
+          id: "purrivacy.signup.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.seed.saved"
+    timeout: 30000
+# Capture the seed words
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 0
+- evalScript: ${output.sw1 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 1
+- evalScript: ${output.sw2 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 2
+- evalScript: ${output.sw3 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 3
+- evalScript: ${output.sw4 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 4
+- evalScript: ${output.sw5 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 5
+- evalScript: ${output.sw6 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 6
+- evalScript: ${output.sw7 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 7
+- evalScript: ${output.sw8 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 8
+- evalScript: ${output.sw9 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 9
+- evalScript: ${output.sw10 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 10
+- evalScript: ${output.sw11 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 11
+- evalScript: ${output.sw12 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 12
+- evalScript: ${output.sw13 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 13
+- evalScript: ${output.sw14 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 14
+- evalScript: ${output.sw15 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 15
+- evalScript: ${output.sw16 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 16
+- evalScript: ${output.sw17 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 17
+- evalScript: ${output.sw18 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 18
+- evalScript: ${output.sw19 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 19
+- evalScript: ${output.sw20 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 20
+- evalScript: ${output.sw21 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 21
+- evalScript: ${output.sw22 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 22
+- evalScript: ${output.sw23 = maestro.copiedText}
+- copyTextFrom:
+    text: "^[a-z]+$"
+    index: 23
+- evalScript: ${output.sw24 = maestro.copiedText}
+- tapOn:
+    id: "purrivacy.seed.saved"
+- extendedWaitUntil:
+    visible: "Verify Recovery Seed"
+# PASS 1 — fill every shown challenge position with a WRONG word
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.1"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.1"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.2"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.2"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.3"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.3"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.4"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.4"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.5"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.5"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.6"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.6"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.7"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.7"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.8"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.8"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.9"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.9"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.10"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.10"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.11"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.11"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.12"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.12"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.13"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.13"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.14"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.14"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.15"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.15"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.16"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.16"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.17"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.17"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.18"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.18"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.19"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.19"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.20"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.20"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.21"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.21"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.22"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.22"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.23"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.23"
+      - inputText: ${WRONG_WORD}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.24"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.24"
+      - inputText: ${WRONG_WORD}
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.seed.challenge.verify"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.seed.challenge.verify"
+# Inline error, still on the verification screen, no account created
+- extendedWaitUntil:
+    visible: "Incorrect words, please check your seed and try again."
+    timeout: 15000
+- assertVisible:
+    id: "purrivacy.seed.challenge.verify"
+- assertNotVisible:
+    id: "purrivacy.key.screen"
+# PASS 2 — replace the junk in each shown position (double-tap selects
+# the wrong word; typing replaces the selection) and verify
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.1"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.1"
+          repeat: 2
+      - inputText: ${output.sw1}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.2"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.2"
+          repeat: 2
+      - inputText: ${output.sw2}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.3"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.3"
+          repeat: 2
+      - inputText: ${output.sw3}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.4"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.4"
+          repeat: 2
+      - inputText: ${output.sw4}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.5"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.5"
+          repeat: 2
+      - inputText: ${output.sw5}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.6"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.6"
+          repeat: 2
+      - inputText: ${output.sw6}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.7"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.7"
+          repeat: 2
+      - inputText: ${output.sw7}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.8"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.8"
+          repeat: 2
+      - inputText: ${output.sw8}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.9"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.9"
+          repeat: 2
+      - inputText: ${output.sw9}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.10"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.10"
+          repeat: 2
+      - inputText: ${output.sw10}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.11"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.11"
+          repeat: 2
+      - inputText: ${output.sw11}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.12"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.12"
+          repeat: 2
+      - inputText: ${output.sw12}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.13"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.13"
+          repeat: 2
+      - inputText: ${output.sw13}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.14"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.14"
+          repeat: 2
+      - inputText: ${output.sw14}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.15"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.15"
+          repeat: 2
+      - inputText: ${output.sw15}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.16"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.16"
+          repeat: 2
+      - inputText: ${output.sw16}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.17"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.17"
+          repeat: 2
+      - inputText: ${output.sw17}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.18"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.18"
+          repeat: 2
+      - inputText: ${output.sw18}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.19"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.19"
+          repeat: 2
+      - inputText: ${output.sw19}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.20"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.20"
+          repeat: 2
+      - inputText: ${output.sw20}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.21"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.21"
+          repeat: 2
+      - inputText: ${output.sw21}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.22"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.22"
+          repeat: 2
+      - inputText: ${output.sw22}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.23"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.23"
+          repeat: 2
+      - inputText: ${output.sw23}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.24"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.24"
+          repeat: 2
+      - inputText: ${output.sw24}
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.seed.challenge.verify"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.seed.challenge.verify"
+# Corrected words complete the signup
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 30000
