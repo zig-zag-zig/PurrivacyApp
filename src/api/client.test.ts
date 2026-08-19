@@ -218,9 +218,9 @@ describe('ApiClient', () => {
             const ma = { enableMfa: vi.fn(async () => ({})) } as any;
             __testSetMfaApi(ma);
 
-            await ApiClient.enableMfa();
+            await ApiClient.enableMfa('123456');
 
-            expect(ma.enableMfa).toHaveBeenCalled();
+            expect(ma.enableMfa).toHaveBeenCalledWith('123456');
         });
 
         it('delegates trustSession', async () => {

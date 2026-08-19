@@ -77,6 +77,12 @@ export const useAccountCommands = (deps: AuthCommandDeps): AccountCommands => {
     clearPendingBiometricPromptRetry();
     shouldPromptBiometricRef.current = false;
     localBiometricLockRef.current = false;
+    // Sign-out ends any in-flight user-initiated auth intent. Leaving these
+    // stale makes a later createSession (e.g. after recovery custom-token
+    // sign-in) behave as user-initiated and, on any error, tear down the
+    // fresh Firebase session via clearPartialFirebaseAuth.
+    userInitAuthRef.current = false;
+    forceNewSessionOnNextAuthRef.current = false;
     suppressLastSignedInUserPersistRef.current = true;
     dispatch({ type: 'SIGN_OUT_STARTED' });
 

@@ -25,5 +25,6 @@ export type AuthContextType = {
   toggleBiometric: (enabled: boolean) => Promise<void>;
   setLastUsedBiometricSignIn: (value: boolean) => void;
   signInWithFirebaseCustomToken: (customToken: string, legitCustomTokenSignIn: boolean) => Promise<User>;
+  createSession: () => Promise<void>;
   initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
 };

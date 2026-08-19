@@ -176,6 +176,7 @@ export const SigninScreen = () => {
                 <Button
                     hidden={isUnlockFlow}
                     label="Recover Account"
+                    testID="purrivacy.signin.recover"
                     onPress={() => navigation.navigate('RecoverAccount')}
                     variant="secondary"
                     disabled={signinBusy}

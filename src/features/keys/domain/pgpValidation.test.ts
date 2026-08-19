@@ -58,11 +58,17 @@ describe('validateArmor', () => {
         expect(normalizeArmor(makeValidArmor('MESSAGE'), 'PUBLIC KEY BLOCK')).toBeNull();
     });
 
-    it('normalizeArmor leaves canonical armor intact', () => {
+    it('normalizeArmor preserves the decoded body on canonical armor', () => {
         const canonical = makeArmorWithChecksum('MESSAGE');
         const normalized = normalizeArmor(canonical, 'MESSAGE');
         expect(normalized).not.toBeNull();
-        expect(normalized!.replace(/\s+/g, '')).toBe(canonical.replace(/\s+/g, ''));
+        // Base64 padding is redundant: stripping it preserves the decoded bytes.
+        const decodeBody = (armor: string) =>
+            Buffer.from(armor.split('\n').slice(2, -2).join(''), 'base64');
+        expect(decodeBody(normalized!).toString('hex')).toBe(decodeBody(canonical).toString('hex'));
+        // Checksum line is preserved.
+        const checksumLine = normalized!.split('\n').filter(l => l.startsWith('='))[0];
+        expect(checksumLine).toBe('=eWzB');
     });
 });
 

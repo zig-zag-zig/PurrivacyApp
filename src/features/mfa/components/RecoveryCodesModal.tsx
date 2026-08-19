@@ -75,13 +75,14 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
             onRequestClose={() => { }}
         >
             <View style={styles.modalFullscreen}>
-                <ScreenContainer>
+                <ScreenContainer testID="purrivacy.mfa.recovery.codes">
                     <CustomText style={styles.modalMessageText}>
                         {getSourceDescription()} Save these codes in a secure location. Each code can be used once if you lose access to your authenticator app.
                     </CustomText>
 
                     <TouchableOpacity
                         style={[styles.codesGrid, copyFeedbackVisible && styles.codesGridCopied]}
+                        testID="purrivacy.mfa.recovery.codes.list"
                         activeOpacity={0.7}
                         onLongPress={copyAllCodes}
                         delayLongPress={500}
@@ -114,6 +115,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
 
                     <Button
                         label={copied ? 'Done' : 'Copy codes'}
+                        testID="purrivacy.mfa.recovery.codes.copy"
                         onPress={copied ? handleClose : copyAllCodes}
                         style={styles.closeModalButton}
                         icon={

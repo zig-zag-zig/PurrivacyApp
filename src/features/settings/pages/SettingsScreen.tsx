@@ -122,6 +122,7 @@ export const SettingsScreen = () => {
         <SettingsOption
           iconName="fingerprint"
           text="Biometric Unlock"
+          testID="purrivacy.settings.biometric"
           switchProps={{
             value: settingsPage.isBiometricEnabled,
             onValueChange: settingsPage.onBiometricToggle,

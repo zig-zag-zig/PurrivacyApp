@@ -70,7 +70,14 @@ export class SessionManager {
                     return stored;
                 }
 
-                throw missingStoredSessionError();
+                // No stored session. For user-initiated flows (sign-in,
+                // recovery custom-token sign-in) this is a NORMAL state —
+                // proceed to create a fresh backend session below. For
+                // background/automatic resume it is terminal: there is
+                // nothing to resume.
+                if (!retryOnFailure) {
+                    throw missingStoredSessionError();
+                }
             } catch (error) {
                 if (isStoredSessionMfaRequired(error)) {
                     this.accessTokens.clear();

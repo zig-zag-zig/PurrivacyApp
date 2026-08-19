@@ -124,6 +124,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
         >
             <View style={styles.modalContainer}>
                 <ScreenContainer
+                    testID="purrivacy.mfa.modal"
                     showsHorizontalScrollIndicator={false}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={[
@@ -150,6 +151,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                             focusedIndex={focusedIndex}
                             loading={loading}
                             inputRef={totpInputRef}
+                            testID="purrivacy.mfa.code.input"
                             onChangeText={(text) =>
                                 handleTotpChangeText(text, setTotpCode, setFocusedIndex)
                             }

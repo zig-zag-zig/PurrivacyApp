@@ -28,11 +28,11 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
       return request('/mfa/setup', 'POST', { nonce }) as Promise<MfaSetupResponse>;
     },
 
-    async enableMfa(): Promise<SessionResponse> {
+    async enableMfa(mfaCode: string): Promise<SessionResponse> {
       const response = await request(
         '/mfa/enable',
         'POST',
-        undefined,
+        { mfaCode, mfaTrusted: true },
         true,
         { includeDeviceId: true },
       ) as SessionResponse;

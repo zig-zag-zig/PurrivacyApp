@@ -42,6 +42,10 @@ export const normalizeArmor = (
         body = body.slice(0, body.length - checksum.length);
     }
 
+    // OpenPGP armor base64 must be unpadded: the parser treats any body line
+    // containing '=' as the checksum line and rejects the armor otherwise.
+    body = body.replace(/=+$/, '');
+
     // Wrap the base64 body at 64 columns.
     const wrapped = body.replace(/(.{64})/g, '$1\n').trim();
 

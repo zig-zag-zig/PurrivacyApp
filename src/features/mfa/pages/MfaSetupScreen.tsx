@@ -4,6 +4,7 @@ import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { InputField } from '../../../components/InputField';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { useMfa } from '../state/MfaContext';
@@ -25,6 +26,7 @@ export const MfaSetupScreen = () => {
     const { showRecoveryCodesModal } = useModal();
 
     const [setupData, setSetupData] = useState<any>(null);
+    const [totpCode, setTotpCode] = useState('');
     const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,7 +64,7 @@ export const MfaSetupScreen = () => {
 
     const handleVerifyCode = async () => {
         try {
-            await enableMfa();
+            await enableMfa(totpCode);
             await showRecoveryCodesModal({
                 recoveryCodes: setupData?.recoveryCodes || [],
                 source: 'setup',
@@ -147,6 +149,16 @@ export const MfaSetupScreen = () => {
                 </CustomText>
             </View>
 
+            <InputField
+                label="6-digit code from your authenticator app"
+                testID="purrivacy.mfa.setup.code"
+                value={totpCode}
+                onChangeText={(text) => setTotpCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+                keyboardType="number-pad"
+                maxLength={6}
+                style={styles.codeInput}
+            />
+
             <CustomText style={[commonStyles.textBody, styles.instructionTitle]}>
                 Instructions:
             </CustomText>
@@ -174,7 +186,7 @@ export const MfaSetupScreen = () => {
                 onPress={handleVerifyCode}
                 style={styles.continueButton}
                 loading={isLoading}
-                disabled={isLoading}
+                disabled={isLoading || totpCode.length !== 6}
             />
         </ScreenContainer >
     );
@@ -244,6 +256,9 @@ const styles = StyleSheet.create({
     instruction: {
         marginBottom: theme.spacing.xs,
         color: theme.colors.textSecondary,
+    },
+    codeInput: {
+        marginBottom: theme.spacing.md,
     },
     continueButton: {
         marginTop: theme.spacing.lg,
