@@ -190,9 +190,11 @@ export const useSigninCommands = (
       if (firebaseUser) {
         await rememberLastSignedInUser(dispatch, firebaseUser);
       }
-      if (isLocalUnlock) {
-        dispatch({ type: 'UNLOCK_SUCCEEDED' });
-      }
+      // NOTE: UNLOCK_SUCCEEDED is NOT dispatched here. It flips
+      // isLocalSessionLocked, which gates the unlock UI — dispatching it
+      // before the backend session is established would flip the screen to
+      // the regular sign-in form mid-flow. The lifecycle dispatches it at
+      // session completion, in the same tick as the UI transition.
       return firebaseUser;
     } catch (error: any) {
       userInitAuthRef.current = false;

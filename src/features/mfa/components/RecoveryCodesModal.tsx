@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecoveryCodesModalOptions } from '../../../shared/modals/types';
 
@@ -23,6 +24,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
     source,
 }) => {
     const [copied, setCopied] = useState(false);
+    const insets = useSafeAreaInsets();
     const { secureCopy } = useSecureCopy();
     const [copyFeedbackVisible, setCopyFeedbackVisible] = useState(false);
     const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +77,12 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
             onRequestClose={() => { }}
         >
             <View style={styles.modalFullscreen}>
-                <ScreenContainer testID="purrivacy.mfa.recovery.codes">
+                <ScreenContainer
+                    testID="purrivacy.mfa.recovery.codes"
+                    contentContainerStyle={{
+                        paddingTop: Math.max(theme.spacing.xl, insets.top + theme.spacing.md),
+                    }}
+                >
                     <CustomText style={styles.modalMessageText}>
                         {getSourceDescription()} Save these codes in a secure location. Each code can be used once if you lose access to your authenticator app.
                     </CustomText>

@@ -92,6 +92,12 @@ export function useAuthSessionLifecycle({
           dispatch({ type: 'CHECKING_INACTIVITY', checking });
         },
         setAuthCompleted: () => {
+          // The unlock UI (local session lock) must stay visible until the
+          // backend session is fully established: UNLOCK_SUCCEEDED is
+          // dispatched in the same tick as the UI-settled transition, so the
+          // screen never flips to the regular sign-in form mid-flow. It is a
+          // reducer-level no-op outside the unlocking phase.
+          dispatch({ type: 'UNLOCK_SUCCEEDED' });
           dispatch({ type: 'AUTH_UI_SETTLED' });
         },
       })
