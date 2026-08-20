@@ -53,21 +53,26 @@ export function usePassphraseStorageState({
         }
 
         try {
-            // Decrypt/encrypt screens pass bannerMode='stored' and a stored
-            // passphrase value; when the user is actively using the key,
-            // autofill the stored passphrase even if the device-local flag was
-            // cleared (e.g. app-data reset) - the flag gates the banner UX on
-            // the key screen, not the stored value itself.
+            // Strict consent gate: the storage-enabled flag is
+            // server-authoritative (usePassphraseStorageAutoSync applies it
+            // from the user record on login/unlock) and disabling storage
+            // wipes the stored passphrases server-side. A stored value seen
+            // with the flag off means legacy records that pre-date the sync —
+            // treat that as "re-consent needed", not silent autofill.
             const enabled = await securityService.isPassphraseStorageEnabled(user.uid);
             setStorageEnabled(enabled);
 
-            const stored = storedPassphraseValue ?? null;
-            setStoredPassphrase(stored);
-
-            if (!enabled && !stored) {
+            if (!enabled) {
+                if (!userEditedRef.current && storedPassphrase && currentValueRef.current === storedPassphrase) {
+                    commitPassphraseRef.current('');
+                }
+                setStoredPassphrase(null);
                 setStorageEnabled(false);
                 return;
             }
+
+            const stored = storedPassphraseValue ?? null;
+            setStoredPassphrase(stored);
 
             if (
                 stored

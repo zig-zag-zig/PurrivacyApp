@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
@@ -27,6 +27,7 @@ export const MfaSetupScreen = () => {
 
     const [setupData, setSetupData] = useState<any>(null);
     const [totpCode, setTotpCode] = useState('');
+    const [trustDevice, setTrustDevice] = useState(true);
     const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,12 +48,13 @@ export const MfaSetupScreen = () => {
             const data = await setupMfa();
             setSetupData(data);
         } catch (error: any) {
-            // Backend API-SEC-006: fresh primary authentication is required to
-            // start MFA enrollment. The generic 401 path in httpErrorHandler
-            // does not flag it, so surface a clear message and drop the user
+            // Backend API-SEC-006: fresh primary authentication is required
+            // to start MFA enrollment (FreshAuthRequiredError -> bare 401 with
+            // no structured flag). Any 401 here — stale session OR
+            // fresh-auth-required — is correctly handled by dropping the user
             // back to a fresh sign-in instead of the opaque "Failed to
             // initialize" + silent back.
-            if (error?.status === 401 || String(error?.error ?? error?.message ?? '').includes('Fresh authentication')) {
+            if (error?.status === 401) {
                 await signOut();
                 showToast('Please sign in again to set up two-factor authentication', 'error');
                 return;
@@ -64,7 +66,7 @@ export const MfaSetupScreen = () => {
 
     const handleVerifyCode = async () => {
         try {
-            await enableMfa(totpCode);
+            await enableMfa(totpCode, trustDevice);
             await showRecoveryCodesModal({
                 recoveryCodes: setupData?.recoveryCodes || [],
                 source: 'setup',
@@ -158,6 +160,23 @@ export const MfaSetupScreen = () => {
                 maxLength={6}
                 style={styles.codeInput}
             />
+
+            <View style={styles.trustRow}>
+                <View style={styles.trustTextColumn}>
+                    <CustomText style={[commonStyles.textLabel, styles.trustLabel]}>
+                        Trust this device
+                    </CustomText>
+                    <CustomText style={[commonStyles.textCaption, styles.trustHint]}>
+                        Skip MFA prompts on this device until you sign out. You can change this later in Settings.
+                    </CustomText>
+                </View>
+                <Switch
+                    testID="purrivacy.mfa.setup.trustDevice"
+                    value={trustDevice}
+                    onValueChange={setTrustDevice}
+                    disabled={isLoading}
+                />
+            </View>
 
             <CustomText style={[commonStyles.textBody, styles.instructionTitle]}>
                 Instructions:
@@ -259,6 +278,26 @@ const styles = StyleSheet.create({
     },
     codeInput: {
         marginBottom: theme.spacing.md,
+    },
+    trustRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+    },
+    trustTextColumn: {
+        flex: 1,
+    },
+    trustLabel: {
+        marginBottom: theme.spacing.xs,
+    },
+    trustHint: {
+        color: theme.colors.textSecondary,
     },
     continueButton: {
         marginTop: theme.spacing.lg,

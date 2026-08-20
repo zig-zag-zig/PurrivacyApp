@@ -16,7 +16,7 @@ import { logger } from '../../../utils/logger';
 
 type MfaActions = {
   setupMfa: () => Promise<MfaSetupResponse>;
-  enableMfa: (mfaCode: string) => Promise<void>;
+  enableMfa: (mfaCode: string, mfaTrusted: boolean) => Promise<void>;
   disableMfa: () => Promise<void>;
   setSessionTrust: (mfaTrusted: boolean) => Promise<void>;
   regenerateRecoveryCodes: () => Promise<string[]>;
@@ -64,13 +64,13 @@ export function useMfaActions(
     },
   ), [setIsLoading, setError]);
 
-  const enableMfa = useCallback(async (mfaCode: string): Promise<void> => runMfaAction(
+  const enableMfa = useCallback(async (mfaCode: string, mfaTrusted: boolean): Promise<void> => runMfaAction(
     setIsLoading,
     setError,
     'Failed to enable MFA',
     'failed to enable mfa',
     async () => {
-      const response = await ApiClient.enableMfa(mfaCode);
+      const response = await ApiClient.enableMfa(mfaCode, mfaTrusted);
 
       setMfaState(prev => {
         if (prev.mfaEnabled === true && prev.mfaTrusted === response.mfaTrusted) {

@@ -214,13 +214,13 @@ describe('ApiClient', () => {
             expect(result).toEqual({ nonce: 'n', expiresAt: 't' });
         });
 
-        it('delegates enableMfa', async () => {
+        it('delegates enableMfa (passes the user trust choice through)', async () => {
             const ma = { enableMfa: vi.fn(async () => ({})) } as any;
             __testSetMfaApi(ma);
 
-            await ApiClient.enableMfa('123456');
+            await ApiClient.enableMfa('123456', false);
 
-            expect(ma.enableMfa).toHaveBeenCalledWith('123456');
+            expect(ma.enableMfa).toHaveBeenCalledWith('123456', false);
         });
 
         it('delegates trustSession', async () => {
