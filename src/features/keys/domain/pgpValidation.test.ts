@@ -58,6 +58,19 @@ describe('validateArmor', () => {
         expect(normalizeArmor(makeValidArmor('MESSAGE'), 'PUBLIC KEY BLOCK')).toBeNull();
     });
 
+    it('normalizeArmor canonicalizes markers with irregular internal whitespace', () => {
+        const irregular = makeArmorWithChecksum('MESSAGE').replace(
+            /-----BEGIN\s+PGP\s+MESSAGE\s*-----/i,
+            '-----BEGIN   PGP    MESSAGE-----',
+        );
+        const normalized = normalizeArmor(irregular, 'MESSAGE');
+        expect(normalized).not.toBeNull();
+        expect(normalized!.startsWith('-----BEGIN PGP MESSAGE-----\n\n')).toBe(true);
+        expect(normalized!.endsWith('\n-----END PGP MESSAGE-----')).toBe(true);
+        // The canonicalized armor passes strict validation.
+        expect(validateArmor(normalized!, 'MESSAGE')).toBe(true);
+    });
+
     it('normalizeArmor preserves the decoded body on canonical armor', () => {
         const canonical = makeArmorWithChecksum('MESSAGE');
         const normalized = normalizeArmor(canonical, 'MESSAGE');

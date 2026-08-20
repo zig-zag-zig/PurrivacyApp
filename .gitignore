@@ -89,3 +89,4 @@ coverage/
 .pi*
 # e2e harness temp file
 firebase.json
+.maestro/fixtures.json

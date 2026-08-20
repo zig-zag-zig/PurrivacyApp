@@ -10,6 +10,7 @@ import type { ApiRequestFn } from '../core/apiRequestFactory';
 import { getApiRuntime } from '../runtime';
 import { ApiRequestError } from '../apiError';
 import { buildApiUrl } from '../core/buildApiUrl';
+import { logger } from '../../utils/logger';
 import { isJsonObject } from '../request/errorData';
 import { parseResponseBody } from '../request/parseResponseBody';
 import { parseCreateUserResponse, parseUserEncrypted, CreateUserResponse } from '../request/responseSchema';
@@ -87,8 +88,14 @@ export function createUserApi(request: ApiRequestFn) {
       options: { limit?: number; since?: number } = {},
     ): Promise<UserKeyRecordsResponse['keys']> {
       const PAGE_SIZE = 500;
+      // Guard against a misbehaving pagination cursor (non-advancing or
+      // repeated on the last page): a first-party backend bug must hang key
+      // loading forever or grow memory unboundedly.
+      const MAX_PAGES = 100;
       const keys: UserKeyRecordsResponse['keys'] = [];
       let cursor: string | undefined;
+      let pages = 0;
+      const seenCursors = new Set<string>();
 
       do {
         const page = await this.getKeyRecords({
@@ -98,6 +105,20 @@ export function createUserApi(request: ApiRequestFn) {
         });
         keys.push(...page.keys);
         cursor = page.nextCursor;
+        pages += 1;
+
+        if (cursor !== undefined && (pages >= MAX_PAGES || seenCursors.has(cursor) || page.keys.length === 0)) {
+          logger.warn('key-record pagination terminated early', {
+            pages,
+            nextCursor: cursor,
+            emptyPage: page.keys.length === 0,
+            repeatedCursor: seenCursors.has(cursor),
+          });
+          break;
+        }
+        if (cursor !== undefined) {
+          seenCursors.add(cursor);
+        }
       } while (cursor !== undefined);
 
       return keys;

@@ -49,7 +49,13 @@ export const normalizeArmor = (
     // Wrap the base64 body at 64 columns.
     const wrapped = body.replace(/(.{64})/g, '$1\n').trim();
 
-    return `${begin}\n\n${wrapped}${checksum ? `\n${checksum}` : ''}\n${endMatch[0]}`;
+    // Re-emit CANONICAL markers: the matched ones may contain irregular
+    // internal whitespace (e.g. "-----BEGIN  PGP MESSAGE-----") that would
+    // otherwise survive normalization still unparseable.
+    const canonicalBegin = `-----BEGIN PGP ${blockType}-----`;
+    const canonicalEnd = `-----END PGP ${blockType}-----`;
+
+    return `${canonicalBegin}\n\n${wrapped}${checksum ? `\n${checksum}` : ''}\n${canonicalEnd}`;
 };
 
 export const validateArmor = (

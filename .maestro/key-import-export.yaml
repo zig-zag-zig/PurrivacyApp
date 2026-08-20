@@ -47,7 +47,11 @@ env:
     id: "purrivacy.key.action.import"
 - tapOn:
     id: "purrivacy.key.import.armoredKey"
-- inputText: ${IMPORT_PUBLIC_KEY}
+    retryTapIfNoChange: true
+# Paste is atomic: inputText can drop chars on slow emulators, and the
+# isolated field suppresses accessibility text (Maestro cannot verify input)
+- setClipboard: ${IMPORT_PUBLIC_KEY}
+- pasteText
 - hideKeyboard
 - tapOn:
     id: "purrivacy.key.import.submit"
@@ -78,9 +82,10 @@ env:
 - waitForAnimationToEnd:
     timeout: 3000
 # The import field is a security-isolated input that suppresses accessibility
-# text, so Maestro's inputText can never verify completion. Paste via the
-# device clipboard + KEYCODE_PASTE instead (key events work, no verification).
-- inputText: ${IMPORT_PRIVATE_KEY}
+# text, so Maestro's inputText can never verify completion. Paste is atomic
+# (flattened armor is normalized by the app before validation).
+- setClipboard: ${IMPORT_PRIVATE_KEY}
+- pasteText
 - hideKeyboard
 - tapOn:
     id: "purrivacy.key.import.submit"
