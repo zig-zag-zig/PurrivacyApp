@@ -25,6 +25,12 @@ vi.mock('../../services/eventService', () => ({
   EventService: eventServiceMock,
 }));
 
+let recentSwap = false;
+vi.mock('../session/sessionSwap', () => ({
+  hasRecentSessionSwap: () => recentSwap,
+  recordSessionSwap: vi.fn(),
+}));
+
 vi.mock('../../utils/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
@@ -93,6 +99,20 @@ describe('handleHttpError', () => {
       handleHttpError(401, { bearerTokenInvalid: true }, '/api/test', 'GET', {}, true, false, undefined, noop, noop),
     ).rejects.toThrow(ApiRequestError);
     expect(eventServiceMock.addEvent).toHaveBeenCalledWith('signOut');
+  });
+
+  it('suppresses the sign-out event shortly after a session swap (stale-token race)', async () => {
+    recentSwap = true;
+    try {
+      await expect(
+        handleHttpError(401, { refreshTokenReuse: true }, '/api/test', 'GET', {}, true, true, undefined, noop, noop),
+      ).rejects.toThrow(ApiRequestError);
+      // The error still throws; only the global sign-out EVENT is suppressed
+      // so a request that raced an MFA session swap does not log the user out.
+      expect(eventServiceMock.addEvent).not.toHaveBeenCalledWith('signOut');
+    } finally {
+      recentSwap = false;
+    }
   });
 
   it('throws ApiRequestError for non-retryable generic errors', async () => {

@@ -3,11 +3,20 @@ import { EventService } from '../../services/eventService';
 import { ApiRequestError } from '../apiError';
 import { AuthFlowError } from '../auth/authFlowError';
 import { isApiErrorData, isJsonObject } from './errorData';
+import { hasRecentSessionSwap } from '../session/sessionSwap';
 import type { AuthErrorResponse } from '../../types/types';
 import type { CreateSessionFn, RequestFn, RequestOptions } from './requestOptions';
 
 const signOut = (): never => {
-    EventService.addEvent('signOut');
+    // MFA state transitions swap the session mid-flow: the backend revokes
+    // the OLD family while the new session is stored client-side. A request
+    // that raced the swap then refreshes with a revoked token
+    // (refreshTokenReuse) — that is a stale-token artifact, not a dead
+    // session. Stay quiet shortly after a swap so the app keeps using the
+    // fresh session instead of logging the user out.
+    if (!hasRecentSessionSwap()) {
+        EventService.addEvent('signOut');
+    }
     throw new ApiRequestError('Authentication invalid. Please sign in again.', 401, { sessionInvalid: true });
 };
 

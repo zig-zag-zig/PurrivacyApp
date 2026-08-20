@@ -2,6 +2,7 @@ import { getApiRuntime } from '../runtime';
 import { EventService } from '../../services/eventService';
 import type { MfaState, SessionResponse } from '../../types/types';
 import { logger } from '../../utils/logger';
+import { recordSessionSwap } from './sessionSwap';
 import type { ApiRequestFn } from '../core/apiRequestFactory';
 import { buildApiUrl } from '../core/buildApiUrl';
 import { RequestOptions, processResponse } from '../requestHelpers';
@@ -53,6 +54,7 @@ export class SessionManager {
     async storeSessionResponse(response: SessionResponse, userId: string): Promise<void> {
         this.accessTokens.store(response);
         await getApiRuntime().sessionStore.storeSession(response, userId);
+        recordSessionSwap();
     }
 
     async createSession(

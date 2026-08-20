@@ -7,7 +7,7 @@ import { AuthFlowError } from '../../../api/auth/authFlowError';
 import { isWrongMfaCode } from '../../../shared/errors/errorGuards';
 // Track if we're already in an MFA handler to prevent recursive calls
 let isInMfaHandler = false;
-const MFA_SUBMISSION_TIMEOUT_MS = 30_000;
+const MFA_SUBMISSION_TIMEOUT_MS = 45_000;
 
 const withMfaSubmissionTimeout = async <T>(submission: Promise<T>): Promise<T> => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -49,6 +49,32 @@ export class MfaUtils {
         onMfaCode: (mfaCode: string) => Promise<T>;
         onError?: (error: any) => void;
     }): Promise<T> {
+        // Backend MFA state transitions (enable/disable) are retryable by
+        // design: a slow first attempt (client submission timeout) or a
+        // transient revoke-step failure returns "retry the request to finish"
+        // and the backend resume path is idempotent and fast. Resubmit the
+        // SAME code once so the user is not forced to re-enter it.
+        const submitWithRetry = async (code: string): Promise<T> => {
+            let attempts = 0;
+            for (;;) {
+                attempts += 1;
+                try {
+                    const response = await withMfaSubmissionTimeout(params.onMfaCode(code));
+                    if (!params.isLoginFlow) {
+                        EventService.addEvent('closeMfaModal');
+                    }
+                    return response;
+                } catch (error: any) {
+                    const retryableTransition = error?.errorData?.retryable === true;
+                    const clientTimeout = error?.mfaTimedOut === true;
+                    if (attempts === 1 && (retryableTransition || clientTimeout)) {
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+        };
+
         if (isInMfaHandler) {
             throw new Error('Already in MFA handler');
         }
@@ -67,16 +93,11 @@ export class MfaUtils {
                         isSensitive: params.isSensitive,
                         isLoginFlow: params.isLoginFlow,
                     });
-
                     if (!result?.code) {
                         throw new AuthFlowError('MFA verification was cancelled', { mfaCancelled: true });
                     }
 
-                    const response = await withMfaSubmissionTimeout(params.onMfaCode(result.code));
-                    if (!params.isLoginFlow) {
-                        EventService.addEvent('closeMfaModal');
-                    }
-                    return response;
+                    return await submitWithRetry(result.code);
                 } catch (error: any) {
                     if (isWrongMfaCode(error)) {
                         EventService.addEvent('clearMfaCode', { isWrongMfaCode: true });

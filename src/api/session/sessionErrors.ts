@@ -1,4 +1,5 @@
 import { EventService } from '../../services/eventService';
+import { hasRecentSessionSwap } from './sessionSwap';
 import { AuthErrorResponse } from '../../types/types';
 import { AuthFlowError } from '../auth/authFlowError';
 import { isRecord } from '../../shared/errors/errorGuards';
@@ -50,7 +51,7 @@ export const missingStoredSessionError = (): AuthFlowError => {
 
 export const throwStoredSessionAuthFailure = (error: unknown, emitSignOut: boolean): never => {
     const authError = markRequiresSignOut(error);
-    if (emitSignOut) {
+    if (emitSignOut && !hasRecentSessionSwap()) {
         EventService.addEvent('signOut');
     }
     throw authError;
