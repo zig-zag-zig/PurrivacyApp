@@ -99,6 +99,12 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     returnKeyType="done"
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
+                    // After a programmatic clear (e.g. a rejected code) the
+                    // internal cursor stays at the previous end position and
+                    // renders at the edge of the centered, empty field. Pin
+                    // the selection to the start while the field is empty so
+                    // the caret sits where typing will land.
+                    selection={value.length === 0 ? { start: 0, end: 0 } : undefined}
                 />
             </View>
             <CustomText style={styles.charCount}>

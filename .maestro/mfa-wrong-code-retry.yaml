@@ -29,7 +29,11 @@ env:
     id: "purrivacy.mfa.code.input.box.0"
 - inputText: "000000"
 # The backend rejects it (403 wrongMfaCode); the app clears the input and
-# stays on the modal for retry. Wait for the clear, then assert still modal.
+# stays on the modal for retry. The error toast must be VISIBLE above the
+# modal (rendered by ModalToastHost inside the modal layer).
+- extendedWaitUntil:
+    visible: "The MFA code you entered was incorrect. Please try again."
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: "purrivacy.mfa.modal"
