@@ -172,6 +172,8 @@ export const MfaSetupScreen = () => {
                 </View>
                 <Switch
                     testID="purrivacy.mfa.setup.trustDevice"
+                    accessibilityLabel="Trust this device"
+                    accessibilityRole="switch"
                     value={trustDevice}
                     onValueChange={setTrustDevice}
                     disabled={isLoading}

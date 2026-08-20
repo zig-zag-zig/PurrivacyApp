@@ -10,8 +10,9 @@ import { logger } from '../../../utils/logger';
  * (included in the GET /user backend response) and applies it
  * locally without re-calling the backend API.
  *
- * Subsequent changes to the setting propagate via FCM and are
- * handled by usePassphraseSync.
+ * Subsequent changes made on OTHER devices are NOT pushed: they apply
+ * here on the next login/unlock, when this hook re-reads the flag from
+ * the refreshed user record. (There is no FCM sync for this setting.)
  */
 export function usePassphraseStorageAutoSync(userDecrypted: UserDecrypted | null): void {
     const lastAppliedUserIdRef = useRef<string | null>(null);

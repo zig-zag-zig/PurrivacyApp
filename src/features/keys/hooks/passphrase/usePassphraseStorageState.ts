@@ -44,6 +44,11 @@ export function usePassphraseStorageState({
 }: UsePassphraseStorageStateParams): UsePassphraseStorageStateResult {
     const [storedPassphrase, setStoredPassphrase] = useState<string | null>(null);
     const [storageEnabled, setStorageEnabled] = useState(false);
+    // storedPassphrase is deliberately omitted from loadStoredPassphrase deps
+    // (see NOTE below), so the closure copy goes stale. Mirror the latest
+    // known value here for reads inside that callback (e.g. clearing a
+    // previously-applied autofill when consent flips off mid-session).
+    const storedPassphraseRef = useRef<string | null>(null);
 
     const loadStoredPassphrase = useCallback(async () => {
         if (bannerMode !== 'stored' || !fingerprint || !user?.uid) {
@@ -63,15 +68,18 @@ export function usePassphraseStorageState({
             setStorageEnabled(enabled);
 
             if (!enabled) {
-                if (!userEditedRef.current && storedPassphrase && currentValueRef.current === storedPassphrase) {
+                const lastStored = storedPassphraseRef.current;
+                if (!userEditedRef.current && lastStored && currentValueRef.current === lastStored) {
                     commitPassphraseRef.current('');
                 }
+                storedPassphraseRef.current = null;
                 setStoredPassphrase(null);
                 setStorageEnabled(false);
                 return;
             }
 
             const stored = storedPassphraseValue ?? null;
+            storedPassphraseRef.current = stored;
             setStoredPassphrase(stored);
 
             if (
@@ -85,6 +93,7 @@ export function usePassphraseStorageState({
             storedDefaultAppliedRef.current = true;
         } catch (loadError) {
             logger.warn('passphrase autofill load failed', { error: loadError });
+            storedPassphraseRef.current = null;
             setStoredPassphrase(null);
         }
         // NOTE: deps match the original — storedPassphrase is intentionally omitted
