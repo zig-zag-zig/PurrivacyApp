@@ -63,7 +63,10 @@ export const performPasswordSignIn = async ({
   try {
     const firebaseUser = await UserAuthService.signInWithUsernamePassword(username, password);
     await firebaseUser.getIdToken(true);
-    await securityService.setLocalSessionLocked(firebaseUser.uid, false);
+    // NOTE: the local session lock is NOT cleared here — it gates the unlock
+    // UI, and clearing it mid-flow flips the screen to the regular sign-in
+    // form before the backend session is established. It is cleared in
+    // completeAuthenticatedUi once the session fully completes.
     pendingPasswordRef.current = password;
     setPendingPassword(password);
     const firebaseUsername = getUsernameFromUser(firebaseUser);

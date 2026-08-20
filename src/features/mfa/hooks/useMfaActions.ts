@@ -45,6 +45,26 @@ const runMfaAction = async <T,>(
   }
 };
 
+/**
+ * A retryable TransitionError means the MFA state change COMMITTED
+ * server-side; only the old-session cleanup failed (and our one transparent
+ * retry also failed). The client's session is dead (revoked by the
+ * transition) and the local state is stale. Re-establish the session: the
+ * backend derives the current MFA state, so the fresh session both revives
+ * auth and carries the truth (for an MFA-enabled account the pipeline shows
+ * the MFA modal to complete the fresh session).
+ */
+const recoverSessionAfterRetryableTransition = async (): Promise<SessionResponse | null> => {
+  try {
+    return await ApiClient.createSession(true, undefined, true);
+  } catch (recoveryError) {
+    logger.warn('failed to re-establish session after retryable MFA transition', {
+      error: recoveryError,
+    });
+    return null;
+  }
+};
+
 export function useMfaActions(
   setMfaState: Dispatch<SetStateAction<MfaState>>,
 ): MfaActions {
@@ -70,16 +90,30 @@ export function useMfaActions(
     'Failed to enable MFA',
     'failed to enable mfa',
     async () => {
-      const response = await ApiClient.enableMfa(mfaTrusted);
+      try {
+        const response = await ApiClient.enableMfa(mfaTrusted);
 
-      setMfaState(prev => {
-        if (prev.mfaEnabled === true && prev.mfaTrusted === response.mfaTrusted) {
-          return prev;
+        setMfaState(prev => {
+          if (prev.mfaEnabled === true && prev.mfaTrusted === response.mfaTrusted) {
+            return prev;
+          }
+          return { mfaEnabled: true, mfaTrusted: response.mfaTrusted };
+        });
+
+        showToast('MFA enabled successfully', 'success');
+      } catch (error: any) {
+        if (error?.errorData?.retryable === true) {
+          // The enable committed server-side; only the session cleanup failed.
+          const recovered = await recoverSessionAfterRetryableTransition();
+          setMfaState(prev => ({
+            mfaEnabled: true,
+            mfaTrusted: recovered?.mfaTrusted ?? prev.mfaTrusted,
+          }));
+          showToast('MFA was enabled. Session cleanup will finish on your next action.', 'info');
+          return;
         }
-        return { mfaEnabled: true, mfaTrusted: response.mfaTrusted };
-      });
-
-      showToast('MFA enabled successfully', 'success');
+        throw error;
+      }
     },
   ), [setIsLoading, setError, setMfaState, showToast]);
 
@@ -89,16 +123,30 @@ export function useMfaActions(
     'Failed to disable MFA',
     'failed to disable mfa',
     async () => {
-      const response: SessionResponse = await ApiClient.disableMfa();
+      try {
+        const response: SessionResponse = await ApiClient.disableMfa();
 
-      setMfaState(prev => {
-        if (prev.mfaEnabled === false && prev.mfaTrusted === response.mfaTrusted) {
-          return prev;
+        setMfaState(prev => {
+          if (prev.mfaEnabled === false && prev.mfaTrusted === response.mfaTrusted) {
+            return prev;
+          }
+          return { mfaEnabled: false, mfaTrusted: response.mfaTrusted };
+        });
+
+        showToast('MFA disabled successfully', 'success');
+      } catch (error: any) {
+        if (error?.errorData?.retryable === true) {
+          // The disable committed server-side; only the session cleanup failed.
+          const recovered = await recoverSessionAfterRetryableTransition();
+          setMfaState(prev => ({
+            mfaEnabled: false,
+            mfaTrusted: recovered?.mfaTrusted ?? prev.mfaTrusted,
+          }));
+          showToast('MFA was disabled. Session cleanup will finish on your next action.', 'info');
+          return;
         }
-        return { mfaEnabled: false, mfaTrusted: response.mfaTrusted };
-      });
-
-      showToast('MFA disabled successfully', 'success');
+        throw error;
+      }
     },
   ), [setIsLoading, setError, setMfaState, showToast]);
 

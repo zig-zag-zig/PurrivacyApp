@@ -7,6 +7,9 @@ import { UserDecrypted } from '../../../types/types';
 import { logger } from '../../../utils/logger';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { resetSessionTimer } from '../../security/services/activityService';
+import { securityService } from '../../security/services/securityService';
+import { getUserId } from '../domain/authUtils';
+import { hasRecentSessionSwap } from '../../../api/session/sessionSwap';
 import {
   isMfaRequiredAuthError,
   isRateLimitError,
@@ -29,6 +32,17 @@ export const completeAuthenticatedUi = ({
   setIsAuthLoading(false);
   setIsCheckingInactivity(false);
   setAuthCompleted(true);
+
+  // Clear the local session lock ONLY here, at full session completion: the
+  // lock gates the unlock UI, so clearing it earlier (e.g. right after the
+  // Firebase password check) flips the screen to the regular sign-in form
+  // while the backend session is still being established.
+  const userId = getUserId();
+  if (userId) {
+    securityService.setLocalSessionLocked(userId, false).catch((error) => {
+      logger.warn('failed to clear local session lock at auth completion', { error });
+    });
+  }
 };
 
 type FinishAuthenticatedSessionParams = CompleteAuthenticatedUiParams & {
@@ -179,6 +193,12 @@ export const createBackendAuthSession = async ({
     }
 
     if (shouldEndPartialBackendAuth(error)) {
+      if (hasRecentSessionSwap()) {
+        // A session swap (e.g. an MFA transition) just replaced the tokens;
+        // this failure came from a stale pre-swap request. Keep the fresh
+        // session and let the next request use it.
+        return;
+      }
       setSessionAuthenticated(false);
       resetSessionIntentRefs(userInitAuthRef, forceNewSessionOnNextAuthRef, shouldPromptBiometricRef);
 
@@ -206,6 +226,11 @@ export const createBackendAuthSession = async ({
     }
 
     if (isMfaRequiredAuthError(error)) {
+      if (!isUserInitiatedAuth && hasRecentSessionSwap()) {
+        // The mfaRequired came from a stale pre-swap session call; the fresh
+        // swapped session is already authenticated. Do not lock or re-prompt.
+        return;
+      }
       setSessionAuthenticated(false);
       resetSessionIntentRefs(userInitAuthRef, forceNewSessionOnNextAuthRef, shouldPromptBiometricRef);
 
