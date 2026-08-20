@@ -4,7 +4,6 @@ import { View, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
-import { InputField } from '../../../components/InputField';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { useMfa } from '../state/MfaContext';
@@ -26,7 +25,6 @@ export const MfaSetupScreen = () => {
     const { showRecoveryCodesModal } = useModal();
 
     const [setupData, setSetupData] = useState<any>(null);
-    const [totpCode, setTotpCode] = useState('');
     const [trustDevice, setTrustDevice] = useState(true);
     const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
@@ -66,7 +64,12 @@ export const MfaSetupScreen = () => {
 
     const handleVerifyCode = async () => {
         try {
-            await enableMfa(totpCode, trustDevice);
+            // The request pipeline treats /mfa/enable as MFA-sensitive and
+            // PREEMPTIVELY opens the MFA modal to collect the code before the
+            // request is sent — the code entered there is what reaches the
+            // backend. There is deliberately no code field on this screen:
+            // the modal is the single code-collection UI.
+            await enableMfa(trustDevice);
             await showRecoveryCodesModal({
                 recoveryCodes: setupData?.recoveryCodes || [],
                 source: 'setup',
@@ -151,16 +154,6 @@ export const MfaSetupScreen = () => {
                 </CustomText>
             </View>
 
-            <InputField
-                label="6-digit code from your authenticator app"
-                testID="purrivacy.mfa.setup.code"
-                value={totpCode}
-                onChangeText={(text) => setTotpCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
-                keyboardType="number-pad"
-                maxLength={6}
-                style={styles.codeInput}
-            />
-
             <View style={styles.trustRow}>
                 <View style={styles.trustTextColumn}>
                     <CustomText style={[commonStyles.textLabel, styles.trustLabel]}>
@@ -207,7 +200,7 @@ export const MfaSetupScreen = () => {
                 onPress={handleVerifyCode}
                 style={styles.continueButton}
                 loading={isLoading}
-                disabled={isLoading || totpCode.length !== 6}
+                disabled={isLoading}
             />
         </ScreenContainer >
     );

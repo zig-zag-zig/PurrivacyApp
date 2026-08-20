@@ -29,14 +29,12 @@ env:
     timeout: 15000
 - tapOn:
     id: "purrivacy.settings.mfa"
-# MFA setup screen rendered => mint + setup succeeded (secret + otpauthUrl shown)
+# MFA setup screen rendered => mint + setup succeeded (secret + otpauthUrl shown).
+# Enrollment completes through the MFA modal (the pipeline opens it for
+# /mfa/enable); entering the code there is verified manually / real devices.
 - extendedWaitUntil:
     visible:
       id: "purrivacy.mfa.setup.screen"
     timeout: 20000
 - assertVisible:
-    id: "purrivacy.mfa.setup.code"
-# NOTE: completing enrollment requires a valid 6-digit TOTP derived from the
-# on-screen secret. Maestro cannot compute TOTP inline (no crypto in evalScript),
-# so the enable step is verified manually / on real devices. The recovery-codes
-# modal flow is covered by unit tests + manual QA.
+    id: "purrivacy.mfa.setup.trustDevice"

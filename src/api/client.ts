@@ -100,8 +100,8 @@ export class ApiClient {
         return getMa().mintMfaSetupNonce();
     }
 
-    static async enableMfa(mfaCode: string, mfaTrusted: boolean): Promise<SessionResponse> {
-        return getMa().enableMfa(mfaCode, mfaTrusted);
+    static async enableMfa(mfaTrusted: boolean): Promise<SessionResponse> {
+        return getMa().enableMfa(mfaTrusted);
     }
 
     static async disableMfa(): Promise<SessionResponse> {

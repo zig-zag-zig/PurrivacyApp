@@ -28,11 +28,14 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
       return request('/mfa/setup', 'POST', { nonce }) as Promise<MfaSetupResponse>;
     },
 
-    async enableMfa(mfaCode: string, mfaTrusted: boolean): Promise<SessionResponse> {
+    async enableMfa(mfaTrusted: boolean): Promise<SessionResponse> {
+      // The code is NOT collected here: the request pipeline classifies
+      // /mfa/enable as MFA-sensitive and opens the MFA modal preemptively;
+      // the modal's code is injected into the body via options.mfaCode.
       const response = await request(
         '/mfa/enable',
         'POST',
-        { mfaCode, mfaTrusted },
+        { mfaTrusted },
         true,
         { includeDeviceId: true },
       ) as SessionResponse;
