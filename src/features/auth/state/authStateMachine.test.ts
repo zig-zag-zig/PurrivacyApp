@@ -194,7 +194,7 @@ describe('FIREBASE_USER_ESTABLISHED', () => {
     expect(s.user?.email).toBe('alice-renamed@example.com');
   });
 
-  it('keeps locally-locked from being superseded into authenticated by a stale signal', () => {
+  it('keeps the lock when a Firebase signal arrives while locally-locked (stale listener)', () => {
     const s = run([
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
       { type: 'SESSION_CREATED' },
@@ -203,10 +203,10 @@ describe('FIREBASE_USER_ESTABLISHED', () => {
       { type: 'LOCK_COMPLETED' },
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
     ]);
-    // The listener would only emit ESTABLISHED after a successful unlock;
-    // the machine converges to firebase-authenticated, never authenticated.
-    expect(s.phase).toBe('firebase-authenticated');
-    expect(s.isLocalSessionLocked).toBe(false);
+    // The unlock flow owns the lock: a Firebase signal must not silently
+    // unlock the app. The user unlocks explicitly (UNLOCK_REQUESTED).
+    expect(s.phase).toBe('locally-locked');
+    expect(s.isLocalSessionLocked).toBe(true);
     expect(s.userDecrypted).toBeNull();
   });
 });
@@ -268,15 +268,22 @@ describe('SESSION_CREATED', () => {
     expect(s.priorPhase).toBeNull();
   });
 
-  it('resolves unlocking to firebase-authenticated (biometric unlock path)', () => {
+  it('keeps unlocking (and the lock) until UNLOCK_SUCCEEDED at session completion', () => {
     const s = run([
       { type: 'LOCAL_LOCK_DETECTED', lastSignedInUser: makeLastSignedIn() },
       { type: 'UNLOCK_REQUESTED' },
       { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
       { type: 'SESSION_CREATED' },
     ]);
-    expect(s.phase).toBe('firebase-authenticated');
+    // Mid-flow: the unlock screen must stay (lock kept, phase unlocking)
+    // even after the Firebase user and the backend session exist.
+    expect(s.phase).toBe('unlocking');
+    expect(s.isLocalSessionLocked).toBe(true);
     expect(s.sessionAuthenticated).toBe(true);
+
+    const done = authReducer(s, { type: 'UNLOCK_SUCCEEDED' });
+    expect(done.phase).toBe('firebase-authenticated');
+    expect(done.isLocalSessionLocked).toBe(false);
   });
 
   it('is a re-entrant no-op when the session is already established', () => {

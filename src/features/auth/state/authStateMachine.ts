@@ -217,14 +217,15 @@ export function authReducer(state: AuthMachineState, event: AuthEvent): AuthMach
 
     case 'FIREBASE_USER_ESTABLISHED': {
       if (state.phase === 'locally-locked' || state.phase === 'unlocking') {
-        // The lock has been superseded by a newer Firebase signal (e.g. a
-        // successful unlock completed while the listener was mid-flight).
+        // The unlock flow owns the lock state: a Firebase user signal during
+        // it (auth listener firing right after the password check) must NOT
+        // clear the lock — that would flip the unlock screen to the regular
+        // sign-in form before the backend session exists. UNLOCK_SUCCEEDED
+        // clears the lock at session completion.
         return {
           ...state,
-          phase: state.phase === 'locally-locked' ? 'firebase-authenticated' : state.phase,
           fbUser: event.user,
           user: state.sessionAuthenticated ? event.user : state.user,
-          isLocalSessionLocked: false,
           error: null,
         };
       }
@@ -251,8 +252,19 @@ export function authReducer(state: AuthMachineState, event: AuthEvent): AuthMach
       if (state.sessionAuthenticated && state.phase !== 'mfa-pending') {
         return state; // re-entrant
       }
+      if (state.phase === 'unlocking') {
+        // Keep the unlock flow's phase AND lock: the unlock screen must stay
+        // until the session fully completes (UNLOCK_SUCCEEDED, dispatched at
+        // completion, transitions the phase and clears the lock).
+        return {
+          ...state,
+          sessionAuthenticated: true,
+          user: state.fbUser ?? state.user,
+          priorPhase: null,
+          error: null,
+        };
+      }
       const nextPhase = state.phase === 'mfa-pending'
-        || state.phase === 'unlocking'
         || state.phase === 'locally-locked'
         || state.phase === 'bootstrapping'
         ? 'firebase-authenticated'
