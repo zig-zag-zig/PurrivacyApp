@@ -1,273 +1,80 @@
 import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
-import { consumePendingSignup } from '../../../native/autofillCommit';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useAuth } from '../state/AuthContext';
 import { RootNavigationProps } from '../../../app/navigation/types';
 import { theme } from '../../../styles/theme';
 import { useToast } from '../../../app/state/ToastContext';
-import { securityService } from '../../security/services/securityService';
-import { User } from 'firebase/auth';
-import { BiometricAuthService } from '../../security/services/biometricAuthService';
-import { sanitizeUsernameInput, USERNAME_MAX_LENGTH, validateUsername } from '../domain/usernameIdentity';
+import { sanitizeUsernameInput, USERNAME_MAX_LENGTH } from '../domain/usernameIdentity';
 import { shouldShowUnlockScreen } from '../domain/authUiState';
-import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
-import { logger } from '../../../utils/logger';
-const AUTO_BIOMETRIC_RESET_AFTER_BACKGROUND_MS = 15000;
-const autoBiometricSuppressedUsernames = new Set<string>();
-const autoBiometricUsernameKey = (value: string) => value.trim().toLowerCase();
+import { usePendingSignupResume } from '../hooks/signin/usePendingSignupResume';
+import { useUsernamePrefill } from '../hooks/signin/useUsernamePrefill';
+import { useBiometricAutoPrompt } from '../hooks/signin/useBiometricAutoPrompt';
+import { useSigninActions } from '../hooks/signin/useSigninActions';
 
 export const SigninScreen = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
     const { isAuthLoading, isLocalSessionLocked, authCompleted, initializeBiometricState, lastSignedInUser, setLastUsedBiometricSignIn, appStateIsBackground, signin, signOut, user, canGoDirectlyToBiometricAuth } = useAuth();
-    const [showBiometricButton, setShowBiometricButton] = useState(false);
     const navigation = useNavigation<RootNavigationProps>();
     const { showToast } = useToast();
-    const [alreadyPrompted, setAlreadyPrompted] = React.useState<boolean>(false);
-    const [autoBiometricSuppressed, setAutoBiometricSuppressed] = useState(false);
-    const [loadingAction, setLoadingAction] = useState<'password' | 'biometric' | 'signout' | null>(null);
-    const backgroundTimeRef = useRef<number | null>(null);
-    const signInInFlightRef = useRef(false);
-    const usernamesThatDidNotLastUseBiometrics = useRef<Set<string>>(new Set());
     const usernamePrefillHandledRef = useRef(false);
     const usernameRef = useRef<any>(null);
     const isFocused = useIsFocused();
+    const unlockHandlerRef = useRef<(() => Promise<void>) | null>(null);
 
-    const suppressAutoBiometricForUsername = (value: string) => {
-        const key = autoBiometricUsernameKey(value);
-        if (validateUsername(key)) return;
-        autoBiometricSuppressedUsernames.add(key);
-        setAutoBiometricSuppressed(true);
-    };
+    usePendingSignupResume(navigation);
+    useUsernamePrefill(isFocused, lastSignedInUser, setUsername, usernamePrefillHandledRef);
 
-    useEffect(() => {
-        consumePendingSignup().then((data) => {
-            if (data) {
-                navigation.navigate('Signup', { username: data.username, password: data.password });
-                navigation.navigate('SignupSeedVerification', data);
-            }
-        });
-    }, []);
+    const autoPrompt = useBiometricAutoPrompt({
+        username,
+        appStateIsBackground,
+        authCompleted,
+        canGoDirectlyToBiometricAuth,
+        user,
+        lastSignedInUser,
+        setLastUsedBiometricSignIn,
+        initializeBiometricState,
+        unlockHandlerRef,
+    });
 
-    useEffect(() => {
-        if (isFocused && lastSignedInUser?.username) {
-            usernamePrefillHandledRef.current = true;
-            setUsername(lastSignedInUser.username);
-        }
-    }, [isFocused, lastSignedInUser?.username]);
+    const { showBiometricButton } = autoPrompt;
+
+    const { loadingAction, onSignin, onBiometricUnlock, onUnlockSignOut } = useSigninActions({
+        isAuthLoading,
+        username,
+        password,
+        setUsername,
+        setPassword,
+        setFormErrors,
+        signin,
+        signOut,
+        navigation,
+        showToast,
+        lastSignedInUser,
+        markPrompted: autoPrompt.markPrompted,
+        suppressBiometric: autoPrompt.suppress,
+        unlockHandlerRef,
+    });
 
     useFocusEffect(
         useCallback(() => {
             return () => {
                 if (AppState.currentState !== 'active') return;
 
-                setShowBiometricButton(false);
+                autoPrompt.resetForBlur();
                 usernamePrefillHandledRef.current = false;
                 setUsername('');
                 setPassword('');
                 setFormErrors({});
-                setAlreadyPrompted(false);
             };
-        }, [])
+        }, [autoPrompt.resetForBlur])
     );
-
-    const didLastUseBiometrics = async (username: string) => {
-        if (validateUsername(username)) return false;
-
-        const alreadyTried = usernamesThatDidNotLastUseBiometrics.current.has(username);
-        if (!alreadyTried) {
-            const result = await BiometricAuthService.getLastUsedBiometricSignIn(username);
-            if (!result) {
-                usernamesThatDidNotLastUseBiometrics.current.add(username);
-            }
-            return result;
-        }
-
-        return false;
-    }
-
-    useEffect(() => {
-        const set = async () => {
-            const suppressed = autoBiometricSuppressedUsernames.has(autoBiometricUsernameKey(username));
-            setAutoBiometricSuppressed(suppressed);
-            const lastUsedBiometric = await didLastUseBiometrics(username);
-            setLastUsedBiometricSignIn(lastUsedBiometric);
-            if (await BiometricAuthService.biometricsDisabledInPhoneSettings(username) === true) {
-                setShowBiometricButton(false);
-                initializeBiometricState();
-            }
-            void suppressed;
-        }
-
-        set();
-    }, [username])
-
-    useEffect(() => {
-        if (!isAuthLoading) {
-            signInInFlightRef.current = false;
-            setLoadingAction(null);
-        }
-    }, [isAuthLoading]);
-
-    useEffect(() => {
-        if (appStateIsBackground && backgroundTimeRef.current === null) {
-            backgroundTimeRef.current = Date.now();
-        } else if (backgroundTimeRef.current !== null) {
-            const timeInBackground = Date.now() - backgroundTimeRef.current;
-            if (timeInBackground >= AUTO_BIOMETRIC_RESET_AFTER_BACKGROUND_MS) {
-                setAlreadyPrompted(false);
-                const key = autoBiometricUsernameKey(username);
-                if (!validateUsername(key)) {
-                    autoBiometricSuppressedUsernames.delete(key);
-                    setAutoBiometricSuppressed(false);
-                }
-            }
-            backgroundTimeRef.current = null;
-        }
-    }, [appStateIsBackground, username]);
-
-    useEffect(() => {
-        const checkIfCanGoDirectlyToBiometricUnlock = async () => {
-            if (!authCompleted || user) {
-                return;
-            }
-            const key = autoBiometricUsernameKey(username);
-            if (
-                canGoDirectlyToBiometricAuth
-                && !alreadyPrompted
-                && !autoBiometricSuppressed
-                && !autoBiometricSuppressedUsernames.has(key)
-                && showBiometricButton
-            ) {
-                await onBiometricUnlock();
-            }
-        }
-
-        checkIfCanGoDirectlyToBiometricUnlock();
-    }, [authCompleted, canGoDirectlyToBiometricAuth, username, alreadyPrompted, autoBiometricSuppressed, showBiometricButton, user]);
-
-    useEffect(() => {
-        const checkBiometricButton = async () => {
-            if (user) {
-                setShowBiometricButton(false);
-                return;
-            }
-
-            try {
-                if (!lastSignedInUser || lastSignedInUser.username !== username) {
-                    setShowBiometricButton(false);
-                    return;
-                }
-
-                const hasBiometricDek = await securityService.hasBiometricDek(lastSignedInUser.uid);
-                if (!hasBiometricDek) {
-                    setShowBiometricButton(false);
-                    return;
-                }
-                setShowBiometricButton(true);
-            } catch (error) {
-                logger.warn("failed to check biometric unlock availability", { error });
-                setShowBiometricButton(false);
-            }
-        };
-
-        checkBiometricButton();
-    }, [username, lastSignedInUser, user]);
-
-    const onSignin = async () => {
-        if (isAuthLoading || signInInFlightRef.current) return;
-        signInInFlightRef.current = true;
-        setLoadingAction('password');
-
-        let result: User | null = null;
-        const errors: { [key: string]: string } = {};
-        const submittedUsername = sanitizeUsernameInput(username);
-        if (submittedUsername !== username) {
-            setUsername(submittedUsername);
-        }
-        const usernameError = validateUsername(submittedUsername);
-        if (usernameError) errors.username = usernameError;
-        if (!password) errors.password = 'Password is required';
-
-        setFormErrors(errors);
-        if (Object.keys(errors).length > 0) {
-            signInInFlightRef.current = false;
-            setLoadingAction(null);
-            return;
-        }
-
-        try {
-            result = await signin(submittedUsername, password, false);
-
-            if (!result) {
-                showToast('Failed to sign in. Please check your credentials and try again.', 'error');
-                signInInFlightRef.current = false;
-                setLoadingAction(null);
-            }
-        } catch (error: any) {
-            signInInFlightRef.current = false;
-            setLoadingAction(null);
-            logger.warn('sign-in failed', { error });
-            showToast(getUserFacingErrorMessage(error, 'Failed to sign in. Please try again.'), 'error');
-        } finally {
-            if (result && lastSignedInUser && lastSignedInUser.uid !== result.uid) {
-                await securityService.clearDek(lastSignedInUser.uid);
-            }
-        }
-    };
-
-    const onBiometricUnlock = async () => {
-        if (isAuthLoading || signInInFlightRef.current) return;
-        signInInFlightRef.current = true;
-        setLoadingAction('biometric');
-        setAlreadyPrompted(true);
-        suppressAutoBiometricForUsername(username);
-
-        try {
-            const resultUser = await signin(username, '', true);
-
-            if (!resultUser) {
-                showToast('Biometric unlock failed. Try again or sign in with password.', 'error');
-                signInInFlightRef.current = false;
-                setLoadingAction(null);
-            }
-        } catch (err: any) {
-            signInInFlightRef.current = false;
-            setLoadingAction(null);
-            if (securityService.isBiometricAuthCancelled(err) || err?.mfaCancelled) {
-                suppressAutoBiometricForUsername(username);
-                return;
-            }
-            suppressAutoBiometricForUsername(username);
-            logger.warn('biometric unlock failed', { error: err });
-            showToast(getUserFacingErrorMessage(err, 'Biometric unlock failed'), 'info');
-        }
-    };
-
-    const onUnlockSignOut = async () => {
-        if (isAuthLoading || signInInFlightRef.current) return;
-        signInInFlightRef.current = true;
-        setLoadingAction('signout');
-
-        try {
-            await signOut();
-            setUsername('');
-            setPassword('');
-            setFormErrors({});
-            navigation.navigate('Signin');
-        } catch (error: any) {
-            logger.warn('unlock sign-out failed', { error });
-            showToast(getUserFacingErrorMessage(error, 'Failed to sign out'), 'error');
-            signInInFlightRef.current = false;
-            setLoadingAction(null);
-        }
-    };
 
     const onUsernameChange = (text: string) => {
         usernamePrefillHandledRef.current = true;
@@ -369,6 +176,7 @@ export const SigninScreen = () => {
                 <Button
                     hidden={isUnlockFlow}
                     label="Recover Account"
+                    testID="purrivacy.signin.recover"
                     onPress={() => navigation.navigate('RecoverAccount')}
                     variant="secondary"
                     disabled={signinBusy}

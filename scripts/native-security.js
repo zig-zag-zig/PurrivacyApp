@@ -2,6 +2,72 @@ const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins')
 const fs = require('fs');
 const path = require('path');
 
+const DEFAULT_ANDROID_PACKAGE = 'vip.chi_chi.purrivacy';
+const FLAG_SECURE_MARKER = 'WindowManager.LayoutParams.FLAG_SECURE';
+const WINDOW_MANAGER_IMPORT = 'import android.view.WindowManager';
+const SECURE_FLAG_LINE = '    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)';
+
+function getAndroidPackageName(config) {
+    return config?.android?.package || DEFAULT_ANDROID_PACKAGE;
+}
+
+function addKotlinImport(source, importStatement) {
+    if (source.includes(importStatement)) {
+        return source;
+    }
+
+    const importMatches = Array.from(source.matchAll(/^import .+$/gm));
+    if (importMatches.length === 0) {
+        return source.replace(/^package .+\n/, match => `${match}${importStatement}\n`);
+    }
+
+    const lastImport = importMatches[importMatches.length - 1];
+    const insertIndex = lastImport.index + lastImport[0].length;
+    return `${source.slice(0, insertIndex)}\n${importStatement}${source.slice(insertIndex)}`;
+}
+
+function patchMainActivitySource(source) {
+    let patched = source;
+    let requiresWrite = false;
+
+    if (!patched.includes(FLAG_SECURE_MARKER)) {
+        if (!/super\.onCreate\(null\)/.test(patched)) {
+            throw new Error('Unable to locate super.onCreate(null) in MainActivity.kt');
+        }
+        patched = patched.replace(/super\.onCreate\(null\)/, `$&\n${SECURE_FLAG_LINE}`);
+        requiresWrite = true;
+    }
+
+    if (!patched.includes(WINDOW_MANAGER_IMPORT)) {
+        patched = addKotlinImport(patched, WINDOW_MANAGER_IMPORT);
+        requiresWrite = true;
+    }
+
+    return { contents: patched, requiresWrite };
+}
+
+function patchAndroidMainActivity(projectRoot, packageName) {
+    const mainActivityPath = path.join(
+        projectRoot,
+        'android',
+        'app',
+        'src',
+        'main',
+        'java',
+        ...packageName.split('.'),
+        'MainActivity.kt'
+    );
+
+    const original = fs.readFileSync(mainActivityPath, 'utf8');
+    const { contents, requiresWrite } = patchMainActivitySource(original);
+
+    if (requiresWrite) {
+        fs.writeFileSync(mainActivityPath, contents, 'utf8');
+    }
+
+    return requiresWrite;
+}
+
 function disableAndroidBackups(androidManifest) {
     const application = androidManifest.manifest.application?.[0];
     if (!application) {
@@ -100,8 +166,22 @@ function withNativeSecurity(config) {
         return config;
     }]);
 
+    config = withDangerousMod(config, ['android', (config) => {
+        // Security control (FLAG_SECURE): fail closed. A patch failure must
+        // abort prebuild rather than silently ship unsecured windows.
+        patchAndroidMainActivity(
+            config.modRequest.projectRoot,
+            getAndroidPackageName(config)
+        );
+
+        return config;
+    }]);
+
     return config;
 }
 
 module.exports = withNativeSecurity;
 module.exports.plugin = withNativeSecurity;
+module.exports.addKotlinImport = addKotlinImport;
+module.exports.patchMainActivitySource = patchMainActivitySource;
+module.exports.patchAndroidMainActivity = patchAndroidMainActivity;

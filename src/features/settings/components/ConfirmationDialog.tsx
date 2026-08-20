@@ -16,6 +16,8 @@ interface ConfirmationDialogProps {
     itemType?: 'key' | 'account' | 'data' | 'sessions' | 'mfa' | 'recoveryCodes';
     itemName?: string;
     loading?: boolean;
+    /** Overrides the confirm-button label derived from itemType (e.g. 'Copy'). */
+    confirmLabel?: string;
 }
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
@@ -27,6 +29,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
     itemType = 'data',
     itemName,
     loading = false,
+    confirmLabel,
 }) => {
     const getWarningIcon = () => {
         switch (itemType) {
@@ -226,7 +229,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
                                 style={commonStyles.flex}
                             />
                             <Button
-                                label={getConfirmButtonLabel()}
+                                label={confirmLabel ?? getConfirmButtonLabel()}
                                 onPress={onConfirm}
                                 style={[commonStyles.flex, {
                                     borderWidth: 0,

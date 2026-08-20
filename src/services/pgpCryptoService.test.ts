@@ -8,6 +8,7 @@ vi.mock('../utils/logger', () => ({
 
 import { pgpCryptoService } from '../services/pgpCryptoService';
 import type { PGPExecutor } from '../services/pgpCryptoService';
+import type { PgpOperationName } from '../services/pgpProtocol';
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -17,9 +18,9 @@ beforeEach(() => {
 function createMockExecutor(): PGPExecutor {
     return {
         // Return a non-falsy value for ping so health check passes
-        executePGPOperation: vi.fn(async (op: string) => {
-            if (op === 'ping') return { ok: true };
-            return undefined;
+        executePGPOperation: vi.fn(async (op: PgpOperationName) => {
+            if (op === 'ping') return { ok: true } as never;
+            return undefined as never;
         }),
     };
 }

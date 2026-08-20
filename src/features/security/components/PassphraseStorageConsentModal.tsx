@@ -34,7 +34,9 @@ export const PassphraseStorageConsentModal = ({
 
           <CustomText style={styles.title}>Store passphrases?</CustomText>
           <CustomText style={styles.message}>
-            Autofill saved key passphrases on this device.
+            Saved key passphrases are encrypted with your account key and synced
+            to every device signed into your account. Anyone who recovers your
+            account with your password or recovery seed could decrypt them.
           </CustomText>
 
           <View style={styles.actions}>

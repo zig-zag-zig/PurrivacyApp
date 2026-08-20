@@ -13,7 +13,7 @@ import { logger } from '../../../utils/logger';
 import type { ToastType } from '../../../app/state/ToastContext';
 import { EventService } from '../../../services/eventService';
 import { usePassphraseStorageConsent } from '../../security/hooks/usePassphraseStorageConsent';
-import { identifyKeyType } from '../domain/pgpValidation';
+import { identifyKeyType, normalizeArmor } from '../domain/pgpValidation';
 import {
   changeDevTempKeyExpiration,
   changeDevTempKeyPassphrase,
@@ -95,7 +95,13 @@ export function useKeyOperations({
       return;
     }
 
-    const keyType = identifyKeyType(trimmedContent);
+    // Re-armor collapsed pastes (line breaks stripped by mail/SMS clients or
+    // automation) so OpenPGP parsing succeeds.
+    const normalizedKey = normalizeArmor(trimmedContent, 'PRIVATE KEY BLOCK')
+      ?? normalizeArmor(trimmedContent, 'PUBLIC KEY BLOCK')
+      ?? trimmedContent;
+
+    const keyType = identifyKeyType(normalizedKey);
     if (keyType === 'unknown') {
       showToast(ERROR_MESSAGES.INVALID_KEY_FORMAT, 'error');
       return;
@@ -106,7 +112,7 @@ export function useKeyOperations({
       return;
     }
 
-    const metadata = await pgpCryptoService.extractKeyMetadata(trimmedContent);
+    const metadata = await pgpCryptoService.extractKeyMetadata(normalizedKey);
     dispatch({ type: 'metadataChanged', metadata });
 
     const existingKey = userDecrypted?.keys.find(key => key.fingerprint === metadata.fingerprint);
@@ -115,7 +121,7 @@ export function useKeyOperations({
       setLoading(true);
       try {
         const validPassphrase = await pgpCryptoService.validatePrivateKeyPassphrase(
-          trimmedContent,
+          normalizedKey,
           state.importPassphrase,
         );
 
@@ -143,7 +149,7 @@ export function useKeyOperations({
         }
         const importedKey = await PgpKeyService.importKey(
           user.uid,
-          trimmedContent,
+          normalizedKey,
           existingKey?.publicKey,
           state.setImportAsDefault,
           state.importPassphrase || null,
@@ -169,7 +175,7 @@ export function useKeyOperations({
     try {
       const importedKey = await PgpKeyService.importKey(
         user.uid,
-        trimmedContent,
+        normalizedKey,
         existingKey?.privateKey,
         state.setImportAsDefault,
       );

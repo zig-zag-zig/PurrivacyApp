@@ -148,11 +148,6 @@ export function parseOptionalGitHubRepoUrl(value: string | undefined): string | 
   return `https://github.com/${owner}/${repo}`;
 }
 
-export function parseOptionalString(value: string | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed || null;
-}
-
 function parseOptionalUrl(value: string | undefined, name: string): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -194,7 +189,6 @@ const rawEnv = {
   EXPO_PUBLIC_SENTRY_ENABLED: process.env.EXPO_PUBLIC_SENTRY_ENABLED,
   EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   EXPO_PUBLIC_UPDATE_GITHUB_REPO_URL: process.env.EXPO_PUBLIC_UPDATE_GITHUB_REPO_URL,
-  EXPO_PUBLIC_UPDATE_GITHUB_TOKEN: process.env.EXPO_PUBLIC_UPDATE_GITHUB_TOKEN,
 };
 
 const sentryDsn = parseOptionalUrl(rawEnv.EXPO_PUBLIC_SENTRY_DSN, 'EXPO_PUBLIC_SENTRY_DSN');
@@ -214,5 +208,4 @@ export const ENV = {
   sentryEnabled: Boolean(sentryDsn) && parseBooleanEnv(rawEnv.EXPO_PUBLIC_SENTRY_ENABLED, true),
   sentryTracesSampleRate: parseFloatEnv(rawEnv.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE, 0, 0, 1),
   updateGithubRepoUrl: parseOptionalGitHubRepoUrl(rawEnv.EXPO_PUBLIC_UPDATE_GITHUB_REPO_URL),
-  updateGithubToken: parseOptionalString(rawEnv.EXPO_PUBLIC_UPDATE_GITHUB_TOKEN),
 };

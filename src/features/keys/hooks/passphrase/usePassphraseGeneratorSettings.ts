@@ -9,7 +9,7 @@ import {
     normalizePassphraseGeneratorSettings,
 } from '../../../security/services/passphraseGeneratorSettings';
 import type { PassphraseGeneratorSettings } from '../../../security/services/passphraseGeneratorSettings';
-import type { PassphraseBannerMode } from '../usePassphraseFieldController';
+import type { PassphraseBannerMode } from '../../model/passphraseFieldTypes';
 
 type UsePassphraseGeneratorSettingsParams = {
     bannerMode: PassphraseBannerMode;

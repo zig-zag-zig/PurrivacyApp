@@ -216,7 +216,7 @@ export const AppUpdateModal = ({
               <Button
                 label={updating ? 'Downloading' : availableRelease.downloadLabel}
                 onPress={onUpdate}
-                disabled={updating || !availableRelease.canInstallInApp}
+                disabled={updating || !(availableRelease.canInstallInApp || availableRelease.downloadUrl)}
                 style={commonStyles.flex}
                 icon={updating ? undefined : <Icon name="download" size={20} color={theme.colors.onPrimary} />}
               />

@@ -1,9 +1,9 @@
 appId: vip.chi_chi.purrivacy
 env:
-  TEST_USERNAME: ${E2E_USERNAME}mfa
+  TEST_USERNAME: e2e-mfa
   ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
 ---
-# Sign in to an existing account that has MFA enabled
+# Sign in to the seeded MFA-enabled account; the MFA challenge modal appears.
 - launchApp:
     clearState: true
 - extendedWaitUntil:
@@ -24,24 +24,24 @@ env:
     visible:
       id: "purrivacy.mfa.modal"
     timeout: 30000
-- assertVisible:
-    id: "purrivacy.mfa.code.input"
-# Submit a wrong code first
+# Submit a wrong code (tap a visible box to focus, then type — auto-submits at 6 digits)
 - tapOn:
-    id: "purrivacy.mfa.code.input"
+    id: "purrivacy.mfa.code.input.box.0"
 - inputText: "000000"
-- tapOn:
-    id: "purrivacy.mfa.submit"
-# Error should appear and code input should clear
+# The backend rejects it (403 wrongMfaCode); the app clears the input and
+# stays on the modal for retry. The error toast must be VISIBLE above the
+# modal (rendered by ModalToastHost inside the modal layer).
+- extendedWaitUntil:
+    visible: "The MFA code you entered was incorrect. Please try again."
+    timeout: 15000
 - extendedWaitUntil:
     visible:
-      id: "purrivacy.mfa.error"
+      id: "purrivacy.mfa.modal"
     timeout: 15000
 - assertVisible:
-    id: "purrivacy.mfa.code.input"
-# Cancel the modal (can't test real TOTP in E2E)
-- tapOn:
-    id: "purrivacy.mfa.cancel"
+    id: "purrivacy.mfa.code.input.box.0"
+# Cancel the modal (Android back; can't test real TOTP in E2E)
+- pressKey: Back
 # Should return to signin screen
 - extendedWaitUntil:
     visible:

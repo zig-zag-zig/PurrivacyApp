@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { useToast } from '../../../app/state/ToastContext';
 import { AppUpdateModal } from '../components/AppUpdateModal';
+import { getErrorMessage, useUpdateInstall } from '../hooks/useUpdateInstall';
 import type {
   AppRelease,
   UpdateCheckOptions,
@@ -32,36 +33,25 @@ type UpdateContextType = {
 
 const UpdateContext = createContext<UpdateContextType | null>(null);
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof AppUpdateNoReleaseError) {
-    return UPDATE_COPY.noPublicRelease;
-  }
-
-  if (error instanceof Error && /allow app installs/i.test(error.message)) {
-    return 'Allow app installs for Purrivacy, then try again.';
-  }
-
-  if (error instanceof Error && /update download was cancelled/i.test(error.message)) {
-    return 'Update download was cancelled.';
-  }
-
-  return UPDATE_COPY.checkFailed;
-}
-
 export const UpdateProvider = ({ children }: { children: ReactNode }) => {
   const { showToast } = useToast();
+  const {
+    canInstallUpdates,
+    clearDownloadProgress,
+    downloadProgress,
+    installingRef,
+    installUpdate,
+    isInstalling,
+  } = useUpdateInstall();
   const [status, setStatus] = useState<UpdateStatus>('idle');
   const [latestRelease, setLatestRelease] = useState<AppRelease | null>(null);
   const [skippedReleaseTag, setSkippedReleaseTag] = useState<string | null>(null);
   const [currentVersion, setCurrentVersion] = useState(appUpdateService.getCurrentVersion());
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<UpdateDownloadProgress | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const checkingRef = useRef(false);
-  const installingRef = useRef(false);
   const isConfigured = appUpdateService.isConfigured();
-  const canInstallUpdates = appUpdateService.isInstallSupported();
 
   useEffect(() => {
     void appUpdateService.cleanDownloadedUpdates().catch(() => undefined);
@@ -94,7 +84,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     checkingRef.current = true;
     setStatus('checking');
     setError(null);
-    setDownloadProgress(null);
+    clearDownloadProgress();
 
     try {
       const result = await appUpdateService.checkForUpdate();
@@ -129,22 +119,10 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isConfigured, showToast]);
 
-  const installUpdate = useCallback(async () => {
-    if (!latestRelease) return;
-    if (installingRef.current) return;
-
-    installingRef.current = true;
+  const installLatestRelease = useCallback(() => {
     setError(null);
-    try {
-      await appUpdateService.downloadAndInstallUpdate(latestRelease, setDownloadProgress);
-    } catch (caught) {
-      const message = getErrorMessage(caught);
-      showToast(message, 'error');
-    } finally {
-      installingRef.current = false;
-      setDownloadProgress(null);
-    }
-  }, [latestRelease, showToast]);
+    return installUpdate(latestRelease);
+  }, [installUpdate, latestRelease]);
 
   const skipLatestRelease = useCallback(async () => {
     if (!latestRelease) return;
@@ -175,7 +153,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     hideUpdateModal: () => {
       if (!downloadProgress) setModalVisible(false);
     },
-    installUpdate,
+    installUpdate: installLatestRelease,
     skipLatestRelease,
   }), [
     status,
@@ -188,7 +166,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
     checkedAt,
     downloadProgress,
     checkForUpdates,
-    installUpdate,
+    installLatestRelease,
     skipLatestRelease,
   ]);
 
@@ -202,7 +180,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
         release={latestRelease}
         error={error}
         checking={status === 'checking'}
-        updating={Boolean(downloadProgress)}
+        updating={isInstalling}
         canInstallUpdates={canInstallUpdates}
         downloadProgress={downloadProgress}
         onClose={() => {
@@ -215,7 +193,7 @@ export const UpdateProvider = ({ children }: { children: ReactNode }) => {
           });
         }}
         onUpdate={() => {
-          void installUpdate();
+          void installLatestRelease();
         }}
         onSkipVersion={() => {
           void skipLatestRelease();

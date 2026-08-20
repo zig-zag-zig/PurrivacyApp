@@ -38,4 +38,20 @@ class SecureClipboardModule(
         val clipboard = reactApplicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
     }
+
+    /**
+     * Conditional wipe (APP-SEC-005): only clears the primary clip when it still
+     * holds the exact value this app copied. Never clobbers a newer copy the user
+     * made afterwards (e.g. from another app).
+     */
+    @ReactMethod
+    fun clearClipboardIfMatches(text: String) {
+        val clipboard = reactApplicationContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val currentClip = clipboard.primaryClip ?: return
+        if (currentClip.itemCount == 0) return
+        val currentText = currentClip.getItemAt(0).coerceToText(reactApplicationContext).toString()
+        if (currentText == text) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+        }
+    }
 }

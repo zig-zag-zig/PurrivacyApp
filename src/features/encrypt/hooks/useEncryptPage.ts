@@ -167,13 +167,13 @@ export function useEncryptPage() {
 
   const handleCopyEncrypted = () => {
     if (!state.encryptedContent) return;
-    void secureCopy(state.encryptedContent);
+    void secureCopy(state.encryptedContent, { sensitivity: 'low' });
     showToast(SUCCESS_MESSAGES.ENCRYPTED_COPIED, 'info');
   };
 
   const handleCopySignature = () => {
     if (!state.signature) return;
-    void secureCopy(state.signature);
+    void secureCopy(state.signature, { sensitivity: 'low' });
     showToast(SUCCESS_MESSAGES.SIGNATURE_COPIED, 'info');
   };
 

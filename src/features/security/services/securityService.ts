@@ -29,7 +29,8 @@ import {
     updateStoredSessionMfaTrust,
 } from './storedSessionService';
 import {
-    authenticateBiometric,
+    authenticateForSecretReveal,
+    authenticateForVaultUnlock,
     hasStandaloneBiometricAuth,
     isBiometricAuthCancelled,
     SecureStorageModule,
@@ -63,7 +64,8 @@ export const securityService = {
     setPassphraseGeneratorSettings,
     generatePassphrase,
     hasStandaloneBiometricAuth,
-    authenticateBiometric,
+    authenticateForVaultUnlock,
+    authenticateForSecretReveal,
     clearLastSignedInUser: async (): Promise<void> => {
         await getOrSetLastSignedInUserInSecureStorage('CLEAR');
     },

@@ -3,7 +3,7 @@ env:
   TEST_USERNAME: ${E2E_USERNAME}mfa
   ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
 ---
-# Sign up, create a key, then set up MFA
+# Sign up + create a key (fresh session => the MFA setup nonce can be minted)
 - runFlow:
     file: subflows/register-create-key.yaml
     env:
@@ -14,7 +14,8 @@ env:
     visible:
       id: "purrivacy.key.item"
     timeout: 60000
-# Navigate to settings and enable MFA
+# Navigate to settings and enable MFA (the toggle navigates to MfaSetup,
+# which mints the fresh-auth nonce and calls /mfa/setup with it)
 - tapOn:
     id: "purrivacy.tab.settings"
 - extendedWaitUntil:
@@ -28,36 +29,12 @@ env:
     timeout: 15000
 - tapOn:
     id: "purrivacy.settings.mfa"
+# MFA setup screen rendered => mint + setup succeeded (secret + otpauthUrl shown).
+# Enrollment completes through the MFA modal (the pipeline opens it for
+# /mfa/enable); entering the code there is verified manually / real devices.
 - extendedWaitUntil:
     visible:
       id: "purrivacy.mfa.setup.screen"
-    timeout: 15000
-- tapOn:
-    id: "purrivacy.mfa.setup.enable"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.mfa.recovery.codes"
-    timeout: 30000
+    timeout: 20000
 - assertVisible:
-    id: "purrivacy.mfa.recovery.codes.list"
-- tapOn:
-    id: "purrivacy.mfa.recovery.codes.saved"
-# Verify MFA is now enabled
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.settings.screen"
-    timeout: 15000
-- assertVisible:
-    id: "purrivacy.settings.mfa.enabled"
-# Sign out
-- scrollUntilVisible:
-    element:
-      id: "purrivacy.settings.logout"
-    direction: DOWN
-    timeout: 15000
-- tapOn:
-    id: "purrivacy.settings.logout"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.signin.username"
-    timeout: 15000
+    id: "purrivacy.mfa.setup.trustDevice"

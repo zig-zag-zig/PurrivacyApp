@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { useMfa } from '../state/MfaContext';
+import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
 import { useModal } from '../../../app/state/ModalContext';
 import { commonStyles } from '../../../styles/commonStyles';
@@ -19,10 +20,12 @@ import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 export const MfaSetupScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();
     const { setupMfa, enableMfa, isLoading } = useMfa();
+    const { signOut } = useAuth();
     const { showToast } = useToast();
     const { showRecoveryCodesModal } = useModal();
 
     const [setupData, setSetupData] = useState<any>(null);
+    const [trustDevice, setTrustDevice] = useState(true);
     const { secureCopy } = useSecureCopy();
     const [copied, setCopied] = useState(false);
     const copyFeedbackTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +46,17 @@ export const MfaSetupScreen = () => {
             const data = await setupMfa();
             setSetupData(data);
         } catch (error: any) {
+            // Backend API-SEC-006: fresh primary authentication is required
+            // to start MFA enrollment (FreshAuthRequiredError -> bare 401 with
+            // no structured flag). Any 401 here — stale session OR
+            // fresh-auth-required — is correctly handled by dropping the user
+            // back to a fresh sign-in instead of the opaque "Failed to
+            // initialize" + silent back.
+            if (error?.status === 401) {
+                await signOut();
+                showToast('Please sign in again to set up two-factor authentication', 'error');
+                return;
+            }
             showToast('Failed to initialize MFA setup', 'error');
             navigation.goBack();
         }
@@ -50,7 +64,12 @@ export const MfaSetupScreen = () => {
 
     const handleVerifyCode = async () => {
         try {
-            await enableMfa();
+            // The request pipeline treats /mfa/enable as MFA-sensitive and
+            // PREEMPTIVELY opens the MFA modal to collect the code before the
+            // request is sent — the code entered there is what reaches the
+            // backend. There is deliberately no code field on this screen:
+            // the modal is the single code-collection UI.
+            await enableMfa(trustDevice);
             await showRecoveryCodesModal({
                 recoveryCodes: setupData?.recoveryCodes || [],
                 source: 'setup',
@@ -71,7 +90,7 @@ export const MfaSetupScreen = () => {
         }
 
         try {
-            void secureCopy(setupData.secret);
+            void secureCopy(setupData.secret, { sensitivity: 'high' });
             setCopied(true);
             if (copyFeedbackTimeoutRef.current) {
                 clearTimeout(copyFeedbackTimeoutRef.current);
@@ -91,7 +110,7 @@ export const MfaSetupScreen = () => {
     }
 
     return (
-        <ScreenContainer>
+        <ScreenContainer testID="purrivacy.mfa.setup.screen">
             <CustomText style={[commonStyles.textTitle, styles.title]}>
                 Setup Two-Factor Authentication
             </CustomText>
@@ -135,6 +154,25 @@ export const MfaSetupScreen = () => {
                 </CustomText>
             </View>
 
+            <View style={styles.trustRow}>
+                <View style={styles.trustTextColumn}>
+                    <CustomText style={[commonStyles.textLabel, styles.trustLabel]}>
+                        Trust this device
+                    </CustomText>
+                    <CustomText style={[commonStyles.textCaption, styles.trustHint]}>
+                        Skip MFA prompts on this device until you sign out. You can change this later in Settings.
+                    </CustomText>
+                </View>
+                <Switch
+                    testID="purrivacy.mfa.setup.trustDevice"
+                    accessibilityLabel="Trust this device"
+                    accessibilityRole="switch"
+                    value={trustDevice}
+                    onValueChange={setTrustDevice}
+                    disabled={isLoading}
+                />
+            </View>
+
             <CustomText style={[commonStyles.textBody, styles.instructionTitle]}>
                 Instructions:
             </CustomText>
@@ -158,6 +196,7 @@ export const MfaSetupScreen = () => {
 
             <Button
                 label="Continue to Verification"
+                testID="purrivacy.mfa.setup.enable"
                 onPress={handleVerifyCode}
                 style={styles.continueButton}
                 loading={isLoading}
@@ -230,6 +269,29 @@ const styles = StyleSheet.create({
     },
     instruction: {
         marginBottom: theme.spacing.xs,
+        color: theme.colors.textSecondary,
+    },
+    codeInput: {
+        marginBottom: theme.spacing.md,
+    },
+    trustRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+    },
+    trustTextColumn: {
+        flex: 1,
+    },
+    trustLabel: {
+        marginBottom: theme.spacing.xs,
+    },
+    trustHint: {
         color: theme.colors.textSecondary,
     },
     continueButton: {

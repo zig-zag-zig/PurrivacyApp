@@ -4,7 +4,7 @@ import type { Dispatch } from 'react';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import type { KeyPair } from '../../../types/types';
 import { hasExistingDefaultKeyPair } from '../domain/keyScreenDomain';
-import { identifyKeyType } from '../domain/pgpValidation';
+import { identifyKeyType, normalizeArmor } from '../domain/pgpValidation';
 import type { KeyAction } from '../model/types';
 import type { KeyScreenAction } from '../state/keyScreenReducer';
 
@@ -46,14 +46,19 @@ export function useImportKeyDefaults({
 
   useEffect(() => {
     const trimmedImportKey = importKey.trim();
-    const keyType = identifyKeyType(trimmedImportKey);
+    // Re-armor collapsed pastes so the metadata pre-fill (and therefore the
+    // submit gate) works for armor typed/pasted with stripped line breaks.
+    const normalizedKey = normalizeArmor(trimmedImportKey, 'PRIVATE KEY BLOCK')
+      ?? normalizeArmor(trimmedImportKey, 'PUBLIC KEY BLOCK')
+      ?? trimmedImportKey;
+    const keyType = identifyKeyType(normalizedKey);
     if (keyType !== 'private' && keyType !== 'public') {
       dispatch({ type: 'metadataChanged', metadata: undefined });
       return undefined;
     }
 
     let cancelled = false;
-    void pgpCryptoService.extractKeyMetadata(trimmedImportKey)
+    void pgpCryptoService.extractKeyMetadata(normalizedKey)
       .then(metadata => {
         if (!cancelled) {
           dispatch({ type: 'metadataChanged', metadata });

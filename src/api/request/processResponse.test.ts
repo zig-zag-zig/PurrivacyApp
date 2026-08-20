@@ -4,7 +4,7 @@ const mockEventService = vi.hoisted(() => ({
     addEvent: vi.fn(),
 }));
 
-const mockLogger = vi.hoisted(() => ({ warn: vi.fn() }));
+const mockLogger = vi.hoisted(() => ({ warn: vi.fn(), debug: vi.fn() }));
 
 const mockHandleHttpError = vi.hoisted(() => vi.fn());
 const mockParseResponseBody = vi.hoisted(() => vi.fn());
@@ -29,6 +29,7 @@ vi.mock('./parseResponseBody', () => ({
 (globalThis as any).__DEV__ = true;
 
 import { processResponse } from './processResponse';
+import { ApiSchemaError } from '../apiError';
 
 const requestFn = vi.fn();
 const createSessionFn = vi.fn();
@@ -102,7 +103,7 @@ describe('processResponse', () => {
         mockParseResponseBody.mockResolvedValueOnce({ ok: true });
 
         await processResponse(
-            response, '/user/key-records', 'GET', undefined,
+            response, '/test', 'GET', undefined,
             false, false, undefined, requestFn, createSessionFn,
         );
 
@@ -110,8 +111,16 @@ describe('processResponse', () => {
     });
 
     it('does not emit closeMfaModal for the /auth/session endpoint', async () => {
-        const response = new Response('{"accessToken":"at"}', { status: 200 });
-        mockParseResponseBody.mockResolvedValueOnce({ accessToken: 'at' });
+        const validSession = {
+            accessToken: 'at',
+            refreshToken: 'rt',
+            accessTokenExpiresAt: '2026-01-01T00:00:00.000Z',
+            refreshTokenExpiresAt: '2026-01-02T00:00:00.000Z',
+            mfaTrusted: false,
+            mfaEnabled: false,
+        };
+        const response = new Response(JSON.stringify(validSession), { status: 200 });
+        mockParseResponseBody.mockResolvedValueOnce(validSession);
 
         await processResponse(
             response, '/auth/session', 'POST', undefined,
@@ -126,7 +135,7 @@ describe('processResponse', () => {
         mockParseResponseBody.mockResolvedValueOnce({ newRecoveryCodes: ['a', 'b', 'c'] });
 
         await processResponse(
-            response, '/mfa/recovery-codes/regenerate', 'POST', undefined,
+            response, '/test', 'POST', undefined,
             false, false, undefined, requestFn, createSessionFn,
         );
 
@@ -134,6 +143,30 @@ describe('processResponse', () => {
             'newRecoveryCodes',
             { recoveryCodes: ['a', 'b', 'c'] },
         );
+    });
+
+    it('does not emit newRecoveryCodes for a tampered non-array body', async () => {
+        const response = new Response('{"newRecoveryCodes":"not-an-array"}', { status: 200 });
+        mockParseResponseBody.mockResolvedValueOnce({ newRecoveryCodes: 'not-an-array' });
+
+        await processResponse(
+            response, '/test', 'POST', undefined,
+            false, false, undefined, requestFn, createSessionFn,
+        );
+
+        expect(mockEventService.addEvent).not.toHaveBeenCalledWith('newRecoveryCodes', expect.anything());
+    });
+
+    it('does not emit newRecoveryCodes for an array with non-string entries', async () => {
+        const response = new Response('{"newRecoveryCodes":["a",5]}', { status: 200 });
+        mockParseResponseBody.mockResolvedValueOnce({ newRecoveryCodes: ['a', 5] });
+
+        await processResponse(
+            response, '/test', 'POST', undefined,
+            false, false, undefined, requestFn, createSessionFn,
+        );
+
+        expect(mockEventService.addEvent).not.toHaveBeenCalledWith('newRecoveryCodes', expect.anything());
     });
 
     it('returns parsed data for successful responses', async () => {
@@ -146,5 +179,81 @@ describe('processResponse', () => {
         );
 
         expect(result).toEqual({ data: 'value' });
+    });
+
+    describe('LANE M: runtime response validation at the boundary', () => {
+        const validKeyRecords = {
+            keys: [
+                {
+                    encryptedData: 'ed',
+                    iv: 'iv',
+                    tag: 'tag',
+                    recordId: 'rec-1',
+                },
+            ],
+        };
+
+        it('returns the validated DTO for a well-formed typed response', async () => {
+            const response = new Response(JSON.stringify(validKeyRecords), { status: 200 });
+            mockParseResponseBody.mockResolvedValueOnce(validKeyRecords);
+
+            const result = await processResponse(
+                response, '/user/key-records', 'GET', undefined,
+                false, false, undefined, requestFn, createSessionFn,
+            );
+
+            expect(result).toEqual(validKeyRecords);
+        });
+
+        it('rejects malformed DTO responses with ApiSchemaError instead of leaking a cast', async () => {
+            const response = new Response('{"keys":"not-an-array"}', { status: 200 });
+            mockParseResponseBody.mockResolvedValueOnce({ keys: 'not-an-array' });
+
+            await expect(processResponse(
+                response, '/user/key-records', 'GET', undefined,
+                false, false, undefined, requestFn, createSessionFn,
+            )).rejects.toBeInstanceOf(ApiSchemaError);
+
+            expect(mockEventService.addEvent).not.toHaveBeenCalledWith('closeMfaModal');
+        });
+
+        it('rejects a session response with a missing field', async () => {
+            const response = new Response('{"accessToken":"at"}', { status: 200 });
+            mockParseResponseBody.mockResolvedValueOnce({ accessToken: 'at' });
+
+            await expect(processResponse(
+                response, '/auth/session', 'POST', undefined,
+                false, false, undefined, requestFn, createSessionFn,
+            )).rejects.toBeInstanceOf(ApiSchemaError);
+        });
+
+        it('does not validate non-ok error bodies', async () => {
+            const response = new Response('{"keys":"not-an-array"}', { status: 400 });
+            mockParseResponseBody.mockResolvedValueOnce({ keys: 'not-an-array' });
+            mockHandleHttpError.mockResolvedValueOnce({ handled: true });
+
+            const result = await processResponse(
+                response, '/user/key-records', 'GET', undefined,
+                false, false, undefined, requestFn, createSessionFn,
+            );
+
+            expect(mockHandleHttpError).toHaveBeenCalled();
+            expect(result).toEqual({ handled: true });
+        });
+
+        it('injects x-request-id into validated ok responses', async () => {
+            const response = new Response(JSON.stringify(validKeyRecords), {
+                status: 200,
+                headers: { 'x-request-id': 'req-boundary-1' },
+            });
+            mockParseResponseBody.mockResolvedValueOnce(validKeyRecords);
+
+            const result = await processResponse(
+                response, '/user/key-records', 'GET', undefined,
+                false, false, undefined, requestFn, createSessionFn,
+            ) as { requestId?: string };
+
+            expect(result.requestId).toBe('req-boundary-1');
+        });
     });
 });

@@ -1,0 +1,73 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-shared
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Error path: invalid armored key material must keep the import submit gated
+# (never enabled, never a crash). Garbage text AND armor-shaped junk (bad
+# body/checksum) must both be rejected by the metadata pre-fill gate.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+# Open the import form
+- tapOn:
+    id: "purrivacy.key.action.import"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.import.armoredKey"
+    timeout: 15000
+# Plain garbage -> submit stays disabled
+- tapOn:
+    id: "purrivacy.key.import.armoredKey"
+- inputText: "this is definitely not a pgp key"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.import.submit"
+      enabled: false
+    timeout: 10000
+# Armor-shaped garbage (bad body) -> still disabled
+- tapOn:
+    id: "purrivacy.key.import.armoredKey"
+- eraseText
+- inputText: "-----BEGIN PGP PUBLIC KEY BLOCK----- AAAA -----END PGP PUBLIC KEY BLOCK-----"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.import.submit"
+      enabled: false
+    timeout: 10000
+# Truncated real armor (cut mid-body) -> still disabled
+- tapOn:
+    id: "purrivacy.key.import.armoredKey"
+- eraseText
+- inputText: "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.import.submit"
+      enabled: false
+    timeout: 10000
+# Screen is still usable: the armoredKey field is present and editable
+- assertVisible:
+    id: "purrivacy.key.import.armoredKey"

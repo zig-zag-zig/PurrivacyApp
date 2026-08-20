@@ -13,6 +13,7 @@ interface PasswordFormProps {
     onSubmit: () => void;
     isLoading: boolean;
     formErrors: { [key: string]: string };
+    testIDPrefix?: string;
 }
 
 export const PasswordForm: React.FC<PasswordFormProps> = ({
@@ -23,6 +24,7 @@ export const PasswordForm: React.FC<PasswordFormProps> = ({
     onSubmit,
     isLoading,
     formErrors,
+    testIDPrefix,
 }) => (
     <View style={{ gap: theme.spacing.md }}>
         <InputField
@@ -35,6 +37,7 @@ export const PasswordForm: React.FC<PasswordFormProps> = ({
             showToggleSecureText
             textContentType="newPassword"
             error={formErrors.newPassword}
+            testID={testIDPrefix ? `${testIDPrefix}.newPassword` : undefined}
         />
 
         <InputField
@@ -47,12 +50,14 @@ export const PasswordForm: React.FC<PasswordFormProps> = ({
             showToggleSecureText
             textContentType="newPassword"
             error={formErrors.confirmPassword}
+            testID={testIDPrefix ? `${testIDPrefix}.confirmPassword` : undefined}
         />
 
         <Button
             label={"Reset Password"}
             onPress={onSubmit}
             loading={isLoading}
+            testID={testIDPrefix ? `${testIDPrefix}.submit` : undefined}
         />
     </View>
 );

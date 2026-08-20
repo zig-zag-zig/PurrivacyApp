@@ -1,11 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
-vi.mock('../../../utils/storage', () => ({
-    storage: { getItem: vi.fn(), setItem: vi.fn(), getItemsByPrefix: vi.fn() },
+
+const storeMock = vi.hoisted(() => ({
+    read: vi.fn(),
+    write: vi.fn(),
+    update: vi.fn(),
+    clear: vi.fn(),
 }));
 
-import { sortKeysByPopularity, sortKeysAlphabetically } from './popularityStorage';
+vi.mock('../../../utils/stores/popularityStore', () => ({
+    popularityStore: storeMock,
+}));
+
+import {
+    getAllPopularities,
+    incrementPopularity,
+    sortKeysAlphabetically,
+    sortKeysByPopularity,
+} from './popularityStorage';
 
 const makeKey = (fingerprint: string, userId: string) => ({
     fingerprint,
@@ -16,6 +29,32 @@ const makeKey = (fingerprint: string, userId: string) => ({
     algorithm: 'rsa',
     expiry: null,
 } as any);
+
+beforeEach(() => {
+    storeMock.read.mockReset();
+    storeMock.write.mockReset();
+    storeMock.update.mockReset();
+    storeMock.clear.mockReset();
+
+    let current: Record<string, Record<string, number>> = {};
+    storeMock.read.mockImplementation(async () => current);
+    storeMock.update.mockImplementation(async (updater: (value: Record<string, Record<string, number>>) => Record<string, Record<string, number>>) => {
+        current = updater(current);
+        return current;
+    });
+});
+
+describe('incrementPopularity', () => {
+    it('increments existing counts and initializes missing ones per user', async () => {
+        await incrementPopularity('user1', 'fp1');
+        await incrementPopularity('user1', 'fp1');
+        await incrementPopularity('user1', 'fp2');
+
+        expect(storeMock.update).toHaveBeenCalledTimes(3);
+        expect(await getAllPopularities('user1')).toEqual({ fp1: 2, fp2: 1 });
+        expect(await getAllPopularities('user2')).toEqual({});
+    });
+});
 
 describe('sortKeysByPopularity', () => {
     it('sorts by popularity descending', () => {

@@ -46,7 +46,14 @@ beforeEach(() => {
     mockProcessResponse.mockImplementation(async (response: Response) => response.json());
     mockHandleHttpError.mockRejectedValue(new Error('unexpected http error handler call'));
 
-    const createSession = vi.fn(async () => ({ accessToken: 'token', refreshToken: 'rt' }));
+    const createSession = vi.fn(async () => ({
+        accessToken: 'token',
+        refreshToken: 'rt',
+        accessTokenExpiresAt: '2026-01-01T00:00:00Z',
+        refreshTokenExpiresAt: '2026-01-01T00:00:00Z',
+        mfaTrusted: false,
+        mfaEnabled: false,
+    }));
     request = createApiRequester(createSession);
 });
 

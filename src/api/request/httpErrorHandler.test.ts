@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { ApiRuntime } from '../runtime';
+import type { SessionResponse } from '../../types/types';
 
 const eventServiceMock = vi.hoisted(() => ({
   addEvent: vi.fn(),
@@ -22,6 +23,12 @@ vi.mock('../runtime', () => ({
 
 vi.mock('../../services/eventService', () => ({
   EventService: eventServiceMock,
+}));
+
+let recentSwap = false;
+vi.mock('../session/sessionSwap', () => ({
+  hasRecentSessionSwap: () => recentSwap,
+  recordSessionSwap: vi.fn(),
 }));
 
 vi.mock('../../utils/logger', () => ({
@@ -94,6 +101,20 @@ describe('handleHttpError', () => {
     expect(eventServiceMock.addEvent).toHaveBeenCalledWith('signOut');
   });
 
+  it('suppresses the sign-out event shortly after a session swap (stale-token race)', async () => {
+    recentSwap = true;
+    try {
+      await expect(
+        handleHttpError(401, { refreshTokenReuse: true }, '/api/test', 'GET', {}, true, true, undefined, noop, noop),
+      ).rejects.toThrow(ApiRequestError);
+      // The error still throws; only the global sign-out EVENT is suppressed
+      // so a request that raced an MFA session swap does not log the user out.
+      expect(eventServiceMock.addEvent).not.toHaveBeenCalledWith('signOut');
+    } finally {
+      recentSwap = false;
+    }
+  });
+
   it('throws ApiRequestError for non-retryable generic errors', async () => {
     await expect(
       handleHttpError(500, { error: 'server error' }, '/api/test', 'GET', {}, false, false, undefined, noop, noop),
@@ -135,7 +156,7 @@ describe('handleHttpError', () => {
   });
 
   it('refreshes session on accessTokenExpired with retry', async () => {
-    const sessionResponse = { accessToken: 'new-at' };
+    const sessionResponse = { accessToken: 'new-at' } as SessionResponse;
     const createSession = vi.fn(async () => sessionResponse);
     const requestFn = vi.fn(async () => ({ result: 'ok' }));
 
@@ -204,6 +225,34 @@ describe('handleHttpError', () => {
       name: 'AuthFlowError',
       sessionError: { mfaRequired: true },
       status: 403,
+    });
+  });
+
+  it('treats non-object error bodies as flagless and throws a generic error', async () => {
+    await expect(
+      handleHttpError(500, 'boom', '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 500,
+    });
+  });
+
+  it('does not crash on null error bodies', async () => {
+    await expect(
+      handleHttpError(400, null, '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 400,
+    });
+    expect(eventServiceMock.addEvent).not.toHaveBeenCalledWith('signOut');
+  });
+
+  it('does not crash on array error bodies', async () => {
+    await expect(
+      handleHttpError(500, [{ error: 'x' }], '/api/test', 'GET', {}, false, false, undefined, noop, noop),
+    ).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 500,
     });
   });
 

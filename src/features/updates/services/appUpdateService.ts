@@ -15,17 +15,32 @@ import {
   parseRepoUrl,
 } from './githubReleaseClient';
 import type { GitHubRelease, GitHubReleaseAsset } from './githubReleaseClient';
+import { createSha256Hasher } from './updateSigning';
+import {
+  UPDATE_MANIFEST_ASSET_NAME,
+  parseUpdateManifest,
+  verifyUpdateManifestSignature,
+} from './updateManifest';
+import type { UpdateManifest } from './updateManifest';
 import { compareVersions, getCurrentVersion, normalizeVersion } from './updateVersion';
 
 const GITHUB_RELEASES_NOT_FOUND_MESSAGE = 'No public GitHub release found for this app.';
 const SKIPPED_RELEASE_TAG_KEY = 'app-update-skipped-release-tag';
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
+const APK_HASH_CHUNK_SIZE = 1024 * 1024;
 const supportsInstallActions = (): boolean => Platform.OS === 'android';
 
 export class AppUpdateNoReleaseError extends Error {
   constructor(message = GITHUB_RELEASES_NOT_FOUND_MESSAGE) {
     super(message);
     this.name = 'AppUpdateNoReleaseError';
+  }
+}
+
+export class UpdateVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UpdateVerificationError';
   }
 }
 
@@ -55,19 +70,15 @@ function getDownloadDirectory(): Directory {
 }
 
 function getDownloadHeaders(release: AppRelease): Record<string, string> {
+  // GitHub release assets are public; downloads are unauthenticated. Never
+  // attach an EXPO_PUBLIC token here — it would be recoverable from the APK.
   if (release.assetDownloadUrl?.startsWith('https://api.github.com/')) {
-    return getGitHubHeaders(ENV.updateGithubToken, 'application/octet-stream');
+    return getGitHubHeaders('application/octet-stream');
   }
 
-  const headers: Record<string, string> = {
+  return {
     Accept: APK_MIME_TYPE,
   };
-
-  if (ENV.updateGithubToken) {
-    headers.Authorization = `Bearer ${ENV.updateGithubToken}`;
-  }
-
-  return headers;
 }
 
 function createProgress(
@@ -84,7 +95,44 @@ function createProgress(
   };
 }
 
-function toAppRelease(release: GitHubRelease): AppRelease {
+/**
+ * Fetches and verifies the signed update manifest for the release, and binds it
+ * to the APK asset. Returns null on ANY failure (missing asset, unparseable
+ * JSON, invalid signature, version mismatch, or asset mismatch) — callers must
+ * treat null as "in-app install unavailable" (fail-closed, browser fallback).
+ */
+async function fetchVerifiedUpdateManifest(
+  manifestAsset: GitHubReleaseAsset,
+  release: GitHubRelease,
+  apkAsset: GitHubReleaseAsset,
+): Promise<UpdateManifest | null> {
+  const manifestUrl = manifestAsset.browser_download_url?.trim();
+  const apkDownloadUrl = apkAsset.browser_download_url?.trim();
+  if (!manifestUrl || !apkDownloadUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(manifestUrl, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const raw: unknown = await response.json();
+    const manifest = parseUpdateManifest(raw, release.tag_name?.trim() ?? null);
+    const bindsToAsset =
+      manifest.apkUrl === apkDownloadUrl
+      && manifest.apkAssetName === (apkAsset.name ?? '').trim()
+      && manifest.apkSizeBytes === apkAsset.size;
+    return bindsToAsset ? manifest : null;
+  } catch {
+    return null;
+  }
+}
+
+async function toAppRelease(release: GitHubRelease): Promise<AppRelease> {
   const tagName = release.tag_name?.trim();
   const htmlUrl = release.html_url?.trim();
   if (!tagName || !htmlUrl) {
@@ -92,11 +140,21 @@ function toAppRelease(release: GitHubRelease): AppRelease {
   }
 
   const preferredAsset = getPreferredAsset(release.assets);
+  const apkAsset = supportsInstallActions()
+    ? (release.assets ?? []).find(asset => asset.name?.toLowerCase().endsWith('.apk')) ?? null
+    : null;
+  const manifestAsset = supportsInstallActions()
+    ? (release.assets ?? []).find(asset => asset.name?.toLowerCase() === UPDATE_MANIFEST_ASSET_NAME) ?? null
+    : null;
+  const signedManifest = apkAsset && manifestAsset
+    ? await fetchVerifiedUpdateManifest(manifestAsset, release, apkAsset)
+    : null;
+
   const downloadUrl = preferredAsset?.browser_download_url?.trim() || htmlUrl;
   const assetName = preferredAsset?.name?.trim() || null;
   const assetDownloadUrl = preferredAsset?.url?.trim() || preferredAsset?.browser_download_url?.trim() || null;
-  const isAndroidApk = supportsInstallActions() && Boolean(assetName?.toLowerCase().endsWith('.apk'));
-  const canInstallInApp = isAndroidApk && Boolean(assetDownloadUrl);
+  const isAndroidApk = supportsInstallActions() && Boolean(apkAsset);
+  const canInstallInApp = isAndroidApk && Boolean(assetDownloadUrl) && signedManifest !== null;
 
   return {
     tagName,
@@ -111,6 +169,7 @@ function toAppRelease(release: GitHubRelease): AppRelease {
     assetDownloadUrl,
     assetSizeBytes: typeof preferredAsset?.size === 'number' ? preferredAsset.size : null,
     canInstallInApp,
+    signedManifest,
   };
 }
 
@@ -122,7 +181,6 @@ async function fetchLatestRelease(): Promise<AppRelease> {
 
   const latestResponse = await fetchGitHubJson<GitHubRelease>(
     getGitHubApiUrl(repo, '/releases/latest'),
-    ENV.updateGithubToken,
   );
 
   if (latestResponse.ok) {
@@ -134,6 +192,51 @@ async function fetchLatestRelease(): Promise<AppRelease> {
   }
 
   throw new Error(`GitHub update check failed (${latestResponse.status})`);
+}
+
+async function hashFileSha256(file: File): Promise<string> {
+  const hasher = createSha256Hasher();
+  const handle = file.open();
+  let total = 0;
+  try {
+    for (;;) {
+      const chunk = handle.readBytes(APK_HASH_CHUNK_SIZE);
+      if (chunk.byteLength === 0) {
+        break;
+      }
+      hasher.update(chunk);
+      total += chunk.byteLength;
+      if (chunk.byteLength < APK_HASH_CHUNK_SIZE) {
+        break;
+      }
+    }
+  } finally {
+    handle.close();
+  }
+
+  if (total !== file.size) {
+    throw new UpdateVerificationError(
+      `Downloaded APK is incomplete (read ${total} of ${file.size} bytes)`,
+    );
+  }
+  return hasher.digestHex();
+}
+
+/**
+ * Fail-closed verification before installation: exact size and SHA-256 must
+ * match the signed manifest. Throws UpdateVerificationError on any mismatch.
+ */
+async function verifyDownloadedApk(file: File, manifest: UpdateManifest): Promise<void> {
+  if (file.size !== manifest.apkSizeBytes) {
+    throw new UpdateVerificationError(
+      `Downloaded APK size mismatch (expected ${manifest.apkSizeBytes} bytes, got ${file.size})`,
+    );
+  }
+
+  const sha256 = await hashFileSha256(file);
+  if (sha256.toLowerCase() !== manifest.apkSha256.toLowerCase()) {
+    throw new UpdateVerificationError('Downloaded APK checksum does not match the signed update manifest');
+  }
 }
 
 async function downloadAndInstallApk(
@@ -198,8 +301,18 @@ async function downloadAndInstallApk(
       throw new Error('Update download was cancelled');
     }
 
-    const downloadedSize = result.size > 0 ? result.size : release.assetSizeBytes;
-    onProgress?.(createProgress('opening-installer', 1, downloadedSize, release.assetSizeBytes));
+    // Re-verify the manifest signature right before install (defense in depth)
+    // and then verify the downloaded bytes against the manifest. Never install
+    // anything that does not match; the catch block deletes the file.
+    const manifest = release.signedManifest;
+    if (!manifest || !verifyUpdateManifestSignature(manifest)) {
+      throw new UpdateVerificationError('Update manifest could not be verified; refusing to install');
+    }
+
+    await verifyDownloadedApk(destinationFile, manifest);
+
+    const downloadedSize = result.size > 0 ? result.size : manifest.apkSizeBytes;
+    onProgress?.(createProgress('opening-installer', 1, downloadedSize, manifest.apkSizeBytes));
     await androidApkInstaller.installApk(result.uri);
   } catch (error) {
     if (destinationFile.exists) {

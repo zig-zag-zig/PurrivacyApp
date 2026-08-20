@@ -13,12 +13,33 @@ interface HiddenPGPWebViewProps {
   onReload?: () => void;
 }
 
+/**
+ * Content-Security-Policy for the inline PGP document.
+ *
+ * - `default-src 'none'`: the document needs no network, images, frames,
+ *   media, fonts, styles, or connect (XHR/fetch/WebSocket) sources. The
+ *   OpenPGP.js bundle is pure JS and performs all crypto in memory.
+ * - `script-src 'unsafe-inline'`: required by the injection model — the
+ *   OpenPGP bundle and the operation handler are inline <script> elements
+ *   inside this HTML document. `'unsafe-eval'` is deliberately absent: the
+ *   bundle contains no eval/Function/WebAssembly usage.
+ * - `base-uri 'none'` / `form-action 'none'` / `object-src 'none'`: defense
+ *   in depth against URL rebasing, form submission, and plugin injection.
+ */
+const PGP_CSP_META = [
+  '<meta http-equiv="Content-Security-Policy" content="',
+  "default-src 'none'; script-src 'unsafe-inline'; ",
+  "base-uri 'none'; form-action 'none'; object-src 'none'",
+  '"/>',
+].join('');
+
 const PGP_HTML = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  ${PGP_CSP_META}
 </head>
 <body>
   <script>
@@ -225,7 +246,7 @@ const PGP_HTML = `
               const privateKeyIsUnlocked = typeof key.isDecrypted !== 'function' ? undefined : key.isDecrypted() !== null ? key.isDecrypted() : undefined;
               result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked };
             } catch (err) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ success:false, error: err.message, id }));
+              window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
               return;
             }
             break;
@@ -317,7 +338,7 @@ const PGP_HTML = `
 
         window.ReactNativeWebView.postMessage(JSON.stringify({ success: true, result, id }));
       } catch (err) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: err.message, id }));
+        window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
       }
     };
 
@@ -337,6 +358,11 @@ const HiddenPGPWebView = forwardRef<HiddenPGPWebViewRef, HiddenPGPWebViewProps>(
       ref={webViewRef}
       source={{ html: PGP_HTML }}
       style={{ width: 1, height: 1, opacity: 0.01 }}
+      // Kept as ['*'] on purpose: the react-native-webview JS navigation gate
+      // falls through to Linking.openURL for URLs that do not match the
+      // whitelist. onShouldStartLoadWithRequest below rejects every non-about:
+      // navigation, so '*' here guarantees no URL is ever handed to Linking —
+      // the effective policy is "about:blank only".
       originWhitelist={['*']}
       javaScriptEnabled
       domStorageEnabled={false}
@@ -345,6 +371,11 @@ const HiddenPGPWebView = forwardRef<HiddenPGPWebViewRef, HiddenPGPWebViewProps>(
       allowUniversalAccessFromFileURLs={false}
       mixedContentMode="never"
       setSupportMultipleWindows={false}
+      // Navigation lockdown: the inline HTML loads from about:blank (both
+      // platforms) and must never navigate anywhere else. Any other URL —
+      // http(s), data:, file:, javascript: — is rejected. injectJavaScript /
+      // postMessage are not navigations and are unaffected.
+      onShouldStartLoadWithRequest={request => request.url.startsWith('about:')}
       onMessage={onMessage}
       onError={error => logger.warn('pgp webview error', { error: error.nativeEvent })}
       onLoadEnd={() => {

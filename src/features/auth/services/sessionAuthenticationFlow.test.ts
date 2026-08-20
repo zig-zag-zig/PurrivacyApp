@@ -21,6 +21,19 @@ vi.mock('../../security/services/activityService', () => ({
   resetSessionTimer: vi.fn(),
 }));
 
+vi.mock('../../security/services/securityService', () => ({
+  securityService: { setLocalSessionLocked: vi.fn(async () => {}) },
+}));
+
+vi.mock('../domain/authUtils', () => ({
+  getUserId: () => 'user',
+}));
+
+vi.mock('../../../api/session/sessionSwap', () => ({
+  hasRecentSessionSwap: () => false,
+  recordSessionSwap: vi.fn(),
+}));
+
 import type { RefObject } from 'react';
 import type { User } from 'firebase/auth';
 

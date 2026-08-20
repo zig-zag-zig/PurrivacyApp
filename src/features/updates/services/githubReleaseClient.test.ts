@@ -32,29 +32,19 @@ describe('parseRepoUrl', () => {
 
 describe('getGitHubHeaders', () => {
     it('includes Accept and Cache-Control headers', () => {
-        const headers = getGitHubHeaders(null);
+        const headers = getGitHubHeaders();
         expect(headers.Accept).toBe('application/vnd.github+json');
         expect(headers['Cache-Control']).toBe('no-cache');
         expect(headers['X-GitHub-Api-Version']).toBe('2022-11-28');
     });
 
-    it('includes Authorization header when token provided', () => {
-        const headers = getGitHubHeaders('ghp_abc123');
-        expect(headers.Authorization).toBe('Bearer ghp_abc123');
-    });
-
-    it('omits Authorization header when token is null', () => {
-        const headers = getGitHubHeaders(null);
-        expect(headers.Authorization).toBeUndefined();
-    });
-
-    it('omits Authorization header when token is undefined', () => {
-        const headers = getGitHubHeaders(undefined);
+    it('omits Authorization header (release fetches are unauthenticated)', () => {
+        const headers = getGitHubHeaders();
         expect(headers.Authorization).toBeUndefined();
     });
 
     it('allows custom Accept header', () => {
-        const headers = getGitHubHeaders(null, 'text/plain');
+        const headers = getGitHubHeaders('text/plain');
         expect(headers.Accept).toBe('text/plain');
     });
 });

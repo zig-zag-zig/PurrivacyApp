@@ -9,19 +9,18 @@ import {
     resetSessionTimer,
 } from '../../security/services/activityService';
 import { getUsernameFromUser } from '../domain/usernameIdentity';
+import type { AuthDispatch } from '../state/authStateMachine';
 
 type UseAppInactivityLockParams = {
     user: User | null;
     lock: () => Promise<void>;
-    setAppStateIsBackground: (value: boolean) => void;
-    setIsCheckingInactivity: (value: boolean) => void;
+    dispatch: AuthDispatch;
 };
 
 export const useAppInactivityLock = ({
     user,
     lock,
-    setAppStateIsBackground,
-    setIsCheckingInactivity,
+    dispatch,
 }: UseAppInactivityLockParams): void => {
     useEffect(() => {
         let hasCheckedAppState = false;
@@ -30,31 +29,31 @@ export const useAppInactivityLock = ({
                 if (nextState === 'active') {
                     if (hasCheckedAppState) return;
                     hasCheckedAppState = true;
-                    setAppStateIsBackground(false);
+                    dispatch({ type: 'APP_STATE_CHANGED', isBackground: false });
 
                     if (user) {
                         await BiometricAuthService.isBiometricDisabledInPhoneSettings(getUsernameFromUser(user) || '');
                         if (await inactiveTooLong(user.uid)) {
                             await lock();
                         } else {
-                            setIsCheckingInactivity(false);
+                            dispatch({ type: 'CHECKING_INACTIVITY', checking: false });
                             await resetSessionTimer(user.uid, lock);
                         }
                     } else {
-                        setIsCheckingInactivity(false);
+                        dispatch({ type: 'CHECKING_INACTIVITY', checking: false });
                     }
                 } else {
                     hasCheckedAppState = false;
-                    setAppStateIsBackground(true);
-                    setIsCheckingInactivity(Boolean(user));
+                    dispatch({ type: 'APP_STATE_CHANGED', isBackground: true });
+                    dispatch({ type: 'CHECKING_INACTIVITY', checking: Boolean(user) });
                 }
             } catch (error) {
                 logger.warn('failed to handle app inactivity lock transition', { error });
-                setIsCheckingInactivity(false);
+                dispatch({ type: 'CHECKING_INACTIVITY', checking: false });
             }
         };
 
         const sub = AppState.addEventListener('change', handleAppStateChange);
         return () => sub.remove();
-    }, [lock, user, setAppStateIsBackground, setIsCheckingInactivity]);
+    }, [lock, user, dispatch]);
 };

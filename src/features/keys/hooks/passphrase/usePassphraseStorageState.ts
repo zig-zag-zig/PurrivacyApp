@@ -5,7 +5,7 @@ import type { User } from 'firebase/auth';
 
 import { logger } from '../../../../utils/logger';
 import { securityService } from '../../../security/services/securityService';
-import type { PassphraseBannerMode } from '../usePassphraseFieldController';
+import type { PassphraseBannerMode } from '../../model/passphraseFieldTypes';
 
 type UsePassphraseStorageStateParams = {
     bannerMode: PassphraseBannerMode;
@@ -44,6 +44,11 @@ export function usePassphraseStorageState({
 }: UsePassphraseStorageStateParams): UsePassphraseStorageStateResult {
     const [storedPassphrase, setStoredPassphrase] = useState<string | null>(null);
     const [storageEnabled, setStorageEnabled] = useState(false);
+    // storedPassphrase is deliberately omitted from loadStoredPassphrase deps
+    // (see NOTE below), so the closure copy goes stale. Mirror the latest
+    // known value here for reads inside that callback (e.g. clearing a
+    // previously-applied autofill when consent flips off mid-session).
+    const storedPassphraseRef = useRef<string | null>(null);
 
     const loadStoredPassphrase = useCallback(async () => {
         if (bannerMode !== 'stored' || !fingerprint || !user?.uid) {
@@ -53,19 +58,28 @@ export function usePassphraseStorageState({
         }
 
         try {
+            // Strict consent gate: the storage-enabled flag is
+            // server-authoritative (usePassphraseStorageAutoSync applies it
+            // from the user record on login/unlock) and disabling storage
+            // wipes the stored passphrases server-side. A stored value seen
+            // with the flag off means legacy records that pre-date the sync —
+            // treat that as "re-consent needed", not silent autofill.
             const enabled = await securityService.isPassphraseStorageEnabled(user.uid);
             setStorageEnabled(enabled);
 
             if (!enabled) {
-                if (!userEditedRef.current && storedPassphrase && currentValueRef.current === storedPassphrase) {
+                const lastStored = storedPassphraseRef.current;
+                if (!userEditedRef.current && lastStored && currentValueRef.current === lastStored) {
                     commitPassphraseRef.current('');
                 }
+                storedPassphraseRef.current = null;
                 setStoredPassphrase(null);
                 setStorageEnabled(false);
                 return;
             }
 
             const stored = storedPassphraseValue ?? null;
+            storedPassphraseRef.current = stored;
             setStoredPassphrase(stored);
 
             if (
@@ -79,6 +93,7 @@ export function usePassphraseStorageState({
             storedDefaultAppliedRef.current = true;
         } catch (loadError) {
             logger.warn('passphrase autofill load failed', { error: loadError });
+            storedPassphraseRef.current = null;
             setStoredPassphrase(null);
         }
         // NOTE: deps match the original — storedPassphrase is intentionally omitted

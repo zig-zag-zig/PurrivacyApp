@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useCallback, useState } from 'react';
 import { User } from 'firebase/auth';
 
 import { securityService } from '../../security/services/securityService';
-import { KeyPair, LastSignedInUser } from '../../../types/types';
+import { KeyPair } from '../../../types/types';
 import { useAuthEvents } from '../hooks/useAuthEvents';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 import { useBiometricState } from '../hooks/useBiometricState';
@@ -16,21 +16,16 @@ import { useAuthSessionLifecycle } from '../hooks/useAuthSessionLifecycle';
 import { appendDevTempKeys, loadDevTempKeys } from '../../keys/domain/tempKeyFixtures';
 import { EventService } from '../../../services/eventService';
 import { logger } from '../../../utils/logger';
-import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
+import { authReducer, createInitialAuthState } from './authStateMachine';
+import type { AuthRuntimeRefs } from '../model/authRuntimeTypes';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [authCompleted, setAuthCompleted] = useState(false);
-  const [isCheckingInactivity, setIsCheckingInactivity] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [fbUser, setFbUser] = useState<User | null>(null);
+  const [state, dispatch] = useReducer(authReducer, undefined, createInitialAuthState);
   const userInitAuthRef = useRef(false);
-  const [lastSignedInUser, setLastSignedInUser] = useState<LastSignedInUser | null>(null);
-  const [lastUsedBiometricSignIn, setLastUsedBiometricSignIn] = useState(false);
-  const [appStateIsBackground, setAppStateIsBackground] = useState<boolean>(false);
-  const [sessionAuthenticated, setSessionAuthenticated] = useState<boolean>(false);
-  const [isLocalSessionLocked, setIsLocalSessionLocked] = useState(false);
+  const userRef = useRef<User | null>(null);
+  const runLoadUserRef = useRef(true);
   const [devTempKeys, setDevTempKeys] = useState<KeyPair[]>([]);
   const isGettingSessionRef = useRef<boolean>(false);
   const localBiometricLockRef = useRef(false);
@@ -39,8 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const suppressLastSignedInUserPersistRef = useRef(false);
   const legitCustomTokenSignInRef = useRef<boolean>(false);
   const registrationInProgressRef = useRef(false);
-  const userRef = useRef<User | null>(null);
-  const runLoadUserRef = useRef(true);
+  const pendingPasswordRef = useRef<string | null>(null);
 
   // Load last signed-in user
   useEffect(() => {
@@ -50,12 +44,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const lastCached = await securityService.getOrSetLastSignedInUserInSecureStorage("GET");
         if (!cancelled) {
-          setLastSignedInUser(lastCached);
+          dispatch({ type: 'LAST_SIGNED_IN_USER_CHANGED', user: lastCached });
         }
       } catch (error) {
         if (!cancelled) {
           logger.warn('auth provider failed to load last signed-in user', { error });
-          setLastSignedInUser(null);
+          dispatch({ type: 'LAST_SIGNED_IN_USER_CHANGED', user: null });
         }
       }
     };
@@ -67,21 +61,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const {
-    userDecrypted,
-    isAuthLoading,
-    pendingPassword,
-    setPendingPassword,
     loadUser,
-    setUserDecrypted,
-    setIsAuthLoading,
     invalidateLoads,
-  } = useUserLoading(user, userRef, runLoadUserRef);
-  const pendingPasswordRef = useRef<string | null>(null);
+  } = useUserLoading(state.user, state.pendingPassword, userRef, runLoadUserRef, dispatch);
+
+  useEffect(() => {
+    pendingPasswordRef.current = state.pendingPassword;
+  }, [state.pendingPassword]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!userDecrypted) {
+    if (!state.userDecrypted) {
       setDevTempKeys([]);
       return;
     }
@@ -102,16 +93,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       cancelled = true;
       unsubscribe();
     };
-  }, [userDecrypted]);
+  }, [state.userDecrypted]);
 
   const visibleKeys = useMemo(
-    () => userDecrypted ? appendDevTempKeys(userDecrypted.keys, devTempKeys) : [],
-    [userDecrypted, devTempKeys],
+    () => state.userDecrypted ? appendDevTempKeys(state.userDecrypted.keys, devTempKeys) : [],
+    [state.userDecrypted, devTempKeys],
   );
-
-  useEffect(() => {
-    pendingPasswordRef.current = pendingPassword;
-  }, [pendingPassword]);
 
   const {
     isBiometricAvailable,
@@ -123,12 +110,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsBiometricAvailable,
     setIsBiometricEnabled,
   } = useBiometricState(
-    user ? { username: getUsernameFromUser(user) || '' } : null,
-    authCompleted,
-    appStateIsBackground,
-    fbUser ? { username: getUsernameFromUser(fbUser) || '' } : null,
-    lastUsedBiometricSignIn,
-    isLocalSessionLocked,
+    state.user ? { username: getUsernameFromUser(state.user) || '' } : null,
+    state.authCompleted,
+    state.appStateIsBackground,
+    state.fbUser ? { username: getUsernameFromUser(state.fbUser) || '' } : null,
+    state.lastUsedBiometricSignIn,
+    state.isLocalSessionLocked,
   );
 
   const {
@@ -137,7 +124,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     promptBiometricWhenDekIsReady,
   } = useBiometricSetupPrompt(promptBiometric);
 
-  const authRefs: AuthRuntimeRefs = {
+  const authRefs = useMemo<AuthRuntimeRefs>(() => ({
     forceNewSessionOnNextAuthRef,
     isGettingSessionRef,
     legitCustomTokenSignInRef,
@@ -150,23 +137,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     suppressLastSignedInUserPersistRef,
     userInitAuthRef,
     userRef,
-  };
+  }), [
+    forceNewSessionOnNextAuthRef,
+    isGettingSessionRef,
+    legitCustomTokenSignInRef,
+    localBiometricLockRef,
+    loginWithReauthenticateWithCredentialRef,
+    pendingPasswordRef,
+    registrationInProgressRef,
+    runLoadUserRef,
+    shouldPromptBiometricRef,
+    suppressLastSignedInUserPersistRef,
+    userInitAuthRef,
+    userRef,
+  ]);
 
-  const authStateSetters: AuthStateSetters = {
-    setAuthCompleted,
-    setFbUser,
-    setIsAuthLoading,
-    setIsBiometricAvailable,
-    setIsBiometricEnabled,
-    setIsCheckingInactivity,
-    setIsLocalSessionLocked,
-    setLastSignedInUser,
-    setLastUsedBiometricSignIn,
-    setPendingPassword,
-    setSessionAuthenticated,
-    setUser,
-    setUserDecrypted,
-  };
+  const authServices = useMemo(() => ({
+    clearPendingBiometricPromptRetry,
+    initializeBiometricState,
+  }), [clearPendingBiometricPromptRetry, initializeBiometricState]);
 
   const {
     signOut,
@@ -180,13 +169,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signin,
   } = useAuthActions({
-    userDecrypted,
     refs: authRefs,
-    services: {
-      clearPendingBiometricPromptRetry,
-      initializeBiometricState,
-    },
-    setters: authStateSetters,
+    services: authServices,
+    dispatch,
   });
 
   // Invalidate in-flight loadUser before/with every lock so late resolves cannot
@@ -197,28 +182,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [invalidateLoads, lockSession]);
 
   useAppInactivityLock({
-    user,
+    user: state.user,
     lock,
-    setAppStateIsBackground,
-    setIsCheckingInactivity,
+    dispatch,
   });
 
   // Firebase auth listener
   useFirebaseAuth({
     lock,
     refs: authRefs,
-    setters: authStateSetters,
+    dispatch,
   });
 
   // Event handling
-  useAuthEvents(user, signOut, () => loadUser().then(() => { }));
+  useAuthEvents(state.user, signOut, () => loadUser().then(() => { }));
 
   useAuthSessionLifecycle({
-    sessionAuthenticated,
-    fbUser,
-    user,
-    userDecrypted,
-    isAuthLoading,
+    sessionAuthenticated: state.sessionAuthenticated,
+    fbUser: state.fbUser,
+    user: state.user,
+    userDecrypted: state.userDecrypted,
+    isAuthLoading: state.isAuthLoading,
     refs: authRefs,
     services: {
       createSession,
@@ -226,24 +210,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       loadUser,
       lock,
       promptBiometricWhenDekIsReady,
+      setBiometricAvailability: setIsBiometricAvailable,
+      setBiometricEnabled: setIsBiometricEnabled,
     },
-    setters: authStateSetters,
+    dispatch,
   });
 
+  const setLastUsedBiometricSignIn = useCallback((value: boolean) => {
+    dispatch({ type: 'BIOMETRIC_SIGN_IN_MARKED', used: value });
+  }, [dispatch]);
+
   const value = useMemo<AuthContextType>(() => ({
-    user,
-    isAuthLoading,
-    isLocalSessionLocked,
-    authCompleted,
-    isCheckingInactivity,
-    userDecrypted,
+    user: state.user,
+    isAuthLoading: state.isAuthLoading,
+    isLocalSessionLocked: state.isLocalSessionLocked,
+    authCompleted: state.authCompleted,
+    isCheckingInactivity: state.isCheckingInactivity,
+    userDecrypted: state.userDecrypted,
     visibleKeys,
     isBiometricAvailable,
     isBiometricEnabled,
     canGoDirectlyToBiometricAuth,
-    appStateIsBackground,
-    lastSignedInUser,
+    appStateIsBackground: state.appStateIsBackground,
+    lastSignedInUser: state.lastSignedInUser,
     signInWithFirebaseCustomToken,
+    createSession,
     setLastUsedBiometricSignIn,
     toggleBiometric,
     signUp,
@@ -255,18 +246,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     clearSecureStore,
     initializeBiometricState,
   }), [
-    user,
-    isAuthLoading,
-    isLocalSessionLocked,
-    authCompleted,
-    isCheckingInactivity,
-    userDecrypted,
+    state.user,
+    state.isAuthLoading,
+    state.isLocalSessionLocked,
+    state.authCompleted,
+    state.isCheckingInactivity,
+    state.userDecrypted,
+    state.appStateIsBackground,
+    state.lastSignedInUser,
     visibleKeys,
     isBiometricAvailable,
     isBiometricEnabled,
     canGoDirectlyToBiometricAuth,
-    appStateIsBackground,
-    lastSignedInUser,
     signInWithFirebaseCustomToken,
     setLastUsedBiometricSignIn,
     toggleBiometric,

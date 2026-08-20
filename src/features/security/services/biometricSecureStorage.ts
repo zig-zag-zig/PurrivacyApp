@@ -64,10 +64,22 @@ const isSqlitePointer = (value: string | null): boolean => (
     typeof value === 'string' && value.startsWith(SQLITE_POINTER_PREFIX)
 );
 
-const localAuthenticationOptions = (promptMessage: string): LocalAuthentication.LocalAuthenticationOptions => ({
+const vaultUnlockAuthOptions = (promptMessage: string): LocalAuthentication.LocalAuthenticationOptions => ({
     promptMessage,
     cancelLabel: 'Cancel',
+    // Vault unlock keeps the historical behavior: device-credential fallback is
+    // allowed when biometrics are unavailable (APP-SEC-006).
     disableDeviceFallback: false,
+});
+
+const secretRevealAuthOptions = (promptMessage: string): LocalAuthentication.LocalAuthenticationOptions => ({
+    promptMessage,
+    cancelLabel: 'Cancel',
+    // Private-key reveal is biometrics-only: no device PIN/passcode fallback and
+    // Android must use a strong modality (fingerprint/3D face), matching the
+    // SecureStore BIOMETRIC_STRONG policy used for the DEK (APP-SEC-006).
+    disableDeviceFallback: true,
+    biometricsSecurityLevel: 'strong',
 });
 
 const isSecureStoreAvailable = async (): Promise<boolean> => {
@@ -182,12 +194,21 @@ export const SecureStorageModule = {
         return true;
     },
 
-    async authenticateBiometric(promptMessage: string): Promise<boolean> {
+    async authenticateForVaultUnlock(promptMessage: string): Promise<boolean> {
         if (promptMessage.trim() === '') {
             return false;
         }
 
-        const result = await LocalAuthentication.authenticateAsync(localAuthenticationOptions(promptMessage));
+        const result = await LocalAuthentication.authenticateAsync(vaultUnlockAuthOptions(promptMessage));
+        return result.success === true;
+    },
+
+    async authenticateForSecretReveal(promptMessage: string): Promise<boolean> {
+        if (promptMessage.trim() === '') {
+            return false;
+        }
+
+        const result = await LocalAuthentication.authenticateAsync(secretRevealAuthOptions(promptMessage));
         return result.success === true;
     },
 
@@ -323,8 +344,17 @@ export const hasStandaloneBiometricAuth = (): boolean => Boolean(
     && typeof LocalAuthentication.authenticateAsync === 'function',
 );
 
-export const authenticateBiometric = async (promptMessage: string): Promise<boolean> => (
-    SecureStorageModule.authenticateBiometric(promptMessage)
+export const authenticateForVaultUnlock = async (promptMessage: string): Promise<boolean> => (
+    SecureStorageModule.authenticateForVaultUnlock(promptMessage)
+);
+
+/**
+ * Biometrics-only authentication for revealing cryptographic secrets
+ * (private keys). Device-credential fallback is disabled and Android requires
+ * a strong biometric modality (APP-SEC-006).
+ */
+export const authenticateForSecretReveal = async (promptMessage: string): Promise<boolean> => (
+    SecureStorageModule.authenticateForSecretReveal(promptMessage)
 );
 
 export const biometricKeyExists = async (keyAlias: string): Promise<boolean> => {

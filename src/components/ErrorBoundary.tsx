@@ -1,4 +1,4 @@
-import React, { Component, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button, View, StyleSheet } from 'react-native';
 import * as Updates from 'expo-updates';
 import { CustomText } from './CustomText';
@@ -16,9 +16,26 @@ interface State {
 
 export class ErrorBoundary extends Component<Props, State> {
     state: State = { hasError: false };
+    private reportedError = false;
 
     static getDerivedStateFromError(): State {
         return { hasError: true };
+    }
+
+    componentDidCatch(error: Error, info: ErrorInfo): void {
+        // One-shot report: include only the error and component stack, never props/state
+        // (they may contain secrets such as passphrases or recovery seeds).
+        if (this.reportedError) {
+            return;
+        }
+        this.reportedError = true;
+        captureAppError(error, {
+            source: 'ErrorBoundary',
+            componentStack: info.componentStack ?? null,
+        });
+        logger.error('Unhandled error caught by ErrorBoundary', {
+            componentStack: info.componentStack ?? null,
+        });
     }
 
     handleRestart = () => {

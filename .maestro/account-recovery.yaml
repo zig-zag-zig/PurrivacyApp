@@ -160,6 +160,182 @@ env:
       - tapOn:
           id: "purrivacy.seed.challenge.word.2"
       - inputText: ${output.rw2}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.3"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.3"
+      - inputText: ${output.rw3}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.4"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.4"
+      - inputText: ${output.rw4}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.5"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.5"
+      - inputText: ${output.rw5}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.6"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.6"
+      - inputText: ${output.rw6}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.7"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.7"
+      - inputText: ${output.rw7}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.8"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.8"
+      - inputText: ${output.rw8}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.9"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.9"
+      - inputText: ${output.rw9}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.10"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.10"
+      - inputText: ${output.rw10}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.11"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.11"
+      - inputText: ${output.rw11}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.12"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.12"
+      - inputText: ${output.rw12}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.13"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.13"
+      - inputText: ${output.rw13}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.14"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.14"
+      - inputText: ${output.rw14}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.15"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.15"
+      - inputText: ${output.rw15}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.16"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.16"
+      - inputText: ${output.rw16}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.17"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.17"
+      - inputText: ${output.rw17}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.18"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.18"
+      - inputText: ${output.rw18}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.19"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.19"
+      - inputText: ${output.rw19}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.20"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.20"
+      - inputText: ${output.rw20}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.21"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.21"
+      - inputText: ${output.rw21}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.22"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.22"
+      - inputText: ${output.rw22}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.23"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.23"
+      - inputText: ${output.rw23}
+- runFlow:
+    when:
+      visible:
+        id: "purrivacy.seed.challenge.word.24"
+    commands:
+      - tapOn:
+          id: "purrivacy.seed.challenge.word.24"
+      - inputText: ${output.rw24}
 - pressKey: Enter
 - scrollUntilVisible:
     element:

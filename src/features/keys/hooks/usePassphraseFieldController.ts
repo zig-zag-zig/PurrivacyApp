@@ -7,17 +7,22 @@ import {
     suppressNextPassphraseBannerDismiss,
 } from '../../../services/passphraseBannerEvents';
 import { useAuth } from '../../auth/state/AuthContext';
+import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
 import {
     DEFAULT_PASSPHRASE_GENERATOR_SETTINGS,
 } from '../../security/services/passphraseGeneratorSettings';
 import type { PassphraseGeneratorSettings } from '../../security/services/passphraseGeneratorSettings';
 import { usePassphraseBannerOverlay } from '../components/PassphraseBannerOverlay';
-import { useSecureCopy } from '../../../shared/hooks/useSecureCopy';
-import { usePassphraseStorageState } from './passphrase/usePassphraseStorageState';
-import { usePassphraseGeneratorSettings } from './passphrase/usePassphraseGeneratorSettings';
+import { usePassphraseAutofill } from './passphrase/usePassphraseAutofill';
+import { usePassphraseBannerActions } from './passphrase/usePassphraseBannerActions';
 import { usePassphraseBannerLifecycle } from './passphrase/usePassphraseBannerLifecycle';
+import { usePassphraseFieldFocus } from './passphrase/usePassphraseFieldFocus';
+import { usePassphraseFieldValue } from './passphrase/usePassphraseFieldValue';
+import { usePassphraseGeneratorSettings } from './passphrase/usePassphraseGeneratorSettings';
+import { usePassphraseStorageState } from './passphrase/usePassphraseStorageState';
+import type { PassphraseBannerMode } from '../model/passphraseFieldTypes';
 
-export type PassphraseBannerMode = 'stored' | 'generate' | 'none';
+export type { PassphraseBannerMode } from '../model/passphraseFieldTypes';
 
 type UsePassphraseFieldControllerParams = {
     bannerMode?: PassphraseBannerMode;
@@ -47,8 +52,15 @@ type UsePassphraseFieldControllerResult = {
 };
 
 const BANNER_AUTO_DISMISS_MS = 3000;
-const GENERATOR_SETTINGS_OPEN_DELAY_MS = 120;
 
+/**
+ * Façade (APP-ARCH-002) — owns the shared refs, the cross-module effects and
+ * the public controller surface. Value state lives in usePassphraseFieldValue,
+ * stored-passphrase sync in usePassphraseStorageState, generator settings in
+ * usePassphraseGeneratorSettings, banner visibility in usePassphraseBannerLifecycle,
+ * focus/blur in usePassphraseFieldFocus, autofill actions in usePassphraseAutofill
+ * and cross-cutting dismiss/settings actions in usePassphraseBannerActions.
+ */
 export function usePassphraseFieldController({
     bannerMode: explicitBannerMode,
     doNotUseAutofill,
@@ -67,37 +79,30 @@ export function usePassphraseFieldController({
     const bannerMode: PassphraseBannerMode = explicitBannerMode ?? (doNotUseAutofill ? 'none' : 'stored');
 
     // ── Shared state & refs (owned by facade) ───────────────────────────
-    const [passphrase, setPassphrase] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<TextInput | null>(null);
     const inputAnchorRef = useRef<View | null>(null);
-    const currentValueRef = useRef('');
-    const onGeneratedPassphraseRef = useRef(onGeneratedPassphrase);
-    const commitPassphraseRef = useRef<(nextPassphrase: string) => void>(() => undefined);
-    const previousFingerprintRef = useRef<string | undefined>(undefined);
     const userEditedRef = useRef(false);
     const storedDefaultAppliedRef = useRef(false);
+    const previousFingerprintRef = useRef<string | undefined>(undefined);
     const generatorSettingsRef = useRef<PassphraseGeneratorSettings>(
         DEFAULT_PASSPHRASE_GENERATOR_SETTINGS,
     );
 
-    const currentValue = value !== undefined ? value : passphrase;
-    currentValueRef.current = currentValue;
-    onGeneratedPassphraseRef.current = onGeneratedPassphrase;
+    // ═══ Sub-module: value synchronization ══════════════════════════════
+    const {
+        currentValue,
+        currentValueRef,
+        commitPassphrase,
+        commitPassphraseRef,
+        onGeneratedPassphraseRef,
+    } = usePassphraseFieldValue({
+        value,
+        onPassphraseChange,
+        onGeneratedPassphrase,
+    });
 
-    // ── commitPassphrase (shared) ───────────────────────────────────────
-    const commitPassphrase = useCallback((nextPassphrase: string) => {
-        if (value === undefined) {
-            setPassphrase(nextPassphrase);
-        }
-        onPassphraseChange?.(nextPassphrase);
-    }, [onPassphraseChange, value]);
-
-    useEffect(() => {
-        commitPassphraseRef.current = commitPassphrase;
-    }, [commitPassphrase]);
-
-    // ═══ Sub-module A: passphrase storage state ═════════════════════════
+    // ═══ Sub-module: passphrase storage state ═══════════════════════════
     const {
         storedPassphrase,
         storageEnabled,
@@ -114,7 +119,7 @@ export function usePassphraseFieldController({
         previousFingerprintRef,
     });
 
-    // ═══ Sub-module B: generator settings (called before banner module
+    // ═══ Sub-module: generator settings (called before banner lifecycle
     //      because banner lifecycle needs showGeneratorSettingsModal etc.) ══
     const {
         generatorSettings,
@@ -149,10 +154,9 @@ export function usePassphraseFieldController({
         }
 
         return 'none';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bannerMode, currentValue, fieldId, fingerprint, generatedPassphrase, storedPassphrase]);
 
-    // ═══ Sub-module C: banner lifecycle ═════════════════════════════════
+    // ═══ Sub-module: banner lifecycle ═══════════════════════════════════
     const {
         showBanner,
         isBannerReady,
@@ -183,81 +187,84 @@ export function usePassphraseFieldController({
         storageEnabled,
     });
 
-    // ═══ Cross-cutting: closeGeneratorSettings (banner + generator) ═════
-    const closeGeneratorSettings = useCallback(() => {
-        if (settingsOpenTimeoutRef.current) {
-            clearTimeout(settingsOpenTimeoutRef.current);
-            settingsOpenTimeoutRef.current = null;
-        }
-        generatorSettingsOpeningRef.current = false;
-        setShowGeneratorSettingsModal(false);
-        setIsBannerPinned(true);
-    }, [settingsOpenTimeoutRef, generatorSettingsOpeningRef, setShowGeneratorSettingsModal, setIsBannerPinned]);
-
-    // ═══ Cross-cutting: dismissBanner (generator + banner) ══════════════
-    const dismissBanner = useCallback((dismissKeyboard = true) => {
-        if (!showBannerRef.current && !showGeneratorSettingsModal) return;
-
-        dismissedBannerTokenRef.current = activeBannerTokenRef.current;
-        if (settingsOpenTimeoutRef.current) {
-            clearTimeout(settingsOpenTimeoutRef.current);
-            settingsOpenTimeoutRef.current = null;
-        }
-        clearBannerFocusSettleTimeout();
-        if (bannerAutoDismissTimeoutRef.current) {
-            clearTimeout(bannerAutoDismissTimeoutRef.current);
-            bannerAutoDismissTimeoutRef.current = null;
-        }
-
-        closingBannerRef.current = true;
-        showBannerRef.current = false;
-        generatorSettingsOpeningRef.current = false;
-        if (dismissKeyboard) {
-            Keyboard.dismiss();
-        }
-        setShowBanner(false);
-        setIsBannerPinned(false);
-        closeGeneratorSettings();
-        setIsBannerReady(false);
-        setTimeout(() => {
-            closingBannerRef.current = false;
-        }, 180);
-    }, [
-        clearBannerFocusSettleTimeout,
-        showGeneratorSettingsModal,
-        settingsOpenTimeoutRef,
-        activeBannerTokenRef,
-        dismissedBannerTokenRef,
-        bannerAutoDismissTimeoutRef,
-        closingBannerRef,
-        showBannerRef,
-        generatorSettingsOpeningRef,
-        setIsBannerPinned,
-        setShowBanner,
-        setIsBannerReady,
+    // ═══ Sub-module: cross-cutting banner actions ═══════════════════════
+    const {
+        autoHideBanner,
         closeGeneratorSettings,
-    ]);
-
-    // ═══ Cross-cutting: autoHideBanner ══════════════════════════════════
-    const autoHideBanner = useCallback(() => {
-        dismissedBannerTokenRef.current = activeBannerTokenRef.current;
-        if (bannerAutoDismissTimeoutRef.current) {
-            clearTimeout(bannerAutoDismissTimeoutRef.current);
-            bannerAutoDismissTimeoutRef.current = null;
-        }
-        bannerAutoHiddenRef.current = true;
-        showBannerRef.current = false;
-        setShowBanner(false);
-        setIsBannerPinned(false);
-    }, [
+        dismissBanner,
+        openGeneratorSettings,
+    } = usePassphraseBannerActions({
         activeBannerTokenRef,
-        dismissedBannerTokenRef,
         bannerAutoDismissTimeoutRef,
         bannerAutoHiddenRef,
-        showBannerRef,
+        clearBannerFocusSettleTimeout,
+        closingBannerRef,
+        dismissedBannerTokenRef,
+        generatorSettingsOpeningRef,
+        markBannerInteraction,
         setShowBanner,
         setIsBannerPinned,
-    ]);
+        setIsBannerReady,
+        setShowGeneratorSettingsModal,
+        settingsOpenTimeoutRef,
+        showBannerRef,
+        showGeneratorSettingsModal,
+    });
+
+    // ═══ Sub-module: focus/blur orchestration ═══════════════════════════
+    const { handleBlur, handleFocus } = usePassphraseFieldFocus({
+        bannerMode,
+        bannerInteractionRef,
+        clearBannerFocusSettleTimeout,
+        closingBannerRef,
+        dismissedBannerTokenRef,
+        generatedPassphrase,
+        generatorSettingsOpeningRef,
+        loadStoredPassphrase,
+        regeneratePassphrase,
+        scheduleBannerAfterFocusScroll,
+        setIsBannerPinned,
+        setIsBannerReady,
+        setIsFocused,
+        showGeneratorSettingsModal,
+    });
+
+    // ═══ Sub-module: autofill / generated-passphrase actions ════════════
+    const {
+        handleAutofill,
+        handleCopyGeneratedPassphrase,
+        handleGeneratedBannerPress,
+    } = usePassphraseAutofill({
+        commitPassphrase,
+        dismissBanner,
+        generatedPassphrase,
+        markBannerInteraction,
+        onGeneratedPassphrase,
+        secureCopy,
+        storedPassphrase,
+        userEditedRef,
+    });
+
+    // ═══ Event handlers kept in the facade (they bridge all modules) ════
+    const handleChangeText = (text: string) => {
+        userEditedRef.current = true;
+        commitPassphrase(text);
+        if (
+            bannerMode === 'stored'
+            && isFocused
+            && storedPassphrase
+            && text !== storedPassphrase
+        ) {
+            dismissedBannerTokenRef.current = null;
+            if (!isBannerReady) {
+                setIsBannerReady(true);
+            }
+        }
+    };
+
+    const handleInputWrapperRef = useCallback((node: View | null) => {
+        inputAnchorRef.current = node;
+    }, []);
 
     // ═══ Fingerprint-change effect ══════════════════════════════════════
     useEffect(() => {
@@ -277,108 +284,7 @@ export function usePassphraseFieldController({
             }
             previousFingerprintRef.current = fingerprint;
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clearBannerFocusSettleTimeout, commitPassphrase, fingerprint, setShowGeneratorSettingsModal, setIsBannerPinned, setIsBannerReady, setShowBanner, value]);
-
-    // ═══ Event handlers ═════════════════════════════════════════════════
-    const handleFocus = useCallback(() => {
-        suppressNextPassphraseBannerDismiss();
-        dismissedBannerTokenRef.current = null;
-        closingBannerRef.current = false;
-        setIsFocused(true);
-        setIsBannerPinned(false);
-        scheduleBannerAfterFocusScroll();
-
-        if (bannerMode === 'stored') {
-            void loadStoredPassphrase();
-        }
-        if (bannerMode === 'generate' && !generatedPassphrase) {
-            void regeneratePassphrase();
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bannerMode, loadStoredPassphrase, regeneratePassphrase, scheduleBannerAfterFocusScroll, setIsBannerPinned, generatedPassphrase]);
-
-    const handleBlur = useCallback(() => {
-        if (generatorSettingsOpeningRef.current || showGeneratorSettingsModal) {
-            setIsFocused(false);
-            return;
-        }
-
-        if (bannerInteractionRef.current) {
-            setIsFocused(false);
-            setIsBannerPinned(true);
-            return;
-        }
-
-        clearBannerFocusSettleTimeout();
-        setIsBannerReady(false);
-        setIsFocused(false);
-        setIsBannerPinned(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [clearBannerFocusSettleTimeout, generatorSettingsOpeningRef, showGeneratorSettingsModal, bannerInteractionRef, setIsBannerPinned, setIsBannerReady]);
-
-    const handleChangeText = (text: string) => {
-        userEditedRef.current = true;
-        commitPassphrase(text);
-        if (
-            bannerMode === 'stored'
-            && isFocused
-            && storedPassphrase
-            && text !== storedPassphrase
-        ) {
-            dismissedBannerTokenRef.current = null;
-            if (!isBannerReady) {
-                setIsBannerReady(true);
-            }
-        }
-    };
-
-    const handleAutofill = useCallback(() => {
-        if (!storedPassphrase) return;
-        suppressNextPassphraseBannerDismiss();
-        commitPassphrase(storedPassphrase);
-        dismissBanner();
-    }, [commitPassphrase, dismissBanner, storedPassphrase]);
-
-    const applyGeneratedPassphrase = useCallback(() => {
-        if (!generatedPassphrase) return;
-        userEditedRef.current = true;
-        onGeneratedPassphrase?.(generatedPassphrase);
-        if (!onGeneratedPassphrase) {
-            commitPassphrase(generatedPassphrase);
-        }
-    }, [commitPassphrase, generatedPassphrase, onGeneratedPassphrase]);
-
-    const handleGeneratedBannerPress = useCallback(() => {
-        suppressNextPassphraseBannerDismiss();
-        applyGeneratedPassphrase();
-        dismissBanner();
-    }, [applyGeneratedPassphrase, dismissBanner]);
-
-    const handleCopyGeneratedPassphrase = useCallback(() => {
-        if (!generatedPassphrase) return;
-        markBannerInteraction();
-        void secureCopy(generatedPassphrase);
-    }, [generatedPassphrase, markBannerInteraction, secureCopy]);
-
-    const handleInputWrapperRef = useCallback((node: View | null) => {
-        inputAnchorRef.current = node;
-    }, []);
-
-    // ═══ Cross-cutting: openGeneratorSettings (bridges generator + banner) ══
-    const openGeneratorSettings = useCallback(() => {
-        markBannerInteraction();
-        if (settingsOpenTimeoutRef.current) {
-            clearTimeout(settingsOpenTimeoutRef.current);
-        }
-        generatorSettingsOpeningRef.current = true;
-        setIsBannerPinned(true);
-        Keyboard.dismiss();
-        settingsOpenTimeoutRef.current = setTimeout(() => {
-            settingsOpenTimeoutRef.current = null;
-            setShowGeneratorSettingsModal(true);
-        }, GENERATOR_SETTINGS_OPEN_DELAY_MS);
-    }, [markBannerInteraction, settingsOpenTimeoutRef, generatorSettingsOpeningRef, setIsBannerPinned, setShowGeneratorSettingsModal]);
 
     // ═══ Banner dismiss subscription ════════════════════════════════════
     useEffect(() => {
@@ -459,7 +365,6 @@ export function usePassphraseFieldController({
         if (bannerAutoDismissTimeoutRef.current) {
             clearTimeout(bannerAutoDismissTimeoutRef.current);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clearBannerFocusSettleTimeout, hidePassphraseBanner, settingsOpenTimeoutRef, bannerAutoDismissTimeoutRef, latestBannerTokenRef]);
 
     return {

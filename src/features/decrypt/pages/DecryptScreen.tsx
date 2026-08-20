@@ -64,6 +64,7 @@ export const DecryptScreen = () => {
           showPassphraseField={true}
           onPassphraseChange={decryptPage.onPassphraseChanged}
           setDefaultKey={true}
+          passphraseBannerMode="stored"
           optional={false}
           multiSelect={false}
           type="private"

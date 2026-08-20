@@ -1,0 +1,8 @@
+appId: vip.chi_chi.purrivacy
+---
+# Register the MFA-enabled fixture user (e2e-mfa) with a fixed-passphrase key.
+# MFA itself is enabled afterwards by the seeder via the backend API.
+- runFlow:
+    file: subflows/register-create-key-fixed.yaml
+    env:
+      TEST_USERNAME: "e2e-mfa"

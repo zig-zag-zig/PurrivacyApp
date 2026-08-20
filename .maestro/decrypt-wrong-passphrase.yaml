@@ -1,0 +1,94 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-shared
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+  WRONG_PASSPHRASE: wrongpassphrase999
+  DECRYPT_MESSAGE: wrong passphrase must fail cleanly
+---
+# Error path: decrypting with the WRONG key passphrase must fail with a clear
+# error and no partial result — then the screen stays usable (no crash).
+#
+# State-independence: the passphrase field may be pre-filled by stored-passphrase
+# autofill; typing the wrong passphrase into it yields a wrong combined value
+# either way, so this works with storage enabled or disabled.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+# Encrypt a message first (stored passphrase autofills -> succeeds untouched)
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.content"
+- inputText: ${DECRYPT_MESSAGE}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.encrypt.recipients.item.0"
+- tapOn:
+    id: "purrivacy.encrypt.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.result.text"
+    timeout: 90000
+- copyTextFrom:
+    id: "purrivacy.encrypt.result.text"
+- evalScript: ${output.encrypted = maestro.copiedText}
+# Decrypt with the WRONG passphrase
+- tapOn:
+    id: "purrivacy.tab.decrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.encryptedContent"
+- setClipboard: ${output.encrypted}
+- pasteText
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.recipient.passphrase"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.recipient.passphrase"
+- inputText: ${WRONG_PASSPHRASE}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.submit"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.submit"
+# Error path: clear passphrase error toast, no result text, screen intact
+- extendedWaitUntil:
+    visible: "Incorrect passphrase for the selected private key"
+    timeout: 30000
+- assertNotVisible:
+    id: "purrivacy.decrypt.result.text"
+- assertVisible:
+    id: "purrivacy.decrypt.encryptedContent"

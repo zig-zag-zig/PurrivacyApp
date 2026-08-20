@@ -1,0 +1,53 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-mfa
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Feature-completion: an MFA-protected account must be able to sign in using a
+# 12-character recovery code (the seeder captured fresh codes at enable time —
+# no TOTP oracle needed). Recovery codes are single-use: re-run requires a
+# fresh seed.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+# MFA challenge modal appears
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.mfa.modal"
+    timeout: 30000
+# Switch to the recovery-code input
+- tapOn: "Recovery Code"
+- extendedWaitUntil:
+    visible: "Enter 12-character code"
+    timeout: 15000
+- tapOn:
+    text: "Enter 12-character code"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd:
+    timeout: 1000
+# Paste is atomic (inputText can drop chars on slow emulators)
+- setClipboard: ${MFA_RECOVERY_CODE}
+- pasteText
+- hideKeyboard
+- tapOn: "Submit"
+# Successful MFA login lands on the key screen
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000

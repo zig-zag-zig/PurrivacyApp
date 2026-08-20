@@ -34,7 +34,7 @@ export const KeyInfoModal: React.FC<KeyInfoModalProps> = ({
     const handleCopyPublicKey = () => {
         const publicKey = keyPair?.publicKey;
         if (publicKey) {
-            void secureCopy(publicKey);
+            void secureCopy(publicKey, { sensitivity: 'low' });
             setCopied(true);
             if (copyFeedbackTimeoutRef.current) {
                 clearTimeout(copyFeedbackTimeoutRef.current);

@@ -6,7 +6,7 @@ import { ApiClient } from '../../../api/client';
 import { auth } from '../../../config/firebase';
 import { LastSignedInUser } from '../../../types/types';
 import { logger } from '../../../utils/logger';
-import { storage } from '../../../utils/storage';
+import { getPushToken } from '../../../utils/stores/pushTokenCache';
 import {
   clearLastActiveTime,
   clearSessionTimer,
@@ -22,7 +22,7 @@ type Setter<T> = (value: T) => void;
 export const clearStoredSessionAndPushToken = async (userId: string): Promise<void> => {
   await securityService.clearStoredSession(userId);
 
-  const pushToken = await storage.getItem('expoPushToken');
+  const pushToken = await getPushToken();
   if (pushToken) {
     await ApiClient.deletePushToken(pushToken);
   }

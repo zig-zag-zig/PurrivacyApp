@@ -68,6 +68,13 @@ export const RecoverAccountScreen = () => {
                 throw new Error('Recovery token did not match account');
             }
 
+            // A backend session is required for the session-authenticated
+            // recovery calls (changeDekPassword / revokeAllSessions); the
+            // Firebase custom-token sign-in alone does not create one. Create
+            // it directly with force-fresh semantics: the stored-session path
+            // would find nothing (fresh user) and trigger a global sign-out.
+            await ApiClient.createSession(true, undefined, true);
+
             await AuthService.resetPasswordWithSeed(user.uid, recovery.userEncrypted, newPassword, normalizedSeedPhrase);
             await updatePassword(user, newPassword);
             await ApiClient.revokeAllSessions();
@@ -99,6 +106,7 @@ export const RecoverAccountScreen = () => {
             <View style={{ gap: theme.spacing.md }}>
                 <InputField
                     label="Username"
+                    testID="purrivacy.recover.username"
                     value={username}
                     onChangeText={handleUsernameChange}
                     autoCapitalize="none"
@@ -113,6 +121,7 @@ export const RecoverAccountScreen = () => {
 
                 <InputField
                     label="Recovery Seed Phrase"
+                    testID="purrivacy.recover.seed"
                     value={seedPhrase}
                     onChangeText={setSeedPhrase}
                     multiline
@@ -133,6 +142,7 @@ export const RecoverAccountScreen = () => {
                     onSubmit={handleRecover}
                     isLoading={isLoading}
                     formErrors={formErrors}
+                    testIDPrefix="purrivacy.recover"
                 />
             </View>
         </ScreenContainer>

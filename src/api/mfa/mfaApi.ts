@@ -1,5 +1,6 @@
 import { getApiRuntime } from '../runtime';
 import type {
+  MfaSetupNonceResponse,
   MfaSetupResponse,
   RecoveryCodeRegenerateResponse,
   RecoveryCodeRemainingResponse,
@@ -17,15 +18,24 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
   };
 
   return {
-    setupMfa(): Promise<MfaSetupResponse> {
-      return request('/mfa/setup', 'POST');
+    mintMfaSetupNonce(): Promise<MfaSetupNonceResponse> {
+      // Fresh-auth nonce required before MFA setup (backend API-SEC-006).
+      // No mfaCode at this point — the session was recently authenticated.
+      return request('/auth/session/mfa-setup-nonce', 'POST', {}, true) as Promise<MfaSetupNonceResponse>;
     },
 
-    async enableMfa(): Promise<SessionResponse> {
+    setupMfa(nonce: string): Promise<MfaSetupResponse> {
+      return request('/mfa/setup', 'POST', { nonce }) as Promise<MfaSetupResponse>;
+    },
+
+    async enableMfa(mfaTrusted: boolean): Promise<SessionResponse> {
+      // The code is NOT collected here: the request pipeline classifies
+      // /mfa/enable as MFA-sensitive and opens the MFA modal preemptively;
+      // the modal's code is injected into the body via options.mfaCode.
       const response = await request(
         '/mfa/enable',
         'POST',
-        undefined,
+        { mfaTrusted },
         true,
         { includeDeviceId: true },
       ) as SessionResponse;
@@ -64,11 +74,11 @@ export function createMfaApi(request: ApiRequestFn, storeSessionResponse: StoreS
     },
 
     regenerateRecoveryCodes(): Promise<RecoveryCodeRegenerateResponse> {
-      return request('/mfa/recovery-codes/regenerate', 'POST', {}, true);
+      return request('/mfa/recovery-codes/regenerate', 'POST', {}, true) as Promise<RecoveryCodeRegenerateResponse>;
     },
 
     getRemainingRecoveryCodes(): Promise<RecoveryCodeRemainingResponse> {
-      return request('/mfa/recovery-codes/remaining', 'GET', undefined, true);
+      return request('/mfa/recovery-codes/remaining', 'GET', undefined, true) as Promise<RecoveryCodeRemainingResponse>;
     },
   };
 }

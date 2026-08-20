@@ -313,7 +313,7 @@ const maestroArgs = ['test', '--device', deviceId];
 if (process.env.MAESTRO_REINSTALL_DRIVER !== 'false') {
   maestroArgs.push('--reinstall-driver');
 }
-for (const name of ['E2E_USERNAME']) {
+for (const name of ['E2E_USERNAME', 'MFA_RECOVERY_CODE', 'WRONG_SEED_PHRASE']) {
   if (process.env[name]) {
     maestroArgs.push(`--env=${name}=${process.env[name]}`);
   }

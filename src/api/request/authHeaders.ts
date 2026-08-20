@@ -56,8 +56,10 @@ export async function buildAuthHeaders(
     return headers;
 }
 
-export function buildRequestBody(body?: any, options?: RequestOptions): any {
-    const requestBody = body ? { ...body } : {};
+export function buildRequestBody(body?: unknown, options?: RequestOptions): Record<string, unknown> {
+    // Callers pass plain objects; the spread mirrors the historic `{ ...body }`
+    // behavior (including its handling of non-object truthy values).
+    const requestBody = body ? { ...(body as Record<string, unknown>) } : {};
     if (options?.mfaCode) {
         requestBody.mfaCode = options.mfaCode;
     }

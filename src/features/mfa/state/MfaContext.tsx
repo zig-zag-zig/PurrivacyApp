@@ -17,7 +17,7 @@ interface MfaProviderProps {
 interface MfaContextType {
     mfaState: MfaState;
     setupMfa: () => Promise<MfaSetupResponse>;
-    enableMfa: () => Promise<void>;
+    enableMfa: (mfaTrusted: boolean) => Promise<void>;
     disableMfa: () => Promise<void>;
     setSessionTrust: (mfaTrusted: boolean) => Promise<void>;
     regenerateRecoveryCodes: () => Promise<string[]>;

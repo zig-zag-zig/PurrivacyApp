@@ -3,8 +3,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 
 export type RootStackParamList = {
     Signin: undefined;
-    Signup: { username?: string; password?: string } | undefined;
-    SignupSeedVerification: { seed: string; username: string; password: string };
+    Signup: { username?: string } | undefined;
+    // Signup secrets travel via pendingSignupSession (in-process, APP-SEC-007),
+    // never through navigation state.
+    SignupSeedVerification: undefined;
     RecoverAccount: undefined;
     Security: { type: 'password' | 'delete' };
     MfaSetup: undefined;

@@ -65,6 +65,7 @@ export const SettingsScreen = () => {
       <SettingsOption
         iconName="security"
         text="Two-Factor Authentication"
+        testID="purrivacy.settings.mfa"
         switchProps={{
           value: settingsPage.mfaState.mfaEnabled,
           onValueChange: settingsPage.onMfaToggle,
@@ -121,6 +122,7 @@ export const SettingsScreen = () => {
         <SettingsOption
           iconName="fingerprint"
           text="Biometric Unlock"
+          testID="purrivacy.settings.biometric"
           switchProps={{
             value: settingsPage.isBiometricEnabled,
             onValueChange: settingsPage.onBiometricToggle,
@@ -141,7 +143,7 @@ export const SettingsScreen = () => {
           onValueChange: settingsPage.onPassphraseStorageToggle,
         }}
         loading={settingsPage.state.passphraseStorageLoading}
-        extraText="Saved key passphrases autofill on this device without another authentication prompt."
+        extraText="Saved key passphrases are encrypted with your account key and sync across all your devices. They autofill without another authentication prompt."
       />
 
       <SettingsOption

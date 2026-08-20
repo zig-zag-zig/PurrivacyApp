@@ -37,20 +37,13 @@ export function parseRepoUrl(repoUrl: string | null): ParsedRepo | null {
 }
 
 export function getGitHubHeaders(
-  githubToken: string | null | undefined,
   accept = 'application/vnd.github+json',
 ): Record<string, string> {
-  const headers: Record<string, string> = {
+  return {
     Accept: accept,
     'Cache-Control': 'no-cache',
     'X-GitHub-Api-Version': GITHUB_API_VERSION,
   };
-
-  if (githubToken) {
-    headers.Authorization = `Bearer ${githubToken}`;
-  }
-
-  return headers;
 }
 
 export function getGitHubApiUrl(repo: ParsedRepo, path: string): string {
@@ -62,9 +55,8 @@ export function getGitHubApiUrl(repo: ParsedRepo, path: string): string {
 
 export async function fetchGitHubJson<T>(
   url: string,
-  githubToken: string | null | undefined,
 ): Promise<{ ok: true; status: number; data: T } | { ok: false; status: number }> {
-  const response = await fetch(url, { headers: getGitHubHeaders(githubToken) });
+  const response = await fetch(url, { headers: getGitHubHeaders() });
 
   if (!response.ok) {
     return { ok: false, status: response.status };

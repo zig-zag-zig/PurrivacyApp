@@ -3,7 +3,12 @@ import { BackHandler } from 'react-native';
 import { useToast } from './ToastContext';
 import { MfaModal } from '../../features/mfa/components/MfaModal';
 import { RecoveryCodesModal } from '../../features/mfa/components/RecoveryCodesModal';
-import type { MfaModalOptions, RecoveryCodesModalOptions, MfaModalResult } from '../../shared/modals/types';
+import type {
+    MfaModalOptions,
+    MfaModalResult,
+    ModalRequest,
+    RecoveryCodesModalOptions,
+} from '../../shared/modals/types';
 import { PassphraseStorageConsentModal } from '../../features/security/components/PassphraseStorageConsentModal';
 import {
     setMfaModalHandler,
@@ -11,11 +16,11 @@ import {
     setRecoveryCodesModalHandler,
 } from '../../api/modalHandler';
 import { EventService } from '../../services/eventService';
+import type { AppEventPayloadMap } from '../../services/eventService';
 import { shouldCloseMfaModal } from '../../features/mfa/domain/mfaModalClose';
+import { modalPropsOf, modalTypeOf, ModalType } from './modalState';
 
 
-
-type ModalType = 'mfa' | 'recoveryCodes' | 'passphraseStorageConsent' | null;
 
 interface ModalContextType {
     showMfaModal: (options: MfaModalOptions) => Promise<MfaModalResult>; // Returns MFA code and close function or null if cancelled
@@ -23,7 +28,7 @@ interface ModalContextType {
     showPassphraseStorageConsentModal: () => Promise<boolean>;
     hideModal: () => void;
     currentModal: ModalType;
-    modalProps: any;
+    modalProps: MfaModalOptions | RecoveryCodesModalOptions | null;
     triggerMfaClear: boolean;
 }
 
@@ -34,10 +39,12 @@ interface ModalProviderProps {
 }
 
 export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
-    const [currentModal, setCurrentModal] = useState<ModalType>(null);
-    const [modalProps, setModalProps] = useState<any>(null);
-    const currentModalRef = useRef<ModalType>(null);
-    const modalPropsRef = useRef<any>(null);
+    // Discriminated-union modal state: `type` drives rendering and back-press
+    // handling, `options` carries the per-modal props.
+    const [modalState, setModalState] = useState<ModalRequest | null>(null);
+    const modalStateRef = useRef<ModalRequest | null>(null);
+    const currentModal = modalTypeOf(modalState);
+    const modalProps = modalPropsOf(modalState);
     const resolveMfaPromiseRef = useRef<((value: string | null) => void) | null>(null);
     const resolveRecoveryCodesPromiseRef = useRef<(() => void) | null>(null);
     const resolvePassphraseStorageConsentPromiseRef = useRef<((enabled: boolean) => void) | null>(null);
@@ -54,10 +61,8 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const hideModal = useCallback(() => {
         clearScheduledMfaClose();
-        currentModalRef.current = null;
-        modalPropsRef.current = null;
-        setCurrentModal(null);
-        setModalProps(null);
+        modalStateRef.current = null;
+        setModalState(null);
         if (resolveMfaPromiseRef.current) {
             resolveMfaPromiseRef.current(null);
             resolveMfaPromiseRef.current = null;
@@ -100,21 +105,28 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
             if (eventName === 'clearMfaCode') {
                 EventService.consumeEvent('clearMfaCode');
                 setTriggerMfaClear(true);
-                if (payload?.isWrongMfaCode) {
+                // The listener payload is the per-event union; the eventName
+                // check above correlates it (AppEventPayloadMap contract).
+                const clearPayload = payload as AppEventPayloadMap['clearMfaCode'];
+                if (clearPayload?.isWrongMfaCode) {
                     showToast('The MFA code you entered was incorrect. Please try again.', 'info');
                 }
             } else if (eventName === 'closeMfaModal') {
                 EventService.consumeEvent('closeMfaModal');
-                if (currentModalRef.current !== 'mfa') {
+                if (modalStateRef.current?.type !== 'mfa') {
                     clearScheduledMfaClose();
                     return;
                 }
 
-                if (!shouldCloseMfaModal(Boolean(modalPropsRef.current?.isLoginFlow), payload)) {
+                const isLoginFlow = modalStateRef.current.type === 'mfa'
+                    ? Boolean(modalStateRef.current.options.isLoginFlow)
+                    : false;
+                const closePayload = payload as AppEventPayloadMap['closeMfaModal'];
+                if (!shouldCloseMfaModal(isLoginFlow, closePayload)) {
                     return;
                 }
 
-                const delayMs = Number(payload?.delayMs ?? 0);
+                const delayMs = Number(closePayload?.delayMs ?? 0);
 
                 if (Number.isFinite(delayMs) && delayMs > 0) {
                     clearScheduledMfaClose();
@@ -137,10 +149,9 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showMfaModal = useCallback((options: MfaModalOptions): Promise<MfaModalResult> => {
         return new Promise((resolve) => {
-            currentModalRef.current = 'mfa';
-            modalPropsRef.current = options;
-            setCurrentModal('mfa');
-            setModalProps(options);
+            const request: ModalRequest = { type: 'mfa', options };
+            modalStateRef.current = request;
+            setModalState(request);
             resolveMfaPromiseRef.current = (code: string | null) => {
                 resolve({
                     code,
@@ -151,10 +162,9 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showRecoveryCodesModal = useCallback((options: RecoveryCodesModalOptions): Promise<void> => {
         return new Promise((resolve) => {
-            currentModalRef.current = 'recoveryCodes';
-            modalPropsRef.current = options;
-            setCurrentModal('recoveryCodes');
-            setModalProps(options);
+            const request: ModalRequest = { type: 'recoveryCodes', options };
+            modalStateRef.current = request;
+            setModalState(request);
             resolveRecoveryCodesPromiseRef.current = () => {
                 resolve();
             };
@@ -163,10 +173,9 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
 
     const showPassphraseStorageConsentModal = useCallback((): Promise<boolean> => {
         return new Promise((resolve) => {
-            currentModalRef.current = 'passphraseStorageConsent';
-            modalPropsRef.current = null;
-            setCurrentModal('passphraseStorageConsent');
-            setModalProps(null);
+            const request: ModalRequest = { type: 'passphraseStorageConsent' };
+            modalStateRef.current = request;
+            setModalState(request);
             resolvePassphraseStorageConsentPromiseRef.current = resolve;
         });
     }, []);
@@ -239,22 +248,22 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
     return (
         <ModalContext.Provider value={value}>
             {children}
-            {currentModal === 'mfa' && (
+            {modalState?.type === 'mfa' && (
                 <MfaModal
                     onClose={hideModal}
                     onComplete={completeMfa}
                     triggerClear={triggerMfaClear}
                     setTriggerClear={setTriggerMfaClear}
-                    {...modalProps}
+                    {...modalState.options}
                 />
             )}
-            {currentModal === 'recoveryCodes' && (
+            {modalState?.type === 'recoveryCodes' && (
                 <RecoveryCodesModal
                     onComplete={completeRecoveryCodes}
-                    {...modalProps}
+                    {...modalState.options}
                 />
             )}
-            {currentModal === 'passphraseStorageConsent' && (
+            {modalState?.type === 'passphraseStorageConsent' && (
                 <PassphraseStorageConsentModal
                     visible
                     onStore={() => completePassphraseStorageConsent(true)}

@@ -79,6 +79,7 @@ export const EncryptScreen = () => {
           signMessage={encryptPage.state.signMessage}
           setSignMessage={encryptPage.onSignMessageChanged}
           onPassphraseChange={encryptPage.onPassphraseChanged}
+          passphraseBannerMode="stored"
           optional={true}
           multiSelect={false}
           setDefaultKey={false}

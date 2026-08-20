@@ -3,6 +3,7 @@ import {
     UserCreatePayload,
     Encryption,
     EncryptedKeyRecordWithId,
+    MfaSetupNonceResponse,
     MfaSetupResponse,
     RecoveryCodeRegenerateResponse,
     RecoveryCodeRemainingResponse,
@@ -36,8 +37,12 @@ export class ApiClient {
         return getUa().create(user);
     }
 
-    static async getKeyRecords(): Promise<UserKeyRecordsResponse> {
-        return getUa().getKeyRecords();
+    static async getKeyRecords(options?: { limit?: number; cursor?: string; since?: number }): Promise<UserKeyRecordsResponse> {
+        return getUa().getKeyRecords(options);
+    }
+
+    static async fetchAllKeyRecords(options?: { limit?: number; since?: number }): Promise<UserKeyRecordsResponse['keys']> {
+        return getUa().fetchAllKeyRecords(options);
     }
 
     static async addKeyRecord(key: Omit<EncryptedKeyRecordWithId, 'recordId'>): Promise<EncryptedKeyRecordWithId> {
@@ -79,16 +84,24 @@ export class ApiClient {
         await getUa().savePushToken(pushToken);
     }
 
+    static async setPassphraseStorage(enabled: boolean) {
+        await getUa().setPassphraseStorage(enabled);
+    }
+
     static async deletePushToken(pushToken: string) {
         await getUa().deletePushToken(pushToken);
     }
 
-    static async setupMfa(): Promise<MfaSetupResponse> {
-        return getMa().setupMfa();
+    static async setupMfa(nonce: string): Promise<MfaSetupResponse> {
+        return getMa().setupMfa(nonce);
     }
 
-    static async enableMfa(): Promise<SessionResponse> {
-        return getMa().enableMfa();
+    static async mintMfaSetupNonce(): Promise<MfaSetupNonceResponse> {
+        return getMa().mintMfaSetupNonce();
+    }
+
+    static async enableMfa(mfaTrusted: boolean): Promise<SessionResponse> {
+        return getMa().enableMfa(mfaTrusted);
     }
 
     static async disableMfa(): Promise<SessionResponse> {

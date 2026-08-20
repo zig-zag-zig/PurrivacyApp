@@ -5,7 +5,8 @@ import { securityService } from '../../security/services/securityService';
 import { inactiveTooLong } from '../../security/services/activityService';
 import { getUsernameFromUser } from '../domain/usernameIdentity';
 import { logger } from '../../../utils/logger';
-import type { AuthRuntimeRefs, AuthStateSetters } from '../model/authRuntimeTypes';
+import type { AuthRuntimeRefs } from '../model/authRuntimeTypes';
+import type { AuthDispatch } from '../state/authStateMachine';
 
 const AUTH_STATE_READY_TIMEOUT_MS = 5000;
 
@@ -39,28 +40,16 @@ type FirebaseAuthRefs = Pick<
     | 'userRef'
 >;
 
-type FirebaseAuthSetters = Pick<
-    AuthStateSetters,
-    | 'setAuthCompleted'
-    | 'setFbUser'
-    | 'setIsAuthLoading'
-    | 'setIsCheckingInactivity'
-    | 'setIsLocalSessionLocked'
-    | 'setLastSignedInUser'
-    | 'setSessionAuthenticated'
-    | 'setUser'
->;
-
 type UseFirebaseAuthParams = {
     lock: () => Promise<void>;
     refs: FirebaseAuthRefs;
-    setters: FirebaseAuthSetters;
+    dispatch: AuthDispatch;
 };
 
 export const useFirebaseAuth = ({
     lock,
     refs,
-    setters,
+    dispatch,
 }: UseFirebaseAuthParams) => {
     const {
         forceNewSessionOnNextAuthRef,
@@ -73,16 +62,6 @@ export const useFirebaseAuth = ({
         userInitAuthRef,
         userRef,
     } = refs;
-    const {
-        setAuthCompleted,
-        setFbUser,
-        setIsAuthLoading,
-        setIsCheckingInactivity,
-        setIsLocalSessionLocked,
-        setLastSignedInUser,
-        setSessionAuthenticated,
-        setUser,
-    } = setters;
 
     useEffect(() => {
         let customToken = false;
@@ -112,11 +91,11 @@ export const useFirebaseAuth = ({
                             uid: userRef.current.uid,
                             username: getUsernameFromUser(userRef.current),
                         };
-                        setLastSignedInUser(lastSignedInUser);
+                        dispatch({ type: 'LAST_SIGNED_IN_USER_CHANGED', user: lastSignedInUser });
                         await securityService.getOrSetLastSignedInUserInSecureStorage("SET", lastSignedInUser);
                     }
                 } else if (!currentUser && suppressLastSignedInUserPersistRef.current) {
-                    setLastSignedInUser(null);
+                    dispatch({ type: 'LAST_SIGNED_IN_USER_CHANGED', user: null });
                     await securityService.clearLastSignedInUser();
                     suppressLastSignedInUserPersistRef.current = false;
                 }
@@ -127,22 +106,18 @@ export const useFirebaseAuth = ({
 
                 if (!currentUser) {
                     localBiometricLockRef.current = false;
-                    setIsAuthLoading(false);
-                    setAuthCompleted(true);
                     runLoadUserRef.current = false;
-                    setSessionAuthenticated(false);
-                    setIsLocalSessionLocked(false);
-                    setUser(null);
-                    setIsCheckingInactivity(false);
+                    dispatch({ type: 'FIREBASE_USER_LOST' });
+                    return;
                 } else if (localBiometricLockRef.current) {
-                    setIsAuthLoading(false);
-                    setAuthCompleted(true);
                     runLoadUserRef.current = false;
-                    setSessionAuthenticated(false);
-                    setIsLocalSessionLocked(true);
-                    setUser(null);
-                    setIsCheckingInactivity(false);
-                    setFbUser(null);
+                    dispatch({
+                        type: 'LOCAL_LOCK_DETECTED',
+                        lastSignedInUser: {
+                            uid: currentUser.uid,
+                            username: getUsernameFromUser(currentUser),
+                        },
+                    });
                     return;
                 } else {
                     if (registrationInProgressRef.current) {
@@ -163,16 +138,13 @@ export const useFirebaseAuth = ({
                             };
                             localBiometricLockRef.current = true;
                             await securityService.setLocalSessionLocked(currentUser.uid, true);
-                            setLastSignedInUser(lastSignedInUser);
+                            dispatch({ type: 'LAST_SIGNED_IN_USER_CHANGED', user: lastSignedInUser });
                             await securityService.getOrSetLastSignedInUserInSecureStorage("SET", lastSignedInUser);
-                            setIsAuthLoading(false);
-                            setAuthCompleted(true);
                             runLoadUserRef.current = false;
-                            setSessionAuthenticated(false);
-                            setIsLocalSessionLocked(true);
-                            setUser(null);
-                            setIsCheckingInactivity(false);
-                            setFbUser(null);
+                            dispatch({
+                                type: 'LOCAL_LOCK_DETECTED',
+                                lastSignedInUser,
+                            });
                             return;
                         }
 
@@ -183,8 +155,7 @@ export const useFirebaseAuth = ({
                     }
                 }
 
-                setIsLocalSessionLocked(false);
-                setFbUser(currentUser);
+                dispatch({ type: 'FIREBASE_USER_ESTABLISHED', user: currentUser });
             }
         };
 
@@ -212,14 +183,8 @@ export const useFirebaseAuth = ({
                 }
 
                 logger.warn('firebase auth listener did not emit initial state; showing signed-out UI');
-                setIsAuthLoading(false);
-                setAuthCompleted(true);
                 runLoadUserRef.current = false;
-                setSessionAuthenticated(false);
-                setIsLocalSessionLocked(false);
-                setUser(null);
-                setIsCheckingInactivity(false);
-                setFbUser(null);
+                dispatch({ type: 'FIREBASE_USER_LOST' });
             }, AUTH_STATE_READY_TIMEOUT_MS);
         };
 

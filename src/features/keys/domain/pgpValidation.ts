@@ -1,35 +1,85 @@
 export type PgpArmorType = 'private' | 'public' | 'message' | 'unknown';
 
+const ARMOR_MARKER = (blockType: string) =>
+    `-----BEGIN\\s+PGP\\s+${blockType}\\s*-----`;
+
+const END_MARKER = (blockType: string) =>
+    `-----END\\s+PGP\\s+${blockType}\\s*-----`;
+
+const isValidBase64 = (str: string): boolean => {
+    return /^[A-Za-z0-9+/]+={0,2}$/.test(str) && str.length >= 24;
+};
+
+/**
+ * Rebuilds collapsed PGP armor (line breaks removed — common when pasting
+ * from mail/SMS clients or via automation) into canonical multi-line armor.
+ * Returns null when the input is not the requested armor type.
+ */
+export const normalizeArmor = (
+    text: string,
+    blockType: 'MESSAGE' | 'PRIVATE KEY BLOCK' | 'PUBLIC KEY BLOCK',
+): string | null => {
+    if (!text || text.trim() === '') return null;
+
+    const beginRegex = new RegExp(ARMOR_MARKER(blockType), 'i');
+    const endRegex = new RegExp(END_MARKER(blockType), 'i');
+    const beginMatch = text.match(beginRegex);
+    const endMatch = text.match(endRegex);
+    if (!beginMatch || !endMatch) return null;
+
+    const begin = beginMatch[0];
+    const start = (beginMatch.index ?? 0) + begin.length;
+    const end = endMatch.index ?? text.length;
+    const between = text.slice(start, end);
+
+    // Separate the CRC24 checksum line (exactly '=' + 4 base64 chars at the
+    // very end) from the base64 body, which may itself end with 0-2 '=' pads.
+    let body = between.replace(/\s+/g, '');
+    let checksum = '';
+    const checksumMatch = body.match(/(=)([A-Za-z0-9+/]{4})$/);
+    if (checksumMatch) {
+        checksum = checksumMatch[0];
+        body = body.slice(0, body.length - checksum.length);
+    }
+
+    // OpenPGP armor base64 must be unpadded: the parser treats any body line
+    // containing '=' as the checksum line and rejects the armor otherwise.
+    body = body.replace(/=+$/, '');
+
+    // Wrap the base64 body at 64 columns.
+    const wrapped = body.replace(/(.{64})/g, '$1\n').trim();
+
+    // Re-emit CANONICAL markers: the matched ones may contain irregular
+    // internal whitespace (e.g. "-----BEGIN  PGP MESSAGE-----") that would
+    // otherwise survive normalization still unparseable.
+    const canonicalBegin = `-----BEGIN PGP ${blockType}-----`;
+    const canonicalEnd = `-----END PGP ${blockType}-----`;
+
+    return `${canonicalBegin}\n\n${wrapped}${checksum ? `\n${checksum}` : ''}\n${canonicalEnd}`;
+};
+
 export const validateArmor = (
     text: string,
     blockType: 'MESSAGE' | 'PRIVATE KEY BLOCK' | 'PUBLIC KEY BLOCK'
 ): boolean => {
     if (!text || text.trim() === '') return false;
 
-    const beginMarker = `-----BEGIN PGP ${blockType}-----`;
-    const endMarker = `-----END PGP ${blockType}-----`;
+    const beginRegex = new RegExp(ARMOR_MARKER(blockType), 'i');
+    const endRegex = new RegExp(END_MARKER(blockType), 'i');
 
-    const lowerText = text.toLowerCase();
-    if (
-        !lowerText.includes(beginMarker.toLowerCase()) ||
-        !lowerText.includes(endMarker.toLowerCase())
-    ) {
-        return false;
-    }
+    const beginMatch = text.match(beginRegex);
+    const endMatch = text.match(endRegex);
+    if (!beginMatch || !endMatch) return false;
 
-    const start = lowerText.indexOf(beginMarker.toLowerCase()) + beginMarker.length;
-    const end = lowerText.indexOf(endMarker.toLowerCase());
-    const between = text.slice(start, end);
+    const start = (beginMatch.index ?? 0) + beginMatch[0].length;
+    const end = endMatch.index ?? text.length;
+    const between = text.slice(start, end).replace(/\s+/g, '');
 
-    return between.split('\n').some(line => {
-        const cleanLine = line.trim().replace(/\s/g, '');
-        return cleanLine.length > 0 && isValidBase64(cleanLine);
-    });
+    // Drop a trailing CRC24 checksum segment (e.g. "=eWzB") before validating.
+    const body = between.replace(/=+[A-Za-z0-9+/]+$/, '');
+
+    return body.length >= 24 && isValidBase64(body);
 };
-
-const isValidBase64 = (str: string): boolean => {
-    return /^[A-Za-z0-9+/]+={0,2}$/.test(str) && str.length >= 24;
-}
 
 export const identifyKeyType = (content: string): PgpArmorType => {
     const trimmed = content.trim();

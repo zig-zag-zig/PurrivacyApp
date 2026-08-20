@@ -99,7 +99,7 @@ describe('isStoredSessionMfaRequired', () => {
 describe('markRequiresSignOut', () => {
     it('mutates object error to set requiresSignOut', () => {
         const error = { status: 401 } as any;
-        const result = markRequiresSignOut(error);
+        const result = markRequiresSignOut(error) as Record<string, unknown>;
         expect(result.requiresSignOut).toBe(true);
         expect(result).toBe(error);
     });

@@ -62,10 +62,55 @@ EXPO_PUBLIC_API_BASE_URL=https://your-api.example.com/
 EXPO_PUBLIC_AUTH_EMAIL_DOMAIN=example.com
 EXPO_PUBLIC_API_VERSION=v1
 EXPO_PUBLIC_UPDATE_GITHUB_REPO_URL=https://github.com/owner/repo
-EXPO_PUBLIC_UPDATE_GITHUB_TOKEN=
 ```
 
 `EXPO_PUBLIC_*` values are bundled into the client. Do not put private secrets there.
+
+### Signed Android update manifests
+
+In-app APK updates are only offered when the release carries a signed
+`update-manifest.json` asset that verifies against a public key pinned in
+`src/features/updates/services/updateSigning.ts` (ECDSA P-256 over the
+canonical manifest payload; the canonical form is documented in
+`src/features/updates/services/updateManifest.ts`). Without a valid manifest
+for the APK, the app falls back to opening the release page in the browser and
+never installs.
+
+Per release:
+
+```bash
+node scripts/update-signing-keygen.cjs          # once: writes the private key (0600, gitignored) and prints the public key to pin
+node scripts/sign-update-manifest.cjs \
+  --apk ./Purrivacy.apk \
+  --tag v1.0.9 \
+  --url https://github.com/<owner>/<repo>/releases/download/v1.0.9/Purrivacy.apk
+```
+
+Upload the generated `update-manifest.json` next to the APK in the GitHub
+release. The private key (`scripts/release-signing/`) must never be committed
+or embedded in the app.
+
+**Ops note:** the signature covers `apkUrl` exactly as the app normalizes it
+(WHATWG `new URL(...).toString()`). Always sign the literal
+`browser_download_url` value from the GitHub release asset — do not retype,
+re-case, or percent-encode it differently, or verification will fail (and the
+update will safely fall back to the browser).
+
+**Production key:** the pinned key is the production keypair. Its private
+half lives at `scripts/release-signing/update-signing-key-production.pem`
+(gitignored, 0600) — **back it up to secure offline storage now**; losing it
+means future releases can never ship signed in-app updates to existing
+installs. Sign production manifests with:
+
+```bash
+node scripts/sign-update-manifest.cjs --key scripts/release-signing/update-signing-key-production.pem \
+  --apk ./Purrivacy.apk --tag v1.0.9 \
+  --url https://github.com/<owner>/<repo>/releases/download/v1.0.9/Purrivacy.apk
+```
+
+If the private key is ever compromised: generate a fresh keypair
+(`update-signing-keygen.cjs`), re-pin in `updateSigning.ts`, ship the app
+update, and sign only with the new key going forward.
 
 Start the development server:
 

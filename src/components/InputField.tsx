@@ -10,7 +10,7 @@ import {
     ViewStyle,
 } from 'react-native';
 
-import { IsolatedTextInput, suppressBlurForToggle } from './IsolatedTextInput';
+import { suppressBlurForToggle } from './IsolatedTextInput';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
@@ -18,7 +18,7 @@ import { CustomText } from './CustomText';
 import { useKeyboardAwareScroll } from './KeyboardAwareScrollContext';
 import type { KeyboardAwareInputNode } from './KeyboardAwareScrollContext';
 import { FloatingInputLabel } from './inputField/FloatingInputLabel';
-import { useNativeAutofillSuppression } from './inputField/useNativeAutofillSuppression';
+import { useInputFieldAdapters } from './inputField/useInputFieldAdapters';
 
 interface InputFieldProps extends TextInputProps {
     label?: string;
@@ -107,27 +107,21 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             textContentType,
             ...textInputProps
         } = props;
-        const androidAutofillMode = importantForAutofill ?? (
-            enableAutofill ? 'yes' : 'noExcludeDescendants'
-        );
-        const isAndroidAutofillDisabled = androidAutofillMode === 'no' || androidAutofillMode === 'noExcludeDescendants';
-        const resolvedAutoComplete = Platform.OS === 'android'
-            ? isAndroidAutofillDisabled ? 'off' : autoComplete
-            : textContentType ? undefined : autoComplete;
-        const secureTextHidden = showToggleSecureText ? !isRevealed : Boolean(secureTextEntry);
-        const shouldSuppressNativeAutofill = Platform.OS === 'android' && !enableAutofill;
-        const {
-            applyNativeAutofillSuppression,
-            assignInputRef,
-            assignInputWrapperRef,
-            inputRef,
-            inputWrapperRef,
-        } = useNativeAutofillSuppression({
+        const adapters = useInputFieldAdapters({
+            allowPasteOverride,
+            autoCapitalize,
+            autoComplete,
+            autoCorrect: props.autoCorrect,
+            enableAutofill,
             forwardedRef: ref,
+            importantForAutofill,
+            isIsolated,
+            isRevealed,
+            multiline,
             onInputWrapperRef,
             secureTextEntry,
-            secureTextHidden,
-            shouldSuppressNativeAutofill,
+            showToggleSecureText,
+            textContentType,
         });
 
         useEffect(() => () => {
@@ -135,10 +129,6 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                 clearTimeout(blurTimeoutRef.current);
             }
         }, []);
-
-        useEffect(() => {
-            applyNativeAutofillSuppression();
-        }, [applyNativeAutofillSuppression]);
 
         const handleChangeText = (text: string) => {
             if (numberOnly) {
@@ -171,10 +161,7 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                 : theme.colors.textSecondary;
 
         if (hidden) return null;
-        const shouldHideContextMenu = allowPasteOverride ? false : (Boolean(secureTextEntry) && secureTextHidden);
         const keyboardType = numberOnly ? 'number-pad' : email ? 'email-address' : 'default';
-        const useIsolated = Platform.OS === 'android' && isIsolated && !multiline;
-        const InputComponent = useIsolated ? IsolatedTextInput : TextInput;
 
         return (
             <View style={[label && styles.fieldContainerWithLabel, containerStyle]}>
@@ -187,7 +174,7 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                     />
                 )}
                 <View
-                    ref={assignInputWrapperRef}
+                    ref={adapters.assignInputWrapperRef}
                     collapsable={false}
                     style={[
                         styles.inputWrapper,
@@ -211,7 +198,7 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                     onTouchStart={onInputTouchStart}
                 >
                     {/* iOS HEURISTIC DECOY: Absorbs Apple's autofill grouping for isolated fields */}
-                    {Platform.OS === 'ios' && isIsolated && (
+                    {adapters.isIosIsolatedDecoy && (
                         <TextInput
                             style={{ position: 'absolute', top: -9999, left: -9999, width: 1, height: 1, opacity: 0.01 }}
                             textContentType="username"
@@ -220,16 +207,16 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                             editable={false}
                         />
                     )}
-                    <InputComponent
+                    <adapters.InputComponent
                         {...textInputProps}
-                        ref={assignInputRef}
-                        autoComplete={resolvedAutoComplete}
-                        cursorColor={Platform.OS === 'android' ? cursorColor ?? theme.colors.primary : cursorColor}
-                        importantForAutofill={Platform.OS === 'android' ? androidAutofillMode : importantForAutofill}
-                        importantForAccessibility={Platform.OS === 'android' && isAndroidAutofillDisabled ? 'no' : undefined}
+                        ref={adapters.assignInputRef}
+                        autoComplete={adapters.resolvedAutoComplete}
+                        cursorColor={adapters.isAndroid ? cursorColor ?? theme.colors.primary : cursorColor}
+                        importantForAutofill={adapters.isAndroid ? adapters.androidAutofillMode : importantForAutofill}
+                        importantForAccessibility={adapters.isAndroid && adapters.isAndroidAutofillDisabled ? 'no' : undefined}
                         selectionColor={selectionColor ?? theme.colors.primary}
-                        selectionHandleColor={Platform.OS === 'android' ? selectionHandleColor ?? theme.colors.primary : selectionHandleColor}
-                        textContentType={Platform.OS === 'ios' ? (textContentType ?? (isAndroidAutofillDisabled && secureTextEntry ? 'oneTimeCode' : undefined)) : undefined}
+                        selectionHandleColor={adapters.isAndroid ? selectionHandleColor ?? theme.colors.primary : selectionHandleColor}
+                        textContentType={!adapters.isAndroid ? (textContentType ?? (adapters.isAndroidAutofillDisabled && secureTextEntry ? 'oneTimeCode' : undefined)) : undefined}
                         underlineColorAndroid="transparent"
                         style={[
                             commonStyles.flex,
@@ -275,9 +262,9 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                                 blurTimeoutRef.current = null;
                             }
                             setIsFocused(true);
-                            applyNativeAutofillSuppression();
+                            adapters.applyNativeAutofillSuppression();
                             scrollInputIntoView(
-                                (inputWrapperRef.current ?? inputRef.current) as KeyboardAwareInputNode | null,
+                                (adapters.inputWrapperRef.current ?? adapters.inputRef.current) as KeyboardAwareInputNode | null,
                             );
                             if (parentOnFocus) {
                                 parentOnFocus(e);
@@ -304,10 +291,10 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                         }}
                         onChangeText={handleChangeText}
                         keyboardType={keyboardType}
-                        secureTextEntry={Boolean(secureTextEntry) ? secureTextHidden : false}
-                        autoCapitalize={isIsolated ? 'none' : autoCapitalize}
-                        autoCorrect={isIsolated ? false : props.autoCorrect}
-                        contextMenuHidden={shouldHideContextMenu}
+                        secureTextEntry={Boolean(secureTextEntry) ? adapters.secureTextHidden : false}
+                        autoCapitalize={adapters.isolatedAutoCapitalize}
+                        autoCorrect={adapters.isolatedAutoCorrect}
+                        contextMenuHidden={adapters.shouldHideContextMenu}
                     />
                     {rightIcon && (
                         <View style={{
@@ -339,7 +326,7 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                                 // Re-focus the input after toggling reveal
                                 // (backup for any residual focus loss).
                                 setTimeout(() => {
-                                    inputRef.current?.focus?.();
+                                    adapters.inputRef.current?.focus?.();
                                 }, 0);
                             }}
                             style={{

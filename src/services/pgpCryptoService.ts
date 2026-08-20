@@ -1,8 +1,22 @@
 import { DecryptionResult, KeyGenerationOptions, KeyMetadata, PrivateKeyAndPassphrase, PublicAndPrivateKey } from "../types/types";
 import { logger } from "../utils/logger";
+import type {
+    PgpOperationName,
+    PgpOperationResponse,
+    PgpRequestMap,
+} from "./pgpProtocol";
 
+/**
+ * The WebView-backed PGP executor. Operations and payloads are statically
+ * correlated through `PgpRequestMap`/`PgpResponseMap`: calling
+ * `executePGPOperation('encryptMessage', ...)` yields a `Promise<string>`,
+ * and the response is runtime-validated before it is resolved.
+ */
 export interface PGPExecutor {
-    executePGPOperation: (operation: string, data: any) => Promise<any>;
+    executePGPOperation<T extends PgpOperationName>(
+        operation: T,
+        data: PgpRequestMap[T]['data'],
+    ): Promise<PgpOperationResponse<T>>;
 }
 
 class PgpCryptoService {
@@ -39,7 +53,7 @@ class PgpCryptoService {
 
             // Try a simple ping operation
             await Promise.race([
-                this.executor.executePGPOperation('ping', {}),
+                this.executor.executePGPOperation('ping', undefined),
                 timeoutPromise
             ]);
             return true;
@@ -81,7 +95,10 @@ class PgpCryptoService {
         });
     }
 
-    private async executeOperation<T>(operation: string, data: any): Promise<T> {
+    private async executeOperation<T extends PgpOperationName>(
+        operation: T,
+        data: PgpRequestMap[T]['data'],
+    ): Promise<PgpOperationResponse<T>> {
         await this.ensureReady();
 
         try {

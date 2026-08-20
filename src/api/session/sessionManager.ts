@@ -2,6 +2,7 @@ import { getApiRuntime } from '../runtime';
 import { EventService } from '../../services/eventService';
 import type { MfaState, SessionResponse } from '../../types/types';
 import { logger } from '../../utils/logger';
+import { recordSessionSwap } from './sessionSwap';
 import type { ApiRequestFn } from '../core/apiRequestFactory';
 import { buildApiUrl } from '../core/buildApiUrl';
 import { RequestOptions, processResponse } from '../requestHelpers';
@@ -53,6 +54,7 @@ export class SessionManager {
     async storeSessionResponse(response: SessionResponse, userId: string): Promise<void> {
         this.accessTokens.store(response);
         await getApiRuntime().sessionStore.storeSession(response, userId);
+        recordSessionSwap();
     }
 
     async createSession(
@@ -70,7 +72,14 @@ export class SessionManager {
                     return stored;
                 }
 
-                throw missingStoredSessionError();
+                // No stored session. For user-initiated flows (sign-in,
+                // recovery custom-token sign-in) this is a NORMAL state —
+                // proceed to create a fresh backend session below. For
+                // background/automatic resume it is terminal: there is
+                // nothing to resume.
+                if (!retryOnFailure) {
+                    throw missingStoredSessionError();
+                }
             } catch (error) {
                 if (isStoredSessionMfaRequired(error)) {
                     this.accessTokens.clear();
@@ -96,20 +105,20 @@ export class SessionManager {
             includeDeviceId: true,
         };
 
-        const body: any = {};
+        const body: { mfaCode?: string } = {};
         if (mfaCode !== undefined) {
             body.mfaCode = mfaCode;
         }
 
         try {
-            const response = await this.request('/auth/session', 'POST', body, true, options, retryOnFailure);
+            const response = (await this.request('/auth/session', 'POST', body, true, options, retryOnFailure)) as Partial<SessionResponse>;
             if (response.accessToken) {
                 const userId = getApiRuntime().identity.getUserId();
                 await this.storeSessionResponse(response as SessionResponse, userId);
                 this.forceFreshSessionAfterRemoteMfaState = false;
             }
             return response as SessionResponse;
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (isTerminalStoredSessionError(error)) {
                 try {
                     await this.clearBackendSession(getApiRuntime().identity.getUserId());
@@ -193,7 +202,7 @@ export class SessionManager {
 
             try {
                 return await this.refreshSession();
-            } catch (refreshError: any) {
+            } catch (refreshError: unknown) {
                 if (isStoredSessionMfaRequired(refreshError)) {
                     this.accessTokens.clear();
                     throw refreshError;
@@ -277,7 +286,7 @@ export class SessionManager {
             (retryOnFailure: boolean, mfaCode?: string) => (
                 this.createSession(retryOnFailure, mfaCode)
             ),
-        );
+        ) as SessionResponse;
 
         if (response.accessToken) {
             await this.storeSessionResponse(response as SessionResponse, userId);

@@ -12,6 +12,7 @@ interface TotpInputProps {
     onBlur: () => void;
     onBoxPress: (index: number) => void;
     onLongPress: () => void;
+    testID?: string;
 }
 
 export const TotpInput: React.FC<TotpInputProps> = ({
@@ -24,11 +25,13 @@ export const TotpInput: React.FC<TotpInputProps> = ({
     onBlur,
     onBoxPress,
     onLongPress,
+    testID,
 }) => {
     return (
         <View style={styles.codeInputHost}>
             <TextInput
                 ref={inputRef}
+                testID={testID}
                 autoComplete="off"
                 caretHidden={true}
                 contextMenuHidden={true}
@@ -66,6 +69,7 @@ export const TotpInput: React.FC<TotpInputProps> = ({
 
                             <TouchableOpacity
                                 style={styles.touchOverlay}
+                                testID={testID ? `${testID}.box.${index}` : undefined}
                                 activeOpacity={1}
                                 onLongPress={onLongPress}
                                 onPress={() => onBoxPress(index)}

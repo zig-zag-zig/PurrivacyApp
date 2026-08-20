@@ -1,4 +1,6 @@
 import type { StoredSession, SessionResponse } from '../types/types';
+import type { CreateSessionFn, RequestFn, RequestOptions } from './request/requestOptions';
+import type { ApiErrorData } from './request/errorData';
 
 // Re-export types for convenience in tests
 export type { StoredSession, SessionResponse };
@@ -29,51 +31,47 @@ export type ApiSessionStorePort = {
 
 // ─── MFA Error-handler Port ─────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Loose function-signature type matching the MfaErrorHandler static methods
-type MfaApiRequestFn = (
-  endpoint: string,
-  method: string,
-  body?: any,
-  requiresAuth?: boolean,
-  options?: any,
-  retryOnFailure?: boolean,
-) => Promise<any>;
+/**
+ * Request function shape accepted by the MFA error handlers. Bodies and
+ * responses are `unknown`: they cross the boundary between the API layer and
+ * the MFA flow and are narrowed by runtime guards at each use.
+ */
+export type MfaApiRequestFn = RequestFn;
 
 export type ApiMfaErrorPort = {
   getIsInMfaHandler: () => boolean;
-  handleRateLimitError: (errorData: any) => Promise<never>;
+  handleRateLimitError: (errorData: ApiErrorData) => Promise<never>;
   handleSensitiveMfaError: (
     endpoint: string,
     method: string,
-    body: any,
+    body: unknown,
     requiresAuth: boolean,
     retryOnFailure: boolean,
-    options: any,
+    options: RequestOptions,
     requestFn: MfaApiRequestFn,
-  ) => Promise<any>;
+  ) => Promise<unknown>;
   handleSessionMfaError: (
     endpoint: string,
     method: string,
-    body: any,
+    body: unknown,
     requiresAuth: boolean,
     retryOnFailure: boolean,
-    options: any,
+    options: RequestOptions,
     isSession: boolean,
     requestFn: MfaApiRequestFn,
-    createSessionFn: (retryOnFailure: boolean, mfaCode?: string) => Promise<any>,
-  ) => Promise<any>;
+    createSessionFn: CreateSessionFn,
+  ) => Promise<unknown>;
   handleMissingHeadersError: (
     endpoint: string,
     method: string,
-    body: any,
+    body: unknown,
     requiresAuth: boolean,
     retryOnFailure: boolean,
-    options: any,
-    errorData: any,
+    options: RequestOptions,
+    errorData: ApiErrorData,
     requestFn: MfaApiRequestFn,
-    createSessionFn: (retryOnFailure: boolean, mfaCode?: string) => Promise<any>,
-  ) => Promise<any>;
+    createSessionFn: CreateSessionFn,
+  ) => Promise<unknown>;
 };
 
 // ─── Runtime aggregate ──────────────────────────────────────────────────────
