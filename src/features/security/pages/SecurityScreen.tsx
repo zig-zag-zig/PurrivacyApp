@@ -44,6 +44,9 @@ export const SecurityScreen = () => {
                 message += result.requiresSignout ? '. Please sign in again.' : '';
 
                 showToast(message, 'success');
+                if (result.cleanupWarning) {
+                    showToast(result.cleanupWarning, 'error', 'top', 12000);
+                }
 
                 if (result.requiresSignout) {
                     await signOut();
