@@ -623,6 +623,26 @@ describe('DELETION_STARTED / COMPLETED / FAILED', () => {
     expect(s.error).toBe('firebase error');
     expect(s.isAuthLoading).toBe(false);
   });
+
+  it('ignores FIREBASE_USER_LOST during deletion so the deleted username cannot prefill', () => {
+    // firebaseSignOut during the deletion cleanup makes the Firebase listener
+    // report no user. The deletion flow owns its terminal transition and
+    // clears lastSignedInUser itself; jumping to signed-out here would mount
+    // the sign-in screen while the deleted user is still remembered.
+    const s = run([
+      { type: 'FIREBASE_USER_ESTABLISHED', user: makeUser() },
+      { type: 'SESSION_CREATED' },
+      { type: 'AUTHENTICATED_UI_READY' },
+      { type: 'LAST_SIGNED_IN_USER_CHANGED', user: makeLastSignedIn() },
+      { type: 'DELETION_STARTED' },
+      { type: 'FIREBASE_USER_LOST' },
+      { type: 'LAST_SIGNED_IN_USER_CHANGED', user: null },
+      { type: 'DELETION_COMPLETED' },
+    ]);
+    expect(s.phase).toBe('signed-out');
+    expect(s.lastSignedInUser).toBeNull();
+    expect(s.fbUser).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

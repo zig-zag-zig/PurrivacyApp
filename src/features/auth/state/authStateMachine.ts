@@ -213,6 +213,13 @@ export function authReducer(state: AuthMachineState, event: AuthEvent): AuthMach
         // Re-entrant: listener re-emits "no user" after flows already settled.
         return state;
       }
+      if (state.phase === 'deleting') {
+        // The deletion flow owns its terminal transition (DELETION_COMPLETED
+        // / DELETION_FAILED) and clears lastSignedInUser itself; jumping to
+        // signed-out here would mount the sign-in screen while the deleted
+        // user is still remembered and prefill their username.
+        return state;
+      }
       return toSignedOut(state);
 
     case 'FIREBASE_USER_ESTABLISHED': {
