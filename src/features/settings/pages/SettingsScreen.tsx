@@ -28,7 +28,6 @@ export const SettingsScreen = () => {
         eyebrow="Account controls"
         icon="shield-account-outline"
         title="Security & settings"
-        subtitle="Manage authentication, protected storage, sessions, and app maintenance."
       />
 
       <CustomText style={styles.sectionLabel}>Protection</CustomText>

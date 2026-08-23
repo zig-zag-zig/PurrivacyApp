@@ -41,7 +41,6 @@ export const DecryptScreen = () => {
         eyebrow="Reveal safely"
         icon="lock-open-check-outline"
         title="Decrypt a message"
-        subtitle="Open encrypted content locally and verify who signed it when a sender key is available."
       />
 
       <AutofillDisabledView style={styles.autofillScope}>

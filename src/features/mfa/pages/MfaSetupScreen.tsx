@@ -116,7 +116,6 @@ export const MfaSetupScreen = () => {
                 eyebrow="Two-factor authentication"
                 icon="two-factor-authentication"
                 title="Connect your authenticator"
-                subtitle="Add Purrivacy manually, then verify the first code it generates."
             />
 
             <View style={styles.secretContainer}>

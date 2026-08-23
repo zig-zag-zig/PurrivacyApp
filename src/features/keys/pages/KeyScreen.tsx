@@ -49,7 +49,6 @@ export const KeyScreen = () => {
         eyebrow="Encrypted workspace"
         icon="key-chain-variant"
         title="Key vault"
-        subtitle="Generate, import, and manage the identities that protect your messages."
       />
 
       <SegmentedActionTabs

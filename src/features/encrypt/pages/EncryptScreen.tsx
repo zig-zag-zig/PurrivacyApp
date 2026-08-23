@@ -39,7 +39,6 @@ export const EncryptScreen = () => {
         eyebrow="Compose securely"
         icon="lock-plus-outline"
         title="Encrypt a message"
-        subtitle="Choose who can read it, optionally sign it, then export portable OpenPGP text."
       />
 
       <InputField
