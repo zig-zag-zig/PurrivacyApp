@@ -25,6 +25,10 @@ export class MfaErrorHandler {
         return await MfaUtils.executeMfaFlow({
             isSensitive: true,
             isLoginFlow: false,
+            // MFA enrollment is TOTP-only: recovery codes do not exist until
+            // enable completes, and verifying a real authenticator code is
+            // what proves the setup was done correctly.
+            allowRecoveryCode: endpoint !== '/mfa/enable',
             onMfaCode: async (mfaCode: string) => {
                 const retryOptions = MfaUtils.createRetryOptions(options, mfaCode);
                 return await requestFn(endpoint, method, body, requiresAuth, retryOptions, retryOnFailure);

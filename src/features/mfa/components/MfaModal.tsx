@@ -29,6 +29,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
     onComplete,
     isLoginFlow,
     isSensitive,
+    allowRecoveryCode,
     message,
     triggerClear,
     setTriggerClear,
@@ -124,7 +125,12 @@ export const MfaModal: React.FC<MfaModalProps> = ({
         }
     }, [focusInput, pasteFromClipboard]);
 
-    const showRecoveryCodeOption = isSensitive || isLoginFlow;
+    // Recovery codes are only offered where they can actually be used: they
+    // do not exist during MFA enrollment, so the enable step is TOTP-only to
+    // prove the authenticator setup with a real code.
+    const showRecoveryCodeOption = allowRecoveryCode === undefined
+        ? (isSensitive || isLoginFlow)
+        : allowRecoveryCode;
 
     // Tap outside the TOTP boxes: drop focus like a regular input field
     // (clears the box highlight and dismisses the keyboard).

@@ -127,6 +127,40 @@ describe('MFA retry flow', () => {
         });
     });
 
+    it('passes allowRecoveryCode through to the modal handler', async () => {
+        const modalHandler = vi.fn().mockResolvedValueOnce({ code: '123456' });
+        setMfaModalHandler(modalHandler);
+
+        await MfaUtils.executeMfaFlow({
+            isSensitive: true,
+            isLoginFlow: false,
+            allowRecoveryCode: false,
+            onMfaCode: async () => 'ok',
+        });
+
+        expect(modalHandler).toHaveBeenCalledWith({
+            isSensitive: true,
+            isLoginFlow: false,
+            allowRecoveryCode: false,
+        });
+    });
+
+    it('omits allowRecoveryCode when not provided (default behaviour preserved)', async () => {
+        const modalHandler = vi.fn().mockResolvedValueOnce({ code: '123456' });
+        setMfaModalHandler(modalHandler);
+
+        await MfaUtils.executeMfaFlow({
+            isSensitive: false,
+            isLoginFlow: true,
+            onMfaCode: async () => 'ok',
+        });
+
+        expect(modalHandler).toHaveBeenCalledWith({
+            isSensitive: false,
+            isLoginFlow: true,
+        });
+    });
+
     it('keeps a sensitive-flow modal open on a 400 code rejection and surfaces the server message', async () => {
         const events: Array<{ name: string; payload: unknown; }> = [];
         const unsubscribe = EventService.addListener((name, payload) => {

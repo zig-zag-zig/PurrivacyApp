@@ -64,6 +64,7 @@ export class MfaUtils {
     static async executeMfaFlow<T>(params: {
         isSensitive: boolean;
         isLoginFlow: boolean;
+        allowRecoveryCode?: boolean;
         onMfaCode: (mfaCode: string) => Promise<T>;
         onError?: (error: any) => void;
     }): Promise<T> {
@@ -110,6 +111,9 @@ export class MfaUtils {
                     const result = await handler({
                         isSensitive: params.isSensitive,
                         isLoginFlow: params.isLoginFlow,
+                        ...(params.allowRecoveryCode !== undefined
+                            ? { allowRecoveryCode: params.allowRecoveryCode }
+                            : {}),
                     });
                     if (!result?.code) {
                         throw new AuthFlowError('MFA verification was cancelled', { mfaCancelled: true });

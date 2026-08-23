@@ -7,6 +7,12 @@
 export type MfaModalOptions = {
     isSensitive?: boolean;
     isLoginFlow?: boolean;
+    /**
+     * Defaults to showing the recovery-code toggle for sensitive/login
+     * flows. MFA enrollment (enable) passes false: no recovery codes exist
+     * yet, and only a real authenticator TOTP proves the setup works.
+     */
+    allowRecoveryCode?: boolean;
     message?: string;
 };
 
