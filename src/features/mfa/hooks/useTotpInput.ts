@@ -1,24 +1,67 @@
-import { useCallback, useRef } from 'react';
-import { TextInput } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Keyboard, TextInput } from 'react-native';
 import { useToast } from '../../../app/state/ToastContext';
 import * as Clipboard from 'expo-clipboard';
 import { logger } from '../../../utils/logger';
+import { applyTotpEdit } from '../domain/totpEdit';
 
-const TOTP_LENGTH = 6;
+/**
+ * Focuses the hidden TOTP input, re-showing the keyboard when needed.
+ *
+ * Android keeps the focused input focused after the keyboard is dismissed
+ * (back button or swipe), so a later focus() on the already-focused input is
+ * a no-op and the keyboard never reappears. When the keyboard is hidden,
+ * blur() first and then focus() to force the IME back up. When the keyboard
+ * is already visible, a plain focus() avoids any flicker.
+ */
+const focusWithKeyboard = (input: TextInput, keyboardVisible: boolean): void => {
+    if (keyboardVisible) {
+        input.focus();
+        return;
+    }
+    input.blur();
+    setTimeout(() => {
+        input.focus();
+    }, 60);
+};
 
 export const useTotpInput = () => {
     const totpInputRef = useRef<TextInput | null>(null);
     const { showToast } = useToast();
+    // Ref (not state) on purpose: the focus helpers must stay referentially
+    // stable so effects that depend on them never re-run on keyboard events.
+    const keyboardVisibleRef = useRef(true);
+
+    useEffect(() => {
+        const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+            keyboardVisibleRef.current = true;
+        });
+        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+            keyboardVisibleRef.current = false;
+        });
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, []);
 
     const focusInput = useCallback(() => {
         setTimeout(() => {
-            totpInputRef.current?.focus();
+            const input = totpInputRef.current;
+            if (!input) {
+                return;
+            }
+            focusWithKeyboard(input, keyboardVisibleRef.current);
         }, 10);
     }, []);
 
     const focusOnFirstBox = useCallback(() => {
         setTimeout(() => {
-            totpInputRef.current?.focus();
+            const input = totpInputRef.current;
+            if (!input) {
+                return;
+            }
+            focusWithKeyboard(input, keyboardVisibleRef.current);
         }, 100);
     }, []);
 
@@ -34,13 +77,13 @@ export const useTotpInput = () => {
             }
 
             const digits = trimmedContent.replace(/[^0-9]/g, '').split('');
-            if (digits.length < TOTP_LENGTH) {
+            if (digits.length < 6) {
                 showToast('Clipboard does not contain enough digits', 'error');
                 return [];
             }
 
-            const newCode = Array(TOTP_LENGTH).fill('');
-            digits.slice(0, TOTP_LENGTH).forEach((digit, index) => {
+            const newCode = Array(6).fill('');
+            digits.slice(0, 6).forEach((digit, index) => {
                 newCode[index] = digit;
             });
 
@@ -53,19 +96,25 @@ export const useTotpInput = () => {
         }
     }, [showToast, focusInput]);
 
+    /**
+     * Applies a keystroke to the boxes using the tapped box as the edit
+     * target, instead of wherever the hidden input's native caret happens
+     * to be (which is what made every edit land at the end of the code).
+     */
     const handleTotpChangeText = useCallback((
         text: string,
+        previousCode: string[],
+        activeIndex: number,
         setTotpCode: (code: string[]) => void,
         setFocusedIndex: (index: number) => void,
     ) => {
-        const digits = text.replace(/[^0-9]/g, '');
-        const updatedCode = Array(TOTP_LENGTH).fill('');
-        const digitsArray = digits.split('').slice(0, TOTP_LENGTH);
-        digitsArray.forEach((digit, i) => {
-            updatedCode[i] = digit;
-        });
-        setTotpCode(updatedCode);
-        setFocusedIndex(Math.min(digitsArray.length, TOTP_LENGTH - 1));
+        const { code, activeIndex: nextActiveIndex } = applyTotpEdit(
+            previousCode,
+            text,
+            activeIndex,
+        );
+        setTotpCode(code);
+        setFocusedIndex(nextActiveIndex);
     }, []);
 
     return {
@@ -73,6 +122,6 @@ export const useTotpInput = () => {
         pasteFromClipboard,
         handleTotpChangeText,
         focusInput,
-        focusOnFirstBox
+        focusOnFirstBox,
     };
 };

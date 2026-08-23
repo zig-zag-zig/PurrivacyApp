@@ -2,10 +2,13 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import {
     setMfaModalHandler,
     getMfaModalHandler,
+    clearMfaModalHandler,
     setRecoveryCodesModalHandler,
     getRecoveryCodesModalHandler,
+    clearRecoveryCodesModalHandler,
     setPassphraseStorageConsentHandler,
     getPassphraseStorageConsentHandler,
+    clearPassphraseStorageConsentHandler,
 } from './modalHandler';
 
 // The module keeps state across tests — reset between each describe block
@@ -35,6 +38,19 @@ describe('modalHandler', () => {
             setMfaModalHandler(null);
             expect(getMfaModalHandler()).toBeNull();
         });
+
+        it('does not let stale cleanup clear a replacement handler', () => {
+            const staleHandler = async () => ({ code: '111111' });
+            const liveHandler = async () => ({ code: '222222' });
+            setMfaModalHandler(staleHandler);
+            setMfaModalHandler(liveHandler);
+
+            clearMfaModalHandler(staleHandler);
+
+            expect(getMfaModalHandler()).toBe(liveHandler);
+            clearMfaModalHandler(liveHandler);
+            expect(getMfaModalHandler()).toBeNull();
+        });
     });
 
     describe('recovery codes modal handler', () => {
@@ -47,6 +63,15 @@ describe('modalHandler', () => {
             setRecoveryCodesModalHandler(handler);
             expect(getRecoveryCodesModalHandler()).toBe(handler);
         });
+
+        it('clears only the matching recovery-code handler', () => {
+            const staleHandler = async () => { };
+            const liveHandler = async () => { };
+            setRecoveryCodesModalHandler(staleHandler);
+            setRecoveryCodesModalHandler(liveHandler);
+            clearRecoveryCodesModalHandler(staleHandler);
+            expect(getRecoveryCodesModalHandler()).toBe(liveHandler);
+        });
     });
 
     describe('passphrase storage consent handler', () => {
@@ -58,6 +83,15 @@ describe('modalHandler', () => {
             const handler = async () => true;
             setPassphraseStorageConsentHandler(handler);
             expect(getPassphraseStorageConsentHandler()).toBe(handler);
+        });
+
+        it('clears only the matching consent handler', () => {
+            const staleHandler = async () => true;
+            const liveHandler = async () => false;
+            setPassphraseStorageConsentHandler(staleHandler);
+            setPassphraseStorageConsentHandler(liveHandler);
+            clearPassphraseStorageConsentHandler(staleHandler);
+            expect(getPassphraseStorageConsentHandler()).toBe(liveHandler);
         });
     });
 });

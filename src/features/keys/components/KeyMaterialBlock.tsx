@@ -40,14 +40,15 @@ export const KeyMaterialBlock = ({
 
 const styles = StyleSheet.create({
     keyBlock: {
-        backgroundColor: theme.colors.background,
+        backgroundColor: theme.colors.surfaceMuted,
         borderWidth: 1,
         borderColor: theme.colors.divider,
         borderRadius: theme.borderRadius.md,
         maxHeight: 260,
     },
     keyBlockCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
     },
     keyBlockScrollContent: {
         padding: theme.spacing.md,
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
     keyBlockText: {
         fontFamily: 'monospace',
         fontSize: 12,
-        lineHeight: 16,
-        color: theme.colors.text,
+        lineHeight: 18,
+        color: theme.colors.textSecondary,
     },
 });

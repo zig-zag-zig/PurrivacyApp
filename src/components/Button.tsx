@@ -55,8 +55,8 @@ export const Button = ({
 
     const getTextColor = () => {
         if (variant === 'primary') return theme.colors.onPrimary;
-        if (disabled && !loading) return theme.colors.textSecondary;
-        return theme.colors.primary;
+        if (disabled && !loading) return theme.colors.textMuted;
+        return theme.colors.text;
     };
 
     const textColor = getTextColor();
@@ -105,7 +105,8 @@ export const Button = ({
                             color: textColor,
                             fontSize: size === 'compact' ? theme.typography.label.fontSize : theme.typography.body.fontSize,
                             lineHeight: size === 'compact' ? 18 : undefined,
-                            fontWeight: '600',
+                            fontWeight: '700',
+                            letterSpacing: 0.1,
                         }]}>
                             {label}
                         </CustomText>
@@ -131,8 +132,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     compactButton: {
-        minHeight: 36,
-        paddingVertical: 6,
+        minHeight: 42,
+        paddingVertical: 8,
         paddingHorizontal: theme.spacing.md,
         marginVertical: 0,
     },

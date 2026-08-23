@@ -150,6 +150,12 @@ function patchIosAppDelegate(projectRoot) {
     }
 }
 
+function shouldApplyAndroidFlagSecure(appEnv = process.env.APP_ENV || process.env.NODE_ENV) {
+    // Local E2E builds need visual capture for Maestro and design review.
+    // Production and normal development builds remain fail-closed.
+    return appEnv !== 'e2e-test';
+}
+
 function withNativeSecurity(config) {
     config = withAndroidManifest(config, (config) => {
         config.modResults = disableAndroidBackups(config.modResults);
@@ -169,10 +175,14 @@ function withNativeSecurity(config) {
     config = withDangerousMod(config, ['android', (config) => {
         // Security control (FLAG_SECURE): fail closed. A patch failure must
         // abort prebuild rather than silently ship unsecured windows.
-        patchAndroidMainActivity(
-            config.modRequest.projectRoot,
-            getAndroidPackageName(config)
-        );
+        // The isolated local E2E variant is the sole exception so visual
+        // regression tooling can capture emulator screenshots.
+        if (shouldApplyAndroidFlagSecure()) {
+            patchAndroidMainActivity(
+                config.modRequest.projectRoot,
+                getAndroidPackageName(config)
+            );
+        }
 
         return config;
     }]);
@@ -185,3 +195,4 @@ module.exports.plugin = withNativeSecurity;
 module.exports.addKotlinImport = addKotlinImport;
 module.exports.patchMainActivitySource = patchMainActivitySource;
 module.exports.patchAndroidMainActivity = patchAndroidMainActivity;
+module.exports.shouldApplyAndroidFlagSecure = shouldApplyAndroidFlagSecure;

@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { validateMnemonic } from 'bip39';
 import { updatePassword } from 'firebase/auth';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { ApiClient } from '../../../api/client';
 import { RootNavigationProps } from '../../../app/navigation/types';
 import { useToast } from '../../../app/state/ToastContext';
@@ -21,6 +21,7 @@ import { useAuth } from '../state/AuthContext';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { logger } from '../../../utils/logger';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 
 export const RecoverAccountScreen = () => {
     const navigation = useNavigation<RootNavigationProps>();
@@ -103,7 +104,12 @@ export const RecoverAccountScreen = () => {
 
     return (
         <ScreenContainer>
-            <View style={{ gap: theme.spacing.md }}>
+            <AppScreenHeader
+                eyebrow="Account recovery"
+                icon="lifebuoy"
+                title="Restore access"
+            />
+            <View style={styles.formCard}>
                 <InputField
                     label="Username"
                     testID="purrivacy.recover.username"
@@ -148,3 +154,15 @@ export const RecoverAccountScreen = () => {
         </ScreenContainer>
     );
 };
+
+const styles = StyleSheet.create({
+    formCard: {
+        gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        padding: theme.spacing.lg,
+        ...theme.elevation.low,
+    },
+});

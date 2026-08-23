@@ -121,5 +121,92 @@ describe('MFA retry flow', () => {
             name: 'clearMfaCode',
             payload: { isWrongMfaCode: true },
         });
+        expect(events).not.toContainEqual({
+            name: 'closeMfaModal',
+            payload: { force: true },
+        });
+    });
+
+    it('passes allowRecoveryCode through to the modal handler', async () => {
+        const modalHandler = vi.fn().mockResolvedValueOnce({ code: '123456' });
+        setMfaModalHandler(modalHandler);
+
+        await MfaUtils.executeMfaFlow({
+            isSensitive: true,
+            isLoginFlow: false,
+            allowRecoveryCode: false,
+            onMfaCode: async () => 'ok',
+        });
+
+        expect(modalHandler).toHaveBeenCalledWith({
+            isSensitive: true,
+            isLoginFlow: false,
+            allowRecoveryCode: false,
+        });
+    });
+
+    it('omits allowRecoveryCode when not provided (default behaviour preserved)', async () => {
+        const modalHandler = vi.fn().mockResolvedValueOnce({ code: '123456' });
+        setMfaModalHandler(modalHandler);
+
+        await MfaUtils.executeMfaFlow({
+            isSensitive: false,
+            isLoginFlow: true,
+            onMfaCode: async () => 'ok',
+        });
+
+        expect(modalHandler).toHaveBeenCalledWith({
+            isSensitive: false,
+            isLoginFlow: true,
+        });
+    });
+
+    it('keeps a sensitive-flow modal open on a 400 code rejection and surfaces the server message', async () => {
+        const events: Array<{ name: string; payload: unknown; }> = [];
+        const unsubscribe = EventService.addListener((name, payload) => {
+            events.push({ name, payload });
+        });
+        // Recovery code entered in the TOTP-only MFA-enable verification:
+        // the server rejects it with a 400 format error, not a wrong-code
+        // flag. The modal must stay open so the user can retry with TOTP.
+        const modalHandler = vi.fn()
+            .mockResolvedValueOnce({ code: 'ABCDEF123456' })
+            .mockResolvedValueOnce({ code: '123456' });
+        const onMfaCode = vi.fn(async (code: string) => {
+            if (code === 'ABCDEF123456') {
+                throw {
+                    status: 400,
+                    message: 'Invalid code format. Please use a 6-digit TOTP code from your authenticator app. Recovery codes cannot be used to enable MFA.',
+                };
+            }
+            return `accepted:${code}`;
+        });
+
+        setMfaModalHandler(modalHandler);
+
+        try {
+            await expect(MfaUtils.executeMfaFlow({
+                isSensitive: true,
+                isLoginFlow: false,
+                onMfaCode,
+            })).resolves.toBe('accepted:123456');
+        } finally {
+            unsubscribe();
+        }
+
+        expect(modalHandler).toHaveBeenCalledTimes(2);
+        expect(onMfaCode).toHaveBeenCalledWith('ABCDEF123456');
+        expect(onMfaCode).toHaveBeenCalledWith('123456');
+        expect(events).toContainEqual({
+            name: 'clearMfaCode',
+            payload: {
+                isWrongMfaCode: true,
+                message: 'Invalid code format. Please use a 6-digit TOTP code from your authenticator app. Recovery codes cannot be used to enable MFA.',
+            },
+        });
+        expect(events).not.toContainEqual({
+            name: 'closeMfaModal',
+            payload: { force: true },
+        });
     });
 });

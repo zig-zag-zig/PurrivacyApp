@@ -19,12 +19,27 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
 }) => {
     const recoveryInputRef = useRef<TextInput | null>(null);
     const [isFocused, setIsFocused] = useState(false);
+    const previousValueRef = useRef(value);
+    // Bumped when the field is programmatically cleared (a rejected code):
+    // remounting the TextInput rebuilds its native state, so the caret
+    // returns to the centered position of the fresh empty field instead of
+    // staying pinned at the old selection (Android preserves an EditText's
+    // selection across blur()/focus(), so re-focusing alone cannot move it).
+    const [resetKey, setResetKey] = useState(0);
 
     useEffect(() => {
         setTimeout(() => {
             recoveryInputRef.current?.focus();
         }, 100);
-    }, []);
+    }, [resetKey]);
+
+    useEffect(() => {
+        const wasCleared = value.length === 0 && previousValueRef.current.length > 0;
+        previousValueRef.current = value;
+        if (wasCleared) {
+            setResetKey((key) => key + 1);
+        }
+    }, [value]);
 
     const handleChange = (text: string) => {
         const allowedText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -78,6 +93,7 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     Recovery code
                 </CustomText>
                 <TextInput
+                    key={`recovery-code-${resetKey}`}
                     ref={recoveryInputRef}
                     autoComplete="off"
                     cursorColor={theme.colors.primary}
@@ -99,12 +115,6 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     returnKeyType="done"
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    // After a programmatic clear (e.g. a rejected code) the
-                    // internal cursor stays at the previous end position and
-                    // renders at the edge of the centered, empty field. Pin
-                    // the selection to the start while the field is empty so
-                    // the caret sits where typing will land.
-                    selection={value.length === 0 ? { start: 0, end: 0 } : undefined}
                 />
             </View>
             <CustomText style={styles.charCount}>

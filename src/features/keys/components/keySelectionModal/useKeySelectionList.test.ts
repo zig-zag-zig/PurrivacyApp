@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { KeyPair } from '../../../../types/types';
+import { theme } from '../../../../styles/theme';
 
 // The hook is exercised without a React renderer (no react-dom/test-utils in
 // this repo); provide pass-through implementations for the hooks it uses,
@@ -218,7 +219,7 @@ describe('useKeySelectionList derived presentation state', () => {
 
     it('exposes the active/inactive sort pill colors', () => {
         const result = mount();
-        expect(result.popularityColor).toBe('#000000'); // onPrimary when active
-        expect(result.alphabeticalColor).toBe('#A9A9A9'); // textSecondary when idle
+        expect(result.popularityColor).toBe(theme.colors.onPrimary);
+        expect(result.alphabeticalColor).toBe(theme.colors.textSecondary);
     });
 });

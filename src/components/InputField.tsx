@@ -49,7 +49,7 @@ interface InputFieldProps extends TextInputProps {
     normalizeOnBlur?: (text: string) => string;
 }
 
-const INPUT_BORDER_WIDTH = 2;
+const INPUT_BORDER_WIDTH = 1;
 
 export const InputField = forwardRef<TextInput, InputFieldProps>(
     (
@@ -181,9 +181,9 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                         {
                             borderColor: activeBorderColor,
                             shadowColor: isFocused ? theme.colors.primary : 'transparent',
-                            shadowOpacity: isFocused ? 0.18 : 0,
-                            shadowRadius: isFocused ? 6 : 0,
-                            elevation: isFocused ? 2 : 0,
+                            shadowOpacity: isFocused ? 0.22 : 0,
+                            shadowRadius: isFocused ? 10 : 0,
+                            elevation: isFocused ? 3 : 0,
                             borderWidth: INPUT_BORDER_WIDTH,
                         },
                         readOnly && styles.inputWrapperReadOnly,
@@ -224,12 +224,12 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                                 backgroundColor: 'transparent',
                                 color: theme.colors.text,
                                 fontSize: theme.typography.body.fontSize,
-                                height: 44,
-                                minHeight: 44,
+                                height: 54,
+                                minHeight: 54,
                                 borderWidth: 0,
                                 borderRadius: 0,
                                 includeFontPadding: false,
-                                paddingHorizontal: theme.spacing.md + 4,
+                                paddingHorizontal: theme.spacing.md,
                                 paddingVertical: 0,
                                 paddingRight: (showToggleSecureText && rightIcon) ? 70 : (showToggleSecureText || rightIcon) ? 40 : 12,
                                 textAlignVertical: 'center',
@@ -238,12 +238,13 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                                 }),
                                 ...(largeText && {
                                     height: undefined,
-                                    minHeight: 140,
+                                    minHeight: 170,
                                     maxHeight: undefined,
                                     textAlignVertical: 'top',
-                                    paddingVertical: theme.spacing.xl * 2,
-                                    lineHeight: 20,
-                                    paddingHorizontal: theme.spacing.lg,
+                                    paddingTop: theme.spacing.xl,
+                                    paddingBottom: theme.spacing.md,
+                                    lineHeight: theme.typography.body.lineHeight,
+                                    paddingHorizontal: theme.spacing.md,
                                 }),
                                 ...(multiline && {
                                     textAlignVertical: largeText ? 'top' : 'center',
@@ -373,20 +374,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'relative',
         borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.colors.surfaceElevated,
         overflow: 'hidden',
         shadowOffset: { width: 0, height: 0 },
         zIndex: 1,
     },
     inputWrapperReadOnly: {
-        backgroundColor: theme.colors.surface,
-        opacity: 0.78,
+        backgroundColor: theme.colors.surfaceMuted,
+        opacity: 0.82,
     },
     inputWrapperError: {
         borderColor: theme.colors.error,
     },
     supportingText: {
-        marginTop: theme.spacing.xs,
-        marginLeft: theme.spacing.md,
+        marginTop: 6,
+        marginLeft: theme.spacing.sm,
     },
 });

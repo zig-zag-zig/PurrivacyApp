@@ -4,6 +4,7 @@ import { View, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { useMfa } from '../state/MfaContext';
@@ -111,12 +112,11 @@ export const MfaSetupScreen = () => {
 
     return (
         <ScreenContainer testID="purrivacy.mfa.setup.screen">
-            <CustomText style={[commonStyles.textTitle, styles.title]}>
-                Setup Two-Factor Authentication
-            </CustomText>
-            <CustomText style={[commonStyles.textBody, styles.description]}>
-                Copy the secret key below and enter it manually in your authenticator app (like Google Authenticator, Authy, etc.).
-            </CustomText>
+            <AppScreenHeader
+                eyebrow="Two-factor authentication"
+                icon="two-factor-authentication"
+                title="Connect your authenticator"
+            />
 
             <View style={styles.secretContainer}>
                 <CustomText style={[commonStyles.textLabel, styles.secretLabel]}>
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     secretContainer: {
         backgroundColor: theme.colors.surface,
         padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
         borderWidth: 1,
         borderColor: theme.colors.divider,
     },
@@ -237,12 +237,15 @@ const styles = StyleSheet.create({
     },
     secretTextFrame: {
         alignSelf: 'stretch',
-        backgroundColor: theme.colors.background,
-        padding: theme.spacing.sm,
-        borderRadius: theme.borderRadius.sm,
+        backgroundColor: theme.colors.surfaceMuted,
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
     },
     secretTextFrameCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.16)',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
     },
     secretText: {
         fontFamily: 'monospace',
@@ -260,9 +263,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     instructionsContainer: {
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.colors.surfaceMuted,
         padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
         borderWidth: 1,
         borderColor: theme.colors.divider,
         marginBottom: theme.spacing.md,
@@ -281,7 +284,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.surface,
         borderWidth: 1,
         borderColor: theme.colors.divider,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.md,
     },

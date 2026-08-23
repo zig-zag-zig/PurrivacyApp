@@ -160,6 +160,7 @@ const styles = StyleSheet.create({
         color: theme.colors.text,
     },
     publicKeyCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
     },
 });

@@ -75,6 +75,7 @@ export const GeneratedPassphrasePair = ({
                 value={confirmPassphrase}
                 onPassphraseChange={onConfirmPassphraseChange}
                 error={confirmPassphraseError}
+                hidden={!passphrase}
                 testID={confirmTestID}
             />
         </View>

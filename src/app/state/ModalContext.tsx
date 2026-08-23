@@ -11,6 +11,9 @@ import type {
 } from '../../shared/modals/types';
 import { PassphraseStorageConsentModal } from '../../features/security/components/PassphraseStorageConsentModal';
 import {
+    clearMfaModalHandler,
+    clearPassphraseStorageConsentHandler,
+    clearRecoveryCodesModalHandler,
     setMfaModalHandler,
     setPassphraseStorageConsentHandler,
     setRecoveryCodesModalHandler,
@@ -109,7 +112,11 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
                 // check above correlates it (AppEventPayloadMap contract).
                 const clearPayload = payload as AppEventPayloadMap['clearMfaCode'];
                 if (clearPayload?.isWrongMfaCode) {
-                    showToast('The MFA code you entered was incorrect. Please try again.', 'info');
+                    showToast(
+                        clearPayload.message
+                            ?? 'The MFA code you entered was incorrect. Please try again.',
+                        'info',
+                    );
                 }
             } else if (eventName === 'closeMfaModal') {
                 EventService.consumeEvent('closeMfaModal');
@@ -209,9 +216,12 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
         setPassphraseStorageConsentHandler(showPassphraseStorageConsentModal);
 
         return () => {
-            setMfaModalHandler(null);
-            setRecoveryCodesModalHandler(null);
-            setPassphraseStorageConsentHandler(null);
+            // Fast Refresh can mount a replacement provider before cleaning up
+            // the previous one. Only clear handlers still owned by this exact
+            // provider so stale cleanup cannot erase the live registration.
+            clearMfaModalHandler(showMfaModal);
+            clearRecoveryCodesModalHandler(showRecoveryCodesModal);
+            clearPassphraseStorageConsentHandler(showPassphraseStorageConsentModal);
             if (resolveMfaPromiseRef.current) {
                 resolveMfaPromiseRef.current(null);
                 resolveMfaPromiseRef.current = null;

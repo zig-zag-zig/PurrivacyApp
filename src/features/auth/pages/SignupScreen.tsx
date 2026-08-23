@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { validateMnemonic } from 'bip39';
 import { Button } from '../../../components/Button';
+import { CustomText } from '../../../components/CustomText';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { useAuth } from '../state/AuthContext';
@@ -16,6 +18,7 @@ import { ERROR_MESSAGES } from '../../../utils/errorHandling';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
 import { commitAutofill, isNativeSignupRestartAvailable, persistPendingSignup, restartActivity } from '../../../native/autofillCommit';
 import { pendingSignupSession } from '../services/pendingSignupSession';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 
 export const SignupScreen = () => {
     const [username, setUsername] = useState('');
@@ -123,7 +126,12 @@ export const SignupScreen = () => {
 
     return (
         <ScreenContainer testID="purrivacy.signup.screen">
-            <View style={{ gap: theme.spacing.md }}>
+            <AppScreenHeader
+                eyebrow="New encrypted workspace"
+                icon="shield-plus-outline"
+                title="Create your account"
+            />
+            <View style={styles.formCard}>
                 <InputField
                     label="Username"
                     testID="purrivacy.signup.username"
@@ -163,8 +171,16 @@ export const SignupScreen = () => {
                     error={formErrors.confirmPassword}
                 />
 
+                <View style={styles.securityNote}>
+                    <Icon name="lock-check-outline" size={18} color={theme.colors.secondary} />
+                    <View style={styles.securityCopy}>
+                        <CustomText style={styles.securityTitle}>Zero-knowledge setup</CustomText>
+                        <CustomText style={styles.securityText}>Your recovery material is created and encrypted on your device.</CustomText>
+                    </View>
+                </View>
+
                 <Button
-                    label="Sign Up"
+                    label="Create account"
                     testID="purrivacy.signup.submit"
                     onPress={handleSignup}
                     loading={isCheckingAvailability || isAuthLoading}
@@ -172,7 +188,7 @@ export const SignupScreen = () => {
                 />
 
                 <Button
-                    label="Sign In"
+                    label="Back to sign in"
                     testID="purrivacy.signup.signin"
                     onPress={() => navigation.navigate('Signin')}
                     variant="secondary"
@@ -181,3 +197,39 @@ export const SignupScreen = () => {
         </ScreenContainer>
     );
 };
+
+const styles = StyleSheet.create({
+    formCard: {
+        gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        padding: theme.spacing.lg,
+        ...theme.elevation.low,
+    },
+    securityNote: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.secondaryMuted,
+        borderWidth: 1,
+        borderColor: `${theme.colors.secondary}33`,
+    },
+    securityCopy: {
+        flex: 1,
+    },
+    securityTitle: {
+        color: theme.colors.text,
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '700',
+    },
+    securityText: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        lineHeight: 18,
+        marginTop: 2,
+    },
+});

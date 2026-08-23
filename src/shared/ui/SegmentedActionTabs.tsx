@@ -31,25 +31,21 @@ export function SegmentedActionTabs<T extends string>({
         <View style={styles.segmentedControl}>
             {tabs.map(tab => {
                 const active = value === tab.action;
-                const tintColor = active ? theme.colors.onPrimary : theme.colors.textSecondary;
+                const tintColor = active ? theme.colors.primaryStrong : theme.colors.textMuted;
 
                 return (
                     <TouchableOpacity
                         testID={testIDPrefix ? `${testIDPrefix}.${tab.action}` : undefined}
                         key={tab.action}
-                        style={[
-                            styles.segment,
-                            active && styles.segmentActive,
-                        ]}
+                        style={[styles.segment, active && styles.segmentActive]}
                         onPress={() => onChange(tab.action)}
                         activeOpacity={0.78}
                     >
-                        <Icon name={tab.icon} size={19} color={tintColor} />
+                        <View style={[styles.iconFrame, active && styles.iconFrameActive]}>
+                            <Icon name={tab.icon} size={19} color={tintColor} />
+                        </View>
                         <CustomText
-                            style={[
-                                styles.segmentText,
-                                active && styles.segmentTextActive,
-                            ]}
+                            style={[styles.segmentText, active && styles.segmentTextActive]}
                             numberOfLines={1}
                             maxFontSizeMultiplier={1.1}
                         >
@@ -65,35 +61,48 @@ export function SegmentedActionTabs<T extends string>({
 const styles = StyleSheet.create({
     segmentedControl: {
         flexDirection: 'row',
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.colors.surfaceMuted,
         borderRadius: theme.borderRadius.lg,
-        marginBottom: theme.spacing.lg,
+        marginBottom: theme.spacing.sm,
         borderWidth: 1,
         borderColor: theme.colors.divider,
-        overflow: 'hidden',
+        padding: theme.spacing.xs,
+        gap: theme.spacing.xs,
     },
     segment: {
         flex: 1,
-        minHeight: 48,
-        flexDirection: 'row',
+        minHeight: 54,
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: theme.spacing.xs,
-        paddingVertical: theme.spacing.sm,
-        gap: theme.spacing.xs,
+        paddingVertical: theme.spacing.xs,
+        gap: 3,
+        borderRadius: theme.borderRadius.md,
     },
     segmentActive: {
-        backgroundColor: theme.colors.primary,
+        backgroundColor: theme.colors.surfaceElevated,
+        borderWidth: 1,
+        borderColor: theme.colors.dividerStrong,
+        ...theme.elevation.low,
+    },
+    iconFrame: {
+        width: 30,
+        height: 24,
+        borderRadius: theme.borderRadius.pill,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconFrameActive: {
+        backgroundColor: theme.colors.primaryMuted,
     },
     segmentText: {
-        color: theme.colors.textSecondary,
-        fontSize: 14,
-        lineHeight: 18,
-        fontWeight: '600',
+        color: theme.colors.textMuted,
+        fontSize: 12,
+        lineHeight: 15,
+        fontWeight: '700',
         flexShrink: 1,
     },
     segmentTextActive: {
-        color: theme.colors.onPrimary,
-        fontWeight: '700',
+        color: theme.colors.text,
     },
 });

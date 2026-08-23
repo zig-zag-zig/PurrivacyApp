@@ -90,7 +90,7 @@ export const CreateKeyForm = ({
     };
 
     return (
-        <AutofillDisabledView>
+        <AutofillDisabledView style={styles.formStack}>
             {(showAlgorithmSheet || showRsaBitsSheet) && (
                 <View style={styles.backdrop} pointerEvents="box-none" />
             )}
@@ -213,6 +213,10 @@ export const CreateKeyForm = ({
 };
 
 const styles = StyleSheet.create({
+    formStack: {
+        gap: theme.spacing.sm,
+        paddingBottom: theme.spacing.xxl * 2,
+    },
     backdrop: {
         position: 'absolute',
         top: 0,

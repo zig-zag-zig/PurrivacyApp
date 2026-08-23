@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { Keyboard } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabParamList } from './types';
 import { DecryptScreen } from '../../features/decrypt/pages/DecryptScreen';
@@ -11,13 +11,18 @@ import { SettingsScreen } from '../../features/settings/pages/SettingsScreen';
 import { theme } from '../../styles/theme';
 
 const Tab = createBottomTabNavigator<TabParamList>();
-const TAB_BAR_HEIGHT = 48;
-const TAB_BAR_ICON_SIZE = 28;
-const TAB_BAR_ICON_OFFSET = 8;
+const TAB_BAR_BASE_HEIGHT = 58;
+const TAB_BAR_ICON_SIZE = 23;
+
+const tabIcons: Record<keyof TabParamList, React.ComponentProps<typeof Icon>['name']> = {
+  Key: 'key-chain-variant',
+  Encrypt: 'lock-outline',
+  Decrypt: 'lock-open-variant-outline',
+  Settings: 'tune-variant',
+};
 
 export const TabNavigator = () => {
   const insets = useSafeAreaInsets();
-  const bottomInset = insets.bottom;
 
   return (
     <Tab.Navigator
@@ -26,70 +31,75 @@ export const TabNavigator = () => {
           Keyboard.dismiss();
         },
       }}
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: 'rgba(255, 255, 255, 0.16)',
-          borderTopWidth: 1,
-          height: TAB_BAR_HEIGHT + bottomInset,
-          paddingBottom: bottomInset,
-          paddingTop: 0,
+          height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+          marginHorizontal: theme.spacing.sm,
+          paddingHorizontal: theme.spacing.xs,
+          paddingTop: 2,
+          paddingBottom: insets.bottom,
+          backgroundColor: theme.colors.surfaceElevated,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: theme.colors.dividerStrong,
+          borderRadius: theme.borderRadius.xl,
+          ...theme.elevation.high,
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
-        tabBarShowLabel: false,
-        tabBarIconStyle: {
-          height: TAB_BAR_ICON_SIZE,
-          marginTop: TAB_BAR_ICON_OFFSET,
-          width: TAB_BAR_ICON_SIZE,
-        },
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          paddingVertical: 0,
-        },
-      }}
+        tabBarActiveTintColor: theme.colors.primaryStrong,
+        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarLabelStyle: styles.label,
+        tabBarItemStyle: styles.item,
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.iconFrame, focused && styles.iconFrameActive]}>
+            <Icon name={tabIcons[route.name]} size={TAB_BAR_ICON_SIZE} color={color} />
+          </View>
+        ),
+      })}
     >
       <Tab.Screen
         name="Key"
         component={KeyScreen}
-        options={{
-          tabBarButtonTestID: 'purrivacy.tab.key',
-          tabBarIcon: ({ color }) => (
-            <Icon name="vpn-key" size={TAB_BAR_ICON_SIZE} color={color} />
-          ),
-        }}
+        options={{ tabBarButtonTestID: 'purrivacy.tab.key', title: 'Vault' }}
       />
       <Tab.Screen
         name="Encrypt"
         component={EncryptScreen}
-        options={{
-          tabBarButtonTestID: 'purrivacy.tab.encrypt',
-          tabBarIcon: ({ color }) => (
-            <Icon name="lock" size={TAB_BAR_ICON_SIZE} color={color} />
-          ),
-        }}
+        options={{ tabBarButtonTestID: 'purrivacy.tab.encrypt', title: 'Encrypt' }}
       />
       <Tab.Screen
         name="Decrypt"
         component={DecryptScreen}
-        options={{
-          tabBarButtonTestID: 'purrivacy.tab.decrypt',
-          tabBarIcon: ({ color }) => (
-            <Icon name="lock-open" size={TAB_BAR_ICON_SIZE} color={color} />
-          ),
-        }}
+        options={{ tabBarButtonTestID: 'purrivacy.tab.decrypt', title: 'Decrypt' }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{
-          tabBarButtonTestID: 'purrivacy.tab.settings',
-          tabBarIcon: ({ color }) => (
-            <Icon name="settings" size={TAB_BAR_ICON_SIZE} color={color} />
-          ),
-        }}
+        options={{ tabBarButtonTestID: 'purrivacy.tab.settings', title: 'Settings' }}
       />
     </Tab.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  item: {
+    borderRadius: theme.borderRadius.lg,
+  },
+  label: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginTop: -4,
+    marginBottom: 3,
+  },
+  iconFrame: {
+    width: 40,
+    height: 25,
+    borderRadius: theme.borderRadius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconFrameActive: {
+    backgroundColor: theme.colors.primaryMuted,
+  },
+});

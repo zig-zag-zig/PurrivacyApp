@@ -280,7 +280,7 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
                             styles.content,
                             contentContainerStyle,
                             keyboardBottomSpacer > 0 && {
-                                paddingBottom: keyboardBottomSpacer + theme.spacing.xl,
+                                paddingBottom: keyboardBottomSpacer + theme.spacing.xxl,
                             },
                         ]}
                         keyboardShouldPersistTaps={keyboardShouldPersistTaps ?? 'handled'}
@@ -306,6 +306,6 @@ const styles = StyleSheet.create({
     content: {
         flexGrow: 1,
         gap: theme.spacing.md,
-        paddingBottom: theme.spacing.xl,
+        paddingBottom: theme.spacing.xxl,
     },
 });

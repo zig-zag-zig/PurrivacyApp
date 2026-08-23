@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
@@ -23,6 +24,14 @@ export const SettingsScreen = () => {
 
   return (
     <ScreenContainer testID="purrivacy.settings.screen">
+      <AppScreenHeader
+        eyebrow="Account controls"
+        icon="shield-account-outline"
+        title="Security & settings"
+      />
+
+      <CustomText style={styles.sectionLabel}>Protection</CustomText>
+
       <ConfirmationDialog
         visible={settingsPage.state.showDeleteDialog}
         title="Delete Account"
@@ -146,6 +155,8 @@ export const SettingsScreen = () => {
         extraText="Saved key passphrases are encrypted with your account key and sync across all your devices. They autofill without another authentication prompt."
       />
 
+      <CustomText style={styles.sectionLabel}>Account & app</CustomText>
+
       <SettingsOption
         iconName="system-update-alt"
         text="App Updates"
@@ -186,13 +197,23 @@ export const SettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  sectionLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginTop: theme.spacing.sm,
+    marginLeft: theme.spacing.xs,
+  },
   recoveryCodesContainer: {
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.divider,
+    ...theme.elevation.low,
   },
   recoveryCodesHeader: {
     flexDirection: 'row',

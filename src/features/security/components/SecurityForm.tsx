@@ -51,12 +51,12 @@ export const SecurityForm: React.FC<SecurityFormProps> = ({
     };
 
     return (
-        <View style={{ gap: theme.spacing.md }}>
+        <View style={styles.formCard}>
             <CustomText style={[commonStyles.textTitle, { marginBottom: theme.spacing.sm }]}>
                 {getTitle()}
             </CustomText>
 
-            <CustomText style={[commonStyles.textBody, { marginBottom: theme.spacing.md }]}>
+            <CustomText style={styles.description}>
                 {getDescription()}
             </CustomText>
 
@@ -116,4 +116,21 @@ export const SecurityForm: React.FC<SecurityFormProps> = ({
             />
         </View>
     );
+};
+
+const styles = {
+    formCard: {
+        gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        padding: theme.spacing.lg,
+        ...theme.elevation.low,
+    },
+    description: {
+        ...commonStyles.textBody,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.sm,
+    },
 };

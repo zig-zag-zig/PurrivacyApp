@@ -97,26 +97,26 @@ const styles = StyleSheet.create({
         flexShrink: 1,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: '#766786',
-        backgroundColor: '#211E28',
+        borderColor: theme.colors.dividerStrong,
+        backgroundColor: theme.colors.surfaceMuted,
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: 3,
     },
     fingerprintChip: {
-        borderColor: '#8C63B0',
-        backgroundColor: '#2E2440',
+        borderColor: `${theme.colors.primary}88`,
+        backgroundColor: theme.colors.primaryMuted,
     },
     selectedMetadataChip: {
-        borderColor: '#D7BEFF',
-        backgroundColor: '#3A2452',
+        borderColor: theme.colors.primaryStrong,
+        backgroundColor: theme.colors.primaryMuted,
     },
     selectedFingerprintChip: {
-        borderColor: '#F0E5FF',
-        backgroundColor: '#4D2F6C',
+        borderColor: theme.colors.secondary,
+        backgroundColor: theme.colors.secondaryMuted,
     },
     metadataText: {
         ...commonStyles.textCaption,
-        color: '#DED5E8',
+        color: theme.colors.textSecondary,
         fontWeight: '700',
         lineHeight: 16,
     },
@@ -125,6 +125,6 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
     },
     selectedMetadataText: {
-        color: '#FFFFFF',
+        color: theme.colors.text,
     },
 });

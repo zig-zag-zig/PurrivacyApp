@@ -7,7 +7,7 @@
 
 import { useCallback } from 'react';
 import type { User } from 'firebase/auth';
-import { deleteUser as deleteFirebaseUser, signOut as firebaseSignOut } from 'firebase/auth';
+import { signOut as firebaseSignOut } from 'firebase/auth';
 
 import { ApiClient } from '../../../api/client';
 import { auth } from '../../../config/firebase';
@@ -182,30 +182,24 @@ export const useAccountCommands = (deps: AuthCommandDeps): AccountCommands => {
   const deleteCurrentAccount = useCallback(async (currentUser: User): Promise<void> => {
     const userId = currentUser.uid;
     const username = getUsernameFromUser(currentUser) || '';
-    let firebaseDeleteError: any = null;
 
     dispatch({ type: 'DELETION_STARTED' });
     dispatch({ type: 'LOADING_STARTED' });
     suppressLastSignedInUserPersistRef.current = true;
 
     try {
-      await deleteFirebaseUser(currentUser);
+      // The backend's DELETE /user now removes the Firebase Auth identity as
+      // its final server-side step. The client must not call Firebase's
+      // client-side deleteUser afterwards: the backend revokes the user's
+      // refresh tokens before deleting their data, so the client token is
+      // already invalid by the time a client-side deletion would run
+      // (auth/user-token-expired). Local cleanup and a local sign-out are
+      // all that remains on the client.
+      await clearDeletedAccountClientState(userId, username);
+      dispatch({ type: 'DELETION_COMPLETED' });
     } catch (error: any) {
-      if (error?.code !== 'auth/user-not-found') {
-        firebaseDeleteError = error;
-      }
-    } finally {
-      try {
-        await clearDeletedAccountClientState(userId, username);
-        dispatch({ type: 'DELETION_COMPLETED' });
-      } catch (error: any) {
-        logger.warn('failed to clear client state during account deletion', { error });
-        dispatch({ type: 'DELETION_FAILED', error: error.message || 'Account deletion failed' });
-      }
-    }
-
-    if (firebaseDeleteError) {
-      throw firebaseDeleteError;
+      logger.warn('failed to clear client state during account deletion', { error });
+      dispatch({ type: 'DELETION_FAILED', error: error.message || 'Account deletion failed' });
     }
   }, [dispatch, clearDeletedAccountClientState, suppressLastSignedInUserPersistRef]);
 

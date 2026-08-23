@@ -62,23 +62,24 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: theme.typography.title.fontSize,
-        fontWeight: '600' as FontWeight,
-        lineHeight: theme.typography.title.fontSize * 1.3,
+        fontWeight: '700' as FontWeight,
+        lineHeight: theme.typography.title.lineHeight,
+        letterSpacing: -0.35,
     },
     body: {
         fontSize: theme.typography.body.fontSize,
         fontWeight: '400' as FontWeight,
-        lineHeight: theme.typography.body.fontSize * 1.5,
+        lineHeight: theme.typography.body.lineHeight,
     },
     label: {
         fontSize: theme.typography.label.fontSize,
-        fontWeight: '500' as FontWeight,
-        lineHeight: theme.typography.label.fontSize * 1.3,
+        fontWeight: '600' as FontWeight,
+        lineHeight: theme.typography.label.lineHeight,
     },
     caption: {
         fontSize: theme.typography.caption.fontSize,
         fontWeight: '400' as FontWeight,
-        lineHeight: theme.typography.caption.fontSize * 1.3,
+        lineHeight: theme.typography.caption.lineHeight,
     },
     bold: {
         fontWeight: '700' as FontWeight,

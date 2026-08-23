@@ -10,6 +10,15 @@ import { ApiClient } from '../../../api/client';
 import { getUser } from '../../auth/domain/authUtils';
 import { logger } from '../../../utils/logger';
 import { ACCOUNT_PASSWORD_MIN_LENGTH } from '../../../config/inputLimits';
+import { ApiRequestError } from '../../../api/apiError';
+
+export type SecurityActionResult = {
+    success: boolean;
+    requiresSignout?: boolean;
+    requiresMfa?: boolean;
+    mfaError?: string;
+    cleanupWarning?: string;
+};
 
 export const useSecurityActions = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +55,7 @@ export const useSecurityActions = () => {
         newValue?: string,
         confirmValue?: string,
         userDecrypted?: any,
-    ) => {
+    ): Promise<SecurityActionResult> => {
         if (!validateForm(type, currentPassword, newValue, confirmValue)) {
             return { success: false };
         }
@@ -63,6 +72,7 @@ export const useSecurityActions = () => {
             await reauthenticateWithCredential(user, credential);
 
             let success = false;
+            let cleanupWarning: string | undefined;
 
             if (type === 'password' && userDecrypted) {
                 await AuthService.changePassword(
@@ -75,13 +85,19 @@ export const useSecurityActions = () => {
                 success = true;
             }
             else if (type === 'delete') {
-                success = await deleteAccount();
+                const deletion = await deleteAccount();
+                success = deletion.success;
+                cleanupWarning = deletion.cleanupWarning;
             }
 
             if (success && type === 'password') {
                 await ApiClient.revokeAllSessions();
             }
-            return { success, requiresSignout: success && type === 'password' };
+            return {
+                success,
+                requiresSignout: success && type === 'password',
+                cleanupWarning,
+            };
         } catch (error: any) {
             if (error.code === 'auth/invalid-credential') {
                 setFormErrors({ currentPassword: 'Incorrect password' });
@@ -105,18 +121,58 @@ export const useSecurityActions = () => {
     };
 
     const deleteAccount = async () => {
-        try {
-            const currentUser = getUser();
-            if (!currentUser) {
-                throw new Error('Failed to delete account: user in AuthContext cannot be null');
-            }
-            await ApiClient.delete();
-            await deleteCurrentAccount(currentUser);
-            return true;
-        } catch (error: any) {
-            logger.warn('failed to delete account', { error });
-            throw new Error(error.message || 'Failed to delete account');
+        const currentUser = getUser();
+        if (!currentUser) {
+            throw new Error('Failed to delete account: user in AuthContext cannot be null');
         }
+
+        let backendAccountWasDeleted = false;
+        let cleanupWarning: string | undefined;
+        try {
+            await ApiClient.delete();
+            backendAccountWasDeleted = true;
+        } catch (error: any) {
+            const completedSteps = error instanceof ApiRequestError && Array.isArray(error.errorData.completedSteps)
+                ? error.errorData.completedSteps.filter((step): step is string => typeof step === 'string')
+                : [];
+            const remainingSteps = error instanceof ApiRequestError && Array.isArray(error.errorData.remainingSteps)
+                ? error.errorData.remainingSteps.filter((step): step is string => typeof step === 'string')
+                : [];
+            backendAccountWasDeleted = completedSteps.includes('deleteUserDocuments');
+
+            if (!backendAccountWasDeleted) {
+                logger.warn('failed to delete account', { error });
+                throw new Error(error.message || 'Failed to delete account');
+            }
+
+            // The backend deletes in ordered steps. Once the user documents
+            // are gone the account is irreversibly deleted, even when a later
+            // cleanup step (keys, push tokens, Firebase identity) reports a
+            // retryable transition error. The remaining steps are surfaced so
+            // the residual cleanup issue is never silently hidden.
+            logger.warn('account deleted with incomplete backend cleanup', {
+                error,
+                completedSteps,
+                remainingSteps,
+            });
+            cleanupWarning = remainingSteps.includes('deleteFirebaseUser')
+                ? 'Account data was deleted, but the Firebase identity could not be removed. The issue was logged.'
+                : 'Account data was deleted, but some backend cleanup steps could not be completed. The issue was logged.';
+        }
+
+        try {
+            await deleteCurrentAccount(currentUser);
+        } catch (error) {
+            if (!backendAccountWasDeleted) {
+                throw error;
+            }
+
+            logger.warn('backend account deleted but client identity cleanup was incomplete', { error });
+            cleanupWarning = cleanupWarning
+                ?? 'Account data was deleted, but Firebase or local identity cleanup failed. The issue was logged.';
+        }
+
+        return { success: true, cleanupWarning };
     }
 
     return {

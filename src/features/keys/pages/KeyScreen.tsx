@@ -6,6 +6,7 @@ import { CustomText } from '../../../components/CustomText';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
@@ -44,6 +45,12 @@ export const KeyScreen = () => {
       onScroll={keyScreen.onScroll}
       scrollEventThrottle={16}
     >
+      <AppScreenHeader
+        eyebrow="Encrypted workspace"
+        icon="key-chain-variant"
+        title="Key vault"
+      />
+
       <SegmentedActionTabs
         tabs={keyActionTabs}
         value={keyScreen.state.keyAction}
@@ -176,8 +183,12 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     gap: theme.spacing.md,
-    paddingVertical: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
   },
   emptyTitle: {
     color: theme.colors.textSecondary,

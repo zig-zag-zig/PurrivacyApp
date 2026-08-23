@@ -40,10 +40,13 @@ export function SelectField<T extends SelectValue>({
 
     return (
         <FormField>
-            <CustomText style={commonStyles.textLabel}>{label}</CustomText>
+            <CustomText style={styles.label}>{label}</CustomText>
             <View style={styles.dropdownContainer}>
                 <TouchableOpacity
-                    style={styles.selectButton}
+                    style={[
+                        styles.selectButton,
+                        visible && styles.selectButtonOpen,
+                    ]}
                     onPress={() => {
                         Keyboard.dismiss();
                         onOpen();
@@ -75,6 +78,8 @@ export function SelectField<T extends SelectValue>({
                         onSelect(options[index], index);
                     }}
                     onClose={onClose}
+                    selectedIndex={options.findIndex(option => option.value === value)}
+                    integrated
                 />
             </View>
             {error ? (
@@ -90,20 +95,32 @@ const styles = StyleSheet.create({
     dropdownContainer: {
         position: 'relative',
         width: '100%',
-        marginTop: theme.spacing.sm,
+        marginTop: 6,
     },
     selectButton: {
         flexDirection: 'row',
         alignItems: 'center',
         position: 'relative',
         borderColor: theme.colors.divider,
-        borderWidth: 2,
-        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        backgroundColor: theme.colors.surfaceElevated,
         borderRadius: theme.borderRadius.md,
         overflow: 'hidden',
         paddingHorizontal: theme.spacing.md + 4,
-        paddingVertical: theme.spacing.sm + 2,
-        minHeight: 44,
+        paddingVertical: theme.spacing.sm + 3,
+        minHeight: 54,
+        zIndex: 2,
+    },
+    selectButtonOpen: {
+        borderColor: theme.colors.dividerStrong,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        backgroundColor: theme.colors.surface,
+    },
+    label: {
+        ...commonStyles.textLabel,
+        color: theme.colors.textSecondary,
+        marginLeft: theme.spacing.xs,
     },
     errorText: {
         color: theme.colors.error,
