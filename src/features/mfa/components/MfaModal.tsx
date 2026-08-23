@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useToast } from '../../../app/state/ToastContext';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
@@ -157,75 +158,90 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                     ]}
                 >
                     <View onTouchStart={handleContentTouchStart} style={styles.contentTouchArea}>
-                    <CustomText style={styles.mfaModalMessage}>
-                        {message || (isRecoveryCode
-                            ? 'Enter your 12‑character alphanumeric recovery code'
-                            : 'Enter the 6‑digit code from your authenticator app')}
-                    </CustomText>
+                        <View style={styles.modalHeader}>
+                            <View style={styles.headerIconFrame}>
+                                <Icon
+                                    name={isRecoveryCode ? 'key-outline' : 'shield-key-outline'}
+                                    size={28}
+                                    color={theme.colors.primaryStrong}
+                                />
+                            </View>
+                            <CustomText style={styles.modalTitle}>
+                                {isRecoveryCode ? 'Recovery code' : 'Two-factor verification'}
+                            </CustomText>
+                            <CustomText style={styles.mfaModalMessage}>
+                                {message || (isRecoveryCode
+                                    ? 'Enter your 12‑character alphanumeric recovery code'
+                                    : 'Enter the 6‑digit code from your authenticator app')}
+                            </CustomText>
+                        </View>
 
-                    {isRecoveryCode ? (
-                        <RecoveryCodeInput
-                            value={recoveryCode}
-                            onChange={setRecoveryCode}
-                            onSubmit={handleSubmitRecoveryCode}
-                            loading={loading}
-                        />
-                    ) : (
-                        <TotpInput
-                            code={totpCode}
-                            focusedIndex={focusedIndex}
-                            loading={loading}
-                            inputRef={totpInputRef}
-                            testID="purrivacy.mfa.code.input"
-                            onChangeText={(text) =>
-                                handleTotpChangeText(
-                                    text,
-                                    totpCode,
-                                    focusedIndex ?? 0,
-                                    setTotpCode,
-                                    setFocusedIndex,
-                                )
-                            }
-                            onFocus={() => {
-                                setFocusedIndex((index) => {
-                                    if (index !== null) {
-                                        return index;
+                        <View style={styles.inputCard}>
+                            {isRecoveryCode ? (
+                                <RecoveryCodeInput
+                                    value={recoveryCode}
+                                    onChange={setRecoveryCode}
+                                    onSubmit={handleSubmitRecoveryCode}
+                                    loading={loading}
+                                />
+                            ) : (
+                                <TotpInput
+                                    code={totpCode}
+                                    focusedIndex={focusedIndex}
+                                    loading={loading}
+                                    inputRef={totpInputRef}
+                                    testID="purrivacy.mfa.code.input"
+                                    onChangeText={(text) =>
+                                        handleTotpChangeText(
+                                            text,
+                                            totpCode,
+                                            focusedIndex ?? 0,
+                                            setTotpCode,
+                                            setFocusedIndex,
+                                        )
                                     }
-                                    const pending = pendingFocusIndexRef.current;
-                                    pendingFocusIndexRef.current = null;
-                                    return pending ?? 0;
-                                });
-                            }}
-                            onBlur={() => {
-                                // A blur() during the keyboard-reopen cycle
-                                // must not clear the highlight; otherwise the
-                                // tapped box's border flickers off and on.
-                                if (pendingFocusIndexRef.current !== null) {
-                                    return;
-                                }
-                                setFocusedIndex(null);
-                            }}
-                            onBoxPress={(index) => {
-                                pendingFocusIndexRef.current = index;
-                                setFocusedIndex(index);
-                                focusInput();
-                            }}
-                            onLongPress={handlePaste}
-                            onTouchStart={() => {
-                                totpTouchInsideRef.current = true;
-                            }}
-                        />
-                    )}
+                                    onFocus={() => {
+                                        setFocusedIndex((index) => {
+                                            if (index !== null) {
+                                                return index;
+                                            }
+                                            const pending = pendingFocusIndexRef.current;
+                                            pendingFocusIndexRef.current = null;
+                                            return pending ?? 0;
+                                        });
+                                    }}
+                                    onBlur={() => {
+                                        // A blur() during the keyboard-reopen
+                                        // cycle must not clear the highlight;
+                                        // otherwise the tapped box's border
+                                        // flickers off and on.
+                                        if (pendingFocusIndexRef.current !== null) {
+                                            return;
+                                        }
+                                        setFocusedIndex(null);
+                                    }}
+                                    onBoxPress={(index) => {
+                                        pendingFocusIndexRef.current = index;
+                                        setFocusedIndex(index);
+                                        focusInput();
+                                    }}
+                                    onLongPress={handlePaste}
+                                    onTouchStart={() => {
+                                        totpTouchInsideRef.current = true;
+                                    }}
+                                />
+                            )}
 
-                    {showRecoveryCodeOption && (
-                        <Button
-                            label={isRecoveryCode ? 'TOTP Code' : 'Recovery Code'}
-                            onPress={toggleRecoveryCode}
-                            variant="secondary"
-                            style={styles.secondaryButton}
-                            disabled={loading}
-                        />
-                    )}
+                            {showRecoveryCodeOption && (
+                                <Button
+                                    label={isRecoveryCode ? 'TOTP Code' : 'Recovery Code'}
+                                    onPress={toggleRecoveryCode}
+                                    variant="secondary"
+                                    style={styles.secondaryButton}
+                                    disabled={loading}
+                                />
+                            )}
+                        </View>
                     </View>
                 </ScreenContainer>
             </View>
@@ -245,15 +261,47 @@ const styles = StyleSheet.create({
     contentTouchArea: {
         flex: 1,
     },
-    mfaModalMessage: {
-        fontSize: 16,
-        textAlign: 'center',
+    modalHeader: {
+        alignItems: 'center',
         marginBottom: theme.spacing.lg,
+        paddingHorizontal: theme.spacing.md,
+    },
+    headerIconFrame: {
+        width: 56,
+        height: 56,
+        borderRadius: theme.borderRadius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.primaryMuted,
+        borderWidth: 1,
+        borderColor: `${theme.colors.primary}66`,
+        marginBottom: theme.spacing.md,
+    },
+    modalTitle: {
+        color: theme.colors.text,
+        fontSize: 22,
+        lineHeight: 28,
+        fontWeight: '800',
+        textAlign: 'center',
+    },
+    mfaModalMessage: {
         color: theme.colors.textSecondary,
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
+        marginTop: theme.spacing.sm,
         flexWrap: 'wrap',
         flexShrink: 1,
     },
+    inputCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        padding: theme.spacing.lg,
+        ...theme.elevation.high,
+    },
     secondaryButton: {
-        marginBottom: theme.spacing.lg,
+        marginTop: theme.spacing.md,
     },
 });
