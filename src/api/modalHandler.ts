@@ -12,14 +12,32 @@ export const setMfaModalHandler = (handler: MfaModalHandler | null) => {
     mfaModalHandler = handler;
 };
 
+export const clearMfaModalHandler = (handler: MfaModalHandler) => {
+    if (mfaModalHandler === handler) {
+        mfaModalHandler = null;
+    }
+};
+
 export const setRecoveryCodesModalHandler = (handler: RecoveryCodesModalHandler | null) => {
     recoveryCodesModalHandler = handler;
+};
+
+export const clearRecoveryCodesModalHandler = (handler: RecoveryCodesModalHandler) => {
+    if (recoveryCodesModalHandler === handler) {
+        recoveryCodesModalHandler = null;
+    }
 };
 
 export const setPassphraseStorageConsentHandler = (
     handler: PassphraseStorageConsentHandler | null,
 ) => {
     passphraseStorageConsentHandler = handler;
+};
+
+export const clearPassphraseStorageConsentHandler = (handler: PassphraseStorageConsentHandler) => {
+    if (passphraseStorageConsentHandler === handler) {
+        passphraseStorageConsentHandler = null;
+    }
 };
 
 export const getMfaModalHandler = (): MfaModalHandler | null => {

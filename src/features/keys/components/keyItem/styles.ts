@@ -10,16 +10,18 @@ import { theme } from '../../../../styles/theme';
 export const styles = StyleSheet.create({
     card: {
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        ...theme.elevation.low
-    },
-    cardExpanded: {
+        borderRadius: theme.borderRadius.lg,
         borderWidth: 1,
         borderColor: theme.colors.divider,
+        overflow: 'hidden',
+        ...theme.elevation.low,
+    },
+    cardExpanded: {
+        borderColor: theme.colors.primary,
     },
     summaryPressable: {
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: theme.borderRadius.lg,
     },
     summaryPressableExpanded: {
         borderBottomLeftRadius: 0,
@@ -30,7 +32,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: theme.spacing.md,
-        padding: theme.spacing.md,
+        padding: theme.spacing.lg,
     },
     summaryMain: {
         flex: 1,
@@ -56,8 +58,9 @@ export const styles = StyleSheet.create({
     details: {
         borderTopWidth: 1,
         borderTopColor: theme.colors.divider,
+        backgroundColor: theme.colors.surfaceMuted,
         gap: theme.spacing.xl,
-        paddingHorizontal: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
         paddingTop: theme.spacing.lg,
         paddingBottom: theme.spacing.lg,
     },
@@ -76,8 +79,9 @@ export const styles = StyleSheet.create({
     },
     tempLabel: {
         alignSelf: 'flex-start',
-        color: theme.colors.primary,
-        borderColor: theme.colors.primary,
+        color: theme.colors.secondary,
+        borderColor: `${theme.colors.secondary}66`,
+        backgroundColor: theme.colors.secondaryMuted,
         borderWidth: 1,
         borderRadius: 999,
         paddingHorizontal: theme.spacing.sm,

@@ -194,7 +194,12 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
         <View style={styles.gapLg}>
             {Object.keys(keys).length > 0 && (
                 <>
-                    <CustomText style={commonStyles.textLabel}>{title}</CustomText>
+                    <View style={styles.sectionHeader}>
+                        <CustomText style={styles.sectionTitle}>{title}</CustomText>
+                        <CustomText style={styles.sectionMeta}>
+                            {multiSelect ? 'Select one or more' : optional ? 'Optional' : 'Required'}
+                        </CustomText>
+                    </View>
                     <KeyList
                         keys={displayedKeys}
                         selectedKeys={[visualSelectedKeys]}
@@ -276,16 +281,41 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
 const styles = StyleSheet.create({
     gapLg: {
         gap: theme.spacing.md,
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surfaceMuted,
+        borderRadius: theme.borderRadius.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: theme.spacing.sm,
+    },
+    sectionTitle: {
+        ...commonStyles.textLabel,
+        color: theme.colors.text,
+        fontSize: 15,
+        fontWeight: '800',
+    },
+    sectionMeta: {
+        color: theme.colors.textMuted,
+        fontSize: 11,
+        lineHeight: 15,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
     },
     viewMoreButton: {
         alignSelf: 'center',
         marginTop: theme.spacing.sm,
         borderWidth: 1,
-        borderColor: theme.colors.primary,
+        borderColor: theme.colors.dividerStrong,
         borderRadius: 999,
         paddingHorizontal: theme.spacing.md,
         paddingVertical: theme.spacing.sm,
-        backgroundColor: `${theme.colors.primary}14`,
+        backgroundColor: theme.colors.surfaceElevated,
     },
     viewMoreText: {
         color: theme.colors.primary,

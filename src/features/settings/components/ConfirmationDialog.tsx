@@ -87,12 +87,12 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         >
             <View style={[commonStyles.modalOverlay]}>
                 <View style={styles.centeringContainer}>
-                    <View style={[styles.modalDialogCenter, { padding: theme.spacing.lg }]}>
+                    <View style={styles.modalDialogCenter}>
                         {/* Warning Icon */}
                         <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
                             <Icon
                                 name={getWarningIcon()}
-                                size={48}
+                                size={30}
                                 color={getWarningColor()}
                             />
                         </View>
@@ -261,11 +261,13 @@ const styles = StyleSheet.create({
     },
     modalDialogCenter: {
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
+        borderRadius: theme.borderRadius.xl,
         padding: theme.spacing.lg,
         ...theme.elevation.high,
         width: '100%',
-        maxWidth: 400,
+        maxWidth: 420,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
         alignSelf: 'center',
     },
     modalButtonsContainer: {

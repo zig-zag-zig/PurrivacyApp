@@ -5,7 +5,7 @@ import { CustomText } from '../CustomText';
 import { theme } from '../../styles/theme';
 
 const LABEL_LEFT = theme.spacing.md;
-const LABEL_GAP_PADDING = theme.spacing.sm;
+const LABEL_GAP_PADDING = 6;
 const LABEL_LINE_HEIGHT = 18;
 const LABEL_BORDER_CROSSING_Y = 9;
 
@@ -75,7 +75,8 @@ const styles = StyleSheet.create({
         elevation: 6,
         fontSize: theme.typography.caption.fontSize,
         lineHeight: LABEL_LINE_HEIGHT,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
     labelBackplate: {
         position: 'absolute',

@@ -9,6 +9,8 @@ type DropdownSelectProps = {
     onSelect: (idx: number) => void;
     onClose?: () => void;
     destructiveIndex?: number;
+    selectedIndex?: number;
+    integrated?: boolean;
     style?: any;
 };
 
@@ -18,15 +20,16 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
     onSelect,
     onClose,
     destructiveIndex,
+    selectedIndex,
+    integrated = false,
     style,
 }) => {
     if (!visible) return null;
 
     const dropdownStyle = {
-        backgroundColor: theme.colors.surface,
-        borderWidth: 2,
-        borderTopWidth: 0,
-        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surfaceElevated,
+        borderWidth: 1,
+        borderColor: theme.colors.dividerStrong,
         ...theme.elevation.high,
         position: 'absolute' as const,
         zIndex: 9999,
@@ -35,8 +38,10 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
         top: '100%',
         borderBottomLeftRadius: theme.borderRadius.md,
         borderBottomRightRadius: theme.borderRadius.md,
-        borderTopLeftRadius: theme.borderRadius.md,
-        borderTopRightRadius: theme.borderRadius.md,
+        borderTopLeftRadius: integrated ? 0 : theme.borderRadius.md,
+        borderTopRightRadius: integrated ? 0 : theme.borderRadius.md,
+        marginTop: integrated ? -1 : theme.spacing.xs,
+        overflow: 'hidden' as const,
     };
 
     return (
@@ -53,17 +58,22 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
                         hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
                         style={[
                             styles.option,
+                            idx === selectedIndex && styles.selectedOption,
                             idx === destructiveIndex && styles.destructiveOption,
                         ]}
                     >
                         <CustomText
                             style={[
                                 styles.optionText,
+                                idx === selectedIndex && styles.selectedText,
                                 idx === destructiveIndex && styles.destructiveText,
                             ]}
                         >
                             {option}
                         </CustomText>
+                        {idx === selectedIndex ? (
+                            <View style={styles.selectedIndicator} />
+                        ) : null}
                     </TouchableOpacity>
                 ))}
             </ScrollView>
@@ -77,13 +87,30 @@ const styles = StyleSheet.create({
     },
     option: {
         paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
+        paddingVertical: 13,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.divider,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
     },
     optionText: {
         fontSize: 16,
         color: theme.colors.text,
+    },
+    selectedOption: {
+        backgroundColor: theme.colors.primaryMuted,
+    },
+    selectedText: {
+        color: theme.colors.primaryStrong,
+        fontWeight: '700',
+    },
+    selectedIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        backgroundColor: theme.colors.secondary,
+        marginLeft: theme.spacing.md,
     },
     destructiveOption: {
         backgroundColor: theme.colors.error + '22',

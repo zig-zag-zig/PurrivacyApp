@@ -22,13 +22,13 @@ export const SwitchRow = ({
     style,
     value,
 }: SwitchRowProps) => (
-    <View style={[styles.row, style]}>
+    <View style={[styles.row, disabled && styles.rowDisabled, style]}>
         <Switch
             value={value}
             onValueChange={disabled ? undefined : onValueChange}
             disabled={disabled}
-            trackColor={{ false: theme.colors.divider, true: theme.colors.primary }}
-            thumbColor={theme.colors.surface}
+            trackColor={{ false: theme.colors.dividerStrong, true: theme.colors.primary }}
+            thumbColor={value ? theme.colors.text : theme.colors.textMuted}
             style={styles.switch}
         />
         <CustomText style={[
@@ -49,7 +49,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         marginBottom: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surfaceMuted,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+    },
+    rowDisabled: {
+        opacity: 0.58,
     },
     switch: {
         marginRight: theme.spacing.sm,

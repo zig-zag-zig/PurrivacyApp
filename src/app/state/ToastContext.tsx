@@ -28,7 +28,7 @@ const ToastCard = ({ text1, onPress, tone, iconName }: any) => (
     <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.9}
-        style={[styles.toast, { borderLeftColor: tone }]}
+        style={[styles.toast, { borderColor: `${tone}77` }]}
     >
         <View style={[styles.iconContainer, { backgroundColor: `${tone}22` }]}>
             <Icon name={iconName} size={20} color={tone} />
@@ -74,20 +74,18 @@ const styles = StyleSheet.create({
         maxWidth: 560,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        backgroundColor: theme.colors.surfaceElevated,
         borderWidth: 1,
-        borderColor: theme.colors.divider,
-        borderLeftWidth: 4,
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'center',
         gap: theme.spacing.sm,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 6,
+        shadowOpacity: 0.32,
+        shadowRadius: 14,
+        elevation: 10,
     },
     iconContainer: {
         width: 32,

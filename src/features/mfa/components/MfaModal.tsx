@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { useToast } from '../../../app/state/ToastContext';
 import { Button } from '../../../components/Button';
@@ -38,6 +38,10 @@ export const MfaModal: React.FC<MfaModalProps> = ({
     const [isRecoveryCode, setIsRecoveryCode] = useState(false);
     const [loading, setLoading] = useState(false);
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+    // Remembers the box the user tapped while the keyboard is re-shown, so
+    // the highlight survives the blur() → focus() cycle Android needs to
+    // bring the IME back after it was dismissed.
+    const pendingFocusIndexRef = useRef<number | null>(null);
     const { showToast } = useToast();
     const {
         totpInputRef,
@@ -49,6 +53,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
 
     // Clear code and reset state
     const clearCode = useCallback(() => {
+        pendingFocusIndexRef.current = null;
         setTotpCode(Array(TOTP_LENGTH).fill(''));
         setRecoveryCode('');
         setLoading(false);
@@ -108,6 +113,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
     const handlePaste = useCallback(async () => {
         const pastedCode = await pasteFromClipboard();
         if (pastedCode.length > 0) {
+            pendingFocusIndexRef.current = TOTP_LENGTH - 1;
             setTotpCode(pastedCode);
             setFocusedIndex(TOTP_LENGTH - 1);
             focusInput();
@@ -153,11 +159,35 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                             inputRef={totpInputRef}
                             testID="purrivacy.mfa.code.input"
                             onChangeText={(text) =>
-                                handleTotpChangeText(text, setTotpCode, setFocusedIndex)
+                                handleTotpChangeText(
+                                    text,
+                                    totpCode,
+                                    focusedIndex ?? 0,
+                                    setTotpCode,
+                                    setFocusedIndex,
+                                )
                             }
-                            onFocus={() => setFocusedIndex((index) => index ?? 0)}
-                            onBlur={() => setFocusedIndex(null)}
+                            onFocus={() => {
+                                setFocusedIndex((index) => {
+                                    if (index !== null) {
+                                        return index;
+                                    }
+                                    const pending = pendingFocusIndexRef.current;
+                                    pendingFocusIndexRef.current = null;
+                                    return pending ?? 0;
+                                });
+                            }}
+                            onBlur={() => {
+                                // A blur() during the keyboard-reopen cycle
+                                // must not clear the highlight; otherwise the
+                                // tapped box's border flickers off and on.
+                                if (pendingFocusIndexRef.current !== null) {
+                                    return;
+                                }
+                                setFocusedIndex(null);
+                            }}
                             onBoxPress={(index) => {
+                                pendingFocusIndexRef.current = index;
                                 setFocusedIndex(index);
                                 focusInput();
                             }}

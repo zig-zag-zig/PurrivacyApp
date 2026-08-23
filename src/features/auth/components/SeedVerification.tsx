@@ -254,6 +254,12 @@ const SeedVerificationChallenge: React.FC<SeedVerificationChallengeProps> = ({
 const styles = StyleSheet.create({
     panel: {
         gap: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        padding: theme.spacing.lg,
+        ...theme.elevation.low,
     },
     title: {
         textAlign: 'center',
@@ -269,10 +275,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: theme.spacing.sm,
         borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.background,
+        backgroundColor: theme.colors.surfaceMuted,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
     },
     seedGridCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
     },
     seedWord: {
         flexDirection: 'row',
@@ -284,7 +293,7 @@ const styles = StyleSheet.create({
         borderColor: theme.colors.divider,
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: theme.spacing.sm,
-        backgroundColor: theme.colors.surface,
+        backgroundColor: theme.colors.surfaceElevated,
     },
     seedIndex: {
         color: theme.colors.primary,

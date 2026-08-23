@@ -19,12 +19,28 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
 }) => {
     const recoveryInputRef = useRef<TextInput | null>(null);
     const [isFocused, setIsFocused] = useState(false);
+    const previousValueRef = useRef(value);
 
     useEffect(() => {
         setTimeout(() => {
             recoveryInputRef.current?.focus();
         }, 100);
     }, []);
+
+    // A rejected code clears the field. Re-focus it exactly like on first
+    // open so the caret returns to the original empty-field position (the
+    // center of the centered field) instead of lingering at the old spot.
+    useEffect(() => {
+        const wasCleared = value.length === 0 && previousValueRef.current.length > 0;
+        previousValueRef.current = value;
+        if (wasCleared) {
+            const input = recoveryInputRef.current;
+            if (input) {
+                input.blur();
+                setTimeout(() => input.focus(), 80);
+            }
+        }
+    }, [value]);
 
     const handleChange = (text: string) => {
         const allowedText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -99,12 +115,6 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     returnKeyType="done"
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    // After a programmatic clear (e.g. a rejected code) the
-                    // internal cursor stays at the previous end position and
-                    // renders at the edge of the centered, empty field. Pin
-                    // the selection to the start while the field is empty so
-                    // the caret sits where typing will land.
-                    selection={value.length === 0 ? { start: 0, end: 0 } : undefined}
                 />
             </View>
             <CustomText style={styles.charCount}>

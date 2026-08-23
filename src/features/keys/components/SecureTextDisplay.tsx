@@ -52,7 +52,7 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
     }, [revealTimeout]);
 
     return (
-        <View style={[commonStyles.row, commonStyles.spaceBetween, commonStyles.surface, styles.container, style]}>
+        <View style={[commonStyles.row, commonStyles.spaceBetween, styles.container, style]}>
             {onChangeText ? (
                 <>
                     {/* iOS HEURISTIC DECOY: Absorbs Apple's autofill grouping for secure editable fields */}
@@ -111,8 +111,11 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        padding: theme.spacing.sm,
+        padding: theme.spacing.md,
         borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surfaceMuted,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
     },
     iconButton: commonStyles.iconButton,
 });

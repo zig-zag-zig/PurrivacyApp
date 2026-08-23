@@ -6,6 +6,7 @@ import { Button } from '../../../components/Button';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
@@ -34,6 +35,13 @@ export const EncryptScreen = () => {
 
   return (
     <ScreenContainer ref={scrollRef} testID="purrivacy.encrypt.screen">
+      <AppScreenHeader
+        eyebrow="Compose securely"
+        icon="lock-plus-outline"
+        title="Encrypt a message"
+        subtitle="Choose who can read it, optionally sign it, then export portable OpenPGP text."
+      />
+
       <InputField
         label="Text to Encrypt"
         testID="purrivacy.encrypt.content"

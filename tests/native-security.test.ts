@@ -14,6 +14,7 @@ interface MainActivityPatchResult {
 const nativeSecurity = require('../scripts/native-security.js') as {
     patchMainActivitySource: (source: string) => MainActivityPatchResult;
     patchAndroidMainActivity: (projectRoot: string, packageName: string) => boolean;
+    shouldApplyAndroidFlagSecure: (appEnv?: string) => boolean;
 };
 
 const UNPATCHED_MAIN_ACTIVITY = `package vip.chi_chi.purrivacy
@@ -57,6 +58,12 @@ class MainActivity : ReactActivity() {
 `;
 
 describe('scripts/native-security.js Android FLAG_SECURE patching', () => {
+    it('keeps FLAG_SECURE enabled except for the isolated local E2E build', () => {
+        expect(nativeSecurity.shouldApplyAndroidFlagSecure('production')).toBe(true);
+        expect(nativeSecurity.shouldApplyAndroidFlagSecure('development')).toBe(true);
+        expect(nativeSecurity.shouldApplyAndroidFlagSecure('e2e-test')).toBe(false);
+    });
+
     it('adds FLAG_SECURE and the WindowManager import to an unpatched MainActivity', () => {
         const result = nativeSecurity.patchMainActivitySource(UNPATCHED_MAIN_ACTIVITY);
 

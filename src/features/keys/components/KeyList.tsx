@@ -15,8 +15,6 @@ interface KeyListProps {
     testIDPrefix?: string;
 }
 
-
-
 export const KeyList: React.FC<KeyListProps> = ({
     keys,
     selectedKeys,
@@ -61,22 +59,22 @@ export const KeyList: React.FC<KeyListProps> = ({
                             onLongPress={() => onLongPressKey && onLongPressKey(key)}
                             activeOpacity={0.78}
                         >
-                            {renderExtra ? renderExtra(key)
-                                : <View style={styles.keyLabelContainer}>
-                                    <CustomText
-                                        style={styles.keyLabel}
-                                    >
+                            {renderExtra ? renderExtra(key) : (
+                                <View style={styles.keyLabelContainer}>
+                                    <View style={[styles.keyDot, selected && styles.keyDotSelected]} />
+                                    <CustomText style={styles.keyLabel}>
                                         {displayName || key.userId.trim() || 'Unnamed Key'}
                                     </CustomText>
                                     {key.isDefault && (
                                         <Icon
                                             name="star"
                                             size={15}
-                                            color={selected ? '#E9D7FF' : theme.colors.primary}
+                                            color={selected ? theme.colors.secondary : theme.colors.primaryStrong}
                                             style={styles.defaultStar}
                                         />
                                     )}
-                                </View>}
+                                </View>
+                            )}
                         </TouchableOpacity>
                     </View>
                 );
@@ -103,11 +101,11 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     keyItem: {
-        borderRadius: 999,
+        borderRadius: theme.borderRadius.pill,
         borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        minHeight: 34,
+        paddingHorizontal: 13,
+        paddingVertical: 9,
+        minHeight: 40,
         maxWidth: '100%',
         justifyContent: 'center',
     },
@@ -119,43 +117,48 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     keyItemIdle: {
-        backgroundColor: '#342F3D',
-        borderColor: '#6B5D7A',
+        backgroundColor: theme.colors.surfaceElevated,
+        borderColor: theme.colors.dividerStrong,
     },
     keyItemSelected: {
-        backgroundColor: '#553874',
-        borderColor: '#D2A8FF',
-        shadowColor: theme.colors.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 6,
-        elevation: 2,
-    },
-    detailItemIdle: {
-        backgroundColor: '#24212D',
-        borderColor: '#6F6080',
-    },
-    detailItemSelected: {
-        backgroundColor: '#5A3478',
-        borderColor: '#D1A8FF',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
         shadowColor: theme.colors.primary,
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.28,
+        shadowOpacity: 0.22,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 3,
+    },
+    detailItemIdle: {
+        backgroundColor: theme.colors.surface,
+        borderColor: theme.colors.divider,
+    },
+    detailItemSelected: {
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
+        ...theme.elevation.glow,
     },
     keyLabelContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'nowrap',
         justifyContent: 'center',
-        gap: 5,
+        gap: 7,
         minWidth: 0,
         maxWidth: '100%',
     },
+    keyDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 999,
+        backgroundColor: theme.colors.textMuted,
+    },
+    keyDotSelected: {
+        backgroundColor: theme.colors.secondary,
+    },
     keyLabel: {
         color: theme.colors.text,
-        fontWeight: '600',
+        fontWeight: '700',
         fontSize: 13,
         lineHeight: 17,
         flexShrink: 1,

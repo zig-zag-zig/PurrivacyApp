@@ -8,6 +8,7 @@ import { Button } from '../../../components/Button';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
@@ -36,6 +37,13 @@ export const DecryptScreen = () => {
 
   return (
     <ScreenContainer ref={scrollRef} testID="purrivacy.decrypt.screen">
+      <AppScreenHeader
+        eyebrow="Reveal safely"
+        icon="lock-open-check-outline"
+        title="Decrypt a message"
+        subtitle="Open encrypted content locally and verify who signed it when a sender key is available."
+      />
+
       <AutofillDisabledView style={styles.autofillScope}>
         <InputField
           label="Encrypted Content"

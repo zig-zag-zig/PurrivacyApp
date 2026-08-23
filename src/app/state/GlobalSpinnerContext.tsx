@@ -77,7 +77,9 @@ export const GlobalSpinnerProvider: React.FC<GlobalSpinnerProviderProps> = ({ ch
                             !hasOpaqueSource && styles.overlayTransparent,
                         ]}
                     >
-                        <Spinner visible size="large" />
+                        <View style={styles.spinnerCard}>
+                            <Spinner visible size="large" />
+                        </View>
                     </View>
                 ) : null}
             </View>
@@ -127,6 +129,17 @@ const styles = StyleSheet.create({
         zIndex: 20000,
     },
     overlayTransparent: {
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backgroundColor: theme.colors.overlay,
+    },
+    spinnerCard: {
+        width: 72,
+        height: 72,
+        borderRadius: theme.borderRadius.lg,
+        backgroundColor: theme.colors.surfaceElevated,
+        borderWidth: 1,
+        borderColor: theme.colors.dividerStrong,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...theme.elevation.high,
     },
 });

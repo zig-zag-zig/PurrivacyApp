@@ -4,7 +4,7 @@ import { getUserId } from '../../auth/domain/authUtils';
 import { RequestOptions } from '../../../api/requestHelpers';
 import { EventService } from '../../../services/eventService';
 import { AuthFlowError } from '../../../api/auth/authFlowError';
-import { isWrongMfaCode } from '../../../shared/errors/errorGuards';
+import { isRecord, isWrongMfaCode } from '../../../shared/errors/errorGuards';
 // Track if we're already in an MFA handler to prevent recursive calls
 let isInMfaHandler = false;
 const MFA_SUBMISSION_TIMEOUT_MS = 45_000;
@@ -27,6 +27,24 @@ const withMfaSubmissionTimeout = async <T>(submission: Promise<T>): Promise<T> =
         }
     }
 };
+
+/**
+ * True when a code submission was rejected as an unusable code shape (HTTP
+ * 400) during a sensitive flow — e.g. entering a recovery code in the
+ * TOTP-only MFA-enable verification. The server message explains the problem;
+ * the modal must stay open so the user can retry with a valid code.
+ */
+const isBadCodeSubmissionError = (error: unknown, isSensitive: boolean): boolean => {
+    if (!isSensitive) {
+        return false;
+    }
+    const rec = isRecord(error) ? error : null;
+    return rec?.status === 400;
+};
+
+const getErrorMessage = (error: unknown): string | undefined => (
+    isRecord(error) && typeof error.message === 'string' ? error.message : undefined
+);
 
 /**
  * Common MFA handler logic that can be shared between different MFA error types
@@ -99,8 +117,11 @@ export class MfaUtils {
 
                     return await submitWithRetry(result.code);
                 } catch (error: any) {
-                    if (isWrongMfaCode(error)) {
-                        EventService.addEvent('clearMfaCode', { isWrongMfaCode: true });
+                    if (isWrongMfaCode(error) || isBadCodeSubmissionError(error, params.isSensitive)) {
+                        EventService.addEvent('clearMfaCode', {
+                            isWrongMfaCode: true,
+                            message: isWrongMfaCode(error) ? undefined : getErrorMessage(error),
+                        });
                         continue;
                     }
 

@@ -40,7 +40,7 @@ const navigationTheme = {
         ...DarkTheme.colors,
         primary: theme.colors.primary,
         background: theme.colors.background,
-        card: theme.colors.background,
+        card: theme.colors.backgroundElevated,
         text: theme.colors.text,
         border: theme.colors.divider,
         notification: theme.colors.primary,

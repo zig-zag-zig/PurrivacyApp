@@ -4,7 +4,7 @@ import type { MfaState } from '../features/mfa/model/mfaTypes';
 // Payloads are narrowed per event via AppEventPayloadMap below.
 
 export type AppEventPayloadMap = {
-    clearMfaCode: { isWrongMfaCode?: boolean } | undefined;
+    clearMfaCode: { isWrongMfaCode?: boolean; message?: string } | undefined;
     closeMfaModal: { delayMs?: number; force?: boolean } | undefined;
     devTempKeys: undefined;
     mfaState: { mfaState: MfaState; source?: 'remoteNotification' };

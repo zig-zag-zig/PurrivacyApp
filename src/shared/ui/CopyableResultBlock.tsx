@@ -3,6 +3,7 @@ import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-
 
 import { CustomText } from '../../components/CustomText';
 import { commonStyles } from '../../styles/commonStyles';
+import { theme } from '../../styles/theme';
 
 type CopyableResultBlockProps = {
     children: React.ReactNode;
@@ -43,6 +44,7 @@ export const CopyableResultBlock = ({
 
 const styles = StyleSheet.create({
     resultContentCopied: {
-        backgroundColor: 'rgba(187, 134, 252, 0.12)',
+        backgroundColor: theme.colors.primaryMuted,
+        borderColor: theme.colors.primary,
     },
 });
