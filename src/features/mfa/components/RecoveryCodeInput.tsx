@@ -20,25 +20,24 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
     const recoveryInputRef = useRef<TextInput | null>(null);
     const [isFocused, setIsFocused] = useState(false);
     const previousValueRef = useRef(value);
+    // Bumped when the field is programmatically cleared (a rejected code):
+    // remounting the TextInput rebuilds its native state, so the caret
+    // returns to the centered position of the fresh empty field instead of
+    // staying pinned at the old selection (Android preserves an EditText's
+    // selection across blur()/focus(), so re-focusing alone cannot move it).
+    const [resetKey, setResetKey] = useState(0);
 
     useEffect(() => {
         setTimeout(() => {
             recoveryInputRef.current?.focus();
         }, 100);
-    }, []);
+    }, [resetKey]);
 
-    // A rejected code clears the field. Re-focus it exactly like on first
-    // open so the caret returns to the original empty-field position (the
-    // center of the centered field) instead of lingering at the old spot.
     useEffect(() => {
         const wasCleared = value.length === 0 && previousValueRef.current.length > 0;
         previousValueRef.current = value;
         if (wasCleared) {
-            const input = recoveryInputRef.current;
-            if (input) {
-                input.blur();
-                setTimeout(() => input.focus(), 80);
-            }
+            setResetKey((key) => key + 1);
         }
     }, [value]);
 
@@ -94,6 +93,7 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     Recovery code
                 </CustomText>
                 <TextInput
+                    key={`recovery-code-${resetKey}`}
                     ref={recoveryInputRef}
                     autoComplete="off"
                     cursorColor={theme.colors.primary}

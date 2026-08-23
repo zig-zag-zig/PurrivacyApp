@@ -42,6 +42,9 @@ export const MfaModal: React.FC<MfaModalProps> = ({
     // the highlight survives the blur() → focus() cycle Android needs to
     // bring the IME back after it was dismissed.
     const pendingFocusIndexRef = useRef<number | null>(null);
+    // Set on touches that land inside the TOTP box area, so the modal-level
+    // outside-tap handler knows the touch was on a box and skips blurring.
+    const totpTouchInsideRef = useRef(false);
     const { showToast } = useToast();
     const {
         totpInputRef,
@@ -122,6 +125,21 @@ export const MfaModal: React.FC<MfaModalProps> = ({
 
     const showRecoveryCodeOption = isSensitive || isLoginFlow;
 
+    // Tap outside the TOTP boxes: drop focus like a regular input field
+    // (clears the box highlight and dismisses the keyboard).
+    const handleContentTouchStart = useCallback(() => {
+        if (totpTouchInsideRef.current) {
+            totpTouchInsideRef.current = false;
+            return;
+        }
+        if (isRecoveryCode) {
+            return;
+        }
+        pendingFocusIndexRef.current = null;
+        setFocusedIndex(null);
+        totpInputRef.current?.blur();
+    }, [isRecoveryCode, setFocusedIndex, totpInputRef]);
+
     return (
         <Modal
             transparent={false}
@@ -138,6 +156,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                         { paddingTop: Math.max(theme.spacing.xl, insets.top + theme.spacing.lg) },
                     ]}
                 >
+                    <View onTouchStart={handleContentTouchStart} style={styles.contentTouchArea}>
                     <CustomText style={styles.mfaModalMessage}>
                         {message || (isRecoveryCode
                             ? 'Enter your 12‑character alphanumeric recovery code'
@@ -192,6 +211,9 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                                 focusInput();
                             }}
                             onLongPress={handlePaste}
+                            onTouchStart={() => {
+                                totpTouchInsideRef.current = true;
+                            }}
                         />
                     )}
 
@@ -204,6 +226,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
                             disabled={loading}
                         />
                     )}
+                    </View>
                 </ScreenContainer>
             </View>
             <ModalToastHost />
@@ -218,6 +241,9 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         paddingBottom: theme.spacing.xl,
+    },
+    contentTouchArea: {
+        flex: 1,
     },
     mfaModalMessage: {
         fontSize: 16,

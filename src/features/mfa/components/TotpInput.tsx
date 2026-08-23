@@ -12,6 +12,7 @@ interface TotpInputProps {
     onBlur: () => void;
     onBoxPress: (index: number) => void;
     onLongPress: () => void;
+    onTouchStart?: () => void;
     testID?: string;
 }
 
@@ -25,10 +26,11 @@ export const TotpInput: React.FC<TotpInputProps> = ({
     onBlur,
     onBoxPress,
     onLongPress,
+    onTouchStart,
     testID,
 }) => {
     return (
-        <View style={styles.codeInputHost}>
+        <View style={styles.codeInputHost} onTouchStart={onTouchStart}>
             <TextInput
                 ref={inputRef}
                 testID={testID}
