@@ -1,8 +1,8 @@
 services:
   purrivacy:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/server/Dockerfile
       target: build
     command: npx tsx watch src/server.ts
     init: true
@@ -10,11 +10,13 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    working_dir: /repo/apps/server
     volumes:
-      - ./src:/app/src
-      - ./package.json:/app/package.json
-      - ./tsconfig.json:/app/tsconfig.json
-      - ./tsconfig.jest.json:/app/tsconfig.jest.json
+      - ./src:/repo/apps/server/src
+      - ./package.json:/repo/apps/server/package.json
+      - ./tsconfig.json:/repo/apps/server/tsconfig.json
+      - ./tsconfig.jest.json:/repo/apps/server/tsconfig.jest.json
+      - ../../packages/shared/src:/repo/packages/shared/src
       - ${PURRIVACY_SECRETS_DIR:-./secrets/local}:/var/purrivacy/secrets:ro
     mem_limit: 512m
     memswap_limit: 640m

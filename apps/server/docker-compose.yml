@@ -10,8 +10,8 @@ x-purrivacy-logging: &purrivacy-logging
 services:
   purrivacy:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/server/Dockerfile
     image: ${PURRIVACY_IMAGE:-purrivacy:local}
     restart: unless-stopped
     init: true

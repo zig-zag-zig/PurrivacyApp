@@ -276,12 +276,12 @@ sync_repo() {
 
 ensure_runtime_files() {
   local owner="$APP_USER:$APP_USER"
-  local env_file="$APP_DIR/.env.prod"
-  local secrets_dir="$APP_DIR/secrets/prod"
+  local env_file="$APP_DIR/apps/server/.env.prod"
+  local secrets_dir="$APP_DIR/apps/server/secrets/prod"
   local env_source="$SECRETS_SOURCE_DIR/.env.prod"
   local firebase_source="$SECRETS_SOURCE_DIR/firebase-service-account.json"
 
-  install -d -m 0755 -o "$APP_USER" -g "$APP_USER" "$APP_DIR/secrets" "$secrets_dir"
+  install -d -m 0755 -o "$APP_USER" -g "$APP_USER" "$APP_DIR/apps/server/secrets" "$secrets_dir"
 
   if [[ ! -f "$env_source" && -f "$SECRETS_SOURCE_DIR/.env" ]]; then
     env_source="$SECRETS_SOURCE_DIR/.env"
@@ -310,13 +310,13 @@ ensure_runtime_files() {
   replace_or_append_env "$env_file" NODE_ENV production
   replace_or_append_env "$env_file" GOOGLE_APPLICATION_CREDENTIALS /var/purrivacy/secrets/firebase-service-account.json
 
-  chmod 0755 "$APP_DIR/secrets" "$secrets_dir" 2>/dev/null || true
+  chmod 0755 "$APP_DIR/apps/server/secrets" "$secrets_dir" 2>/dev/null || true
   chmod 0644 "$secrets_dir/firebase-service-account.json" 2>/dev/null || true
-  chown -R "$owner" "$APP_DIR/secrets" || true
+  chown -R "$owner" "$APP_DIR/apps/server/secrets" || true
 }
 
 validate_runtime_files() {
-  local env_file="$APP_DIR/.env.prod"
+  local env_file="$APP_DIR/apps/server/.env.prod"
   local firebase_path
   local firebase_json
   local mfa_kek
@@ -347,8 +347,8 @@ validate_runtime_files() {
       exit 1
     fi
 
-    if [[ ! -f "$APP_DIR/secrets/prod/firebase-service-account.json" ]]; then
-      err "Missing Firebase service account: $APP_DIR/secrets/prod/firebase-service-account.json"
+    if [ ! -f "$APP_DIR/apps/server/secrets/prod/firebase-service-account.json" ]; then
+      err "Missing Firebase service account: $APP_DIR/apps/server/secrets/prod/firebase-service-account.json"
       exit 1
     fi
   fi
@@ -375,9 +375,9 @@ docker_registry_login() {
 }
 
 compose_cmd() {
-  local files=("-f" "$APP_DIR/docker-compose.yml")
-  if [[ -f "$APP_DIR/docker-compose.shared-redis.yml" ]]; then
-    files+=("-f" "$APP_DIR/docker-compose.shared-redis.yml")
+  local files=("-f" "$APP_DIR/apps/server/docker-compose.yml")
+  if [[ -f "$APP_DIR/apps/server/docker-compose.shared-redis.yml" ]]; then
+    files+=("-f" "$APP_DIR/apps/server/docker-compose.shared-redis.yml")
   fi
   run_as_app_user docker compose -p "$COMPOSE_PROJECT" --env-file "$APP_DIR/.env.prod" "${files[@]}" "$@"
 }
@@ -388,8 +388,8 @@ compose_cmd() {
 # is regenerated every deploy and removed when no longer applicable, so the
 # attachment can never silently rot.
 ensure_shared_redis_network() {
-  local env_file="$APP_DIR/.env.prod"
-  local override_file="$APP_DIR/docker-compose.shared-redis.yml"
+  local env_file="$APP_DIR/apps/server/.env.prod"
+  local override_file="$APP_DIR/apps/server/docker-compose.shared-redis.yml"
   local store network
 
   store="$(read_env_value "$env_file" RATE_LIMIT_STORE)"
@@ -437,7 +437,7 @@ EOF_OVERRIDE
 # real connectivity from inside the container so a bad REDIS_URL or network
 # attachment fails the deploy loudly instead of degrading production.
 verify_redis_connectivity() {
-  local env_file="$APP_DIR/.env.prod"
+  local env_file="$APP_DIR/apps/server/.env.prod"
   local store
 
   store="$(read_env_value "$env_file" RATE_LIMIT_STORE)"
