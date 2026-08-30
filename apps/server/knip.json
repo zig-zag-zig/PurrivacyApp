@@ -20,5 +20,8 @@
         "src/infrastructure/firebase/chunkedWrites.ts": [
             "exports"
         ]
-    }
+    },
+    "ignoreDependencies": [
+        "@purrivacy/shared"
+    ]
 }
