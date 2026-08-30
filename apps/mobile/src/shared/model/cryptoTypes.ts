@@ -1,4 +1,5 @@
-export type { EncryptedPayload } from '@purrivacy/shared';
+import type { EncryptedPayload } from '@purrivacy/shared';
+export type { EncryptedPayload };
 
 export type EncryptionBase = EncryptedPayload;
 

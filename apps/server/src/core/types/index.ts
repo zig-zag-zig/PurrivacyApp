@@ -1,4 +1,5 @@
-export type { EncryptedPayload, SaltedEncryptedPayload } from '@purrivacy/shared';
+import type { EncryptedPayload, SaltedEncryptedPayload } from '@purrivacy/shared';
+export type { EncryptedPayload, SaltedEncryptedPayload };
 
 export interface UserEncryptedData {
     dekPassword: SaltedEncryptedPayload;
@@ -37,16 +38,6 @@ export interface UserMfaSecurity {
     mfaSecretIv: string;
     mfaSecretTag: string;
     mfaRecoveryCodes: string[]; // Array of hashed recovery codes
-}
-
-export interface SaltedEncryptedPayload extends EncryptedPayload {
-    salt: string;
-}
-
-export interface EncryptedPayload {
-    encryptedData: string;
-    iv: string;
-    tag: string;
 }
 
 export interface SessionTrustRequest {
