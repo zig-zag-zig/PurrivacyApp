@@ -1,0 +1,10 @@
+{
+  "version": "1.1.0",
+  "tagName": "v1.1.0",
+  "apkAssetName": "Purrivacy.apk",
+  "apkUrl": "https://github.com/zig-zag-zig/PurrivacyApp/releases/download/v1.1.0/Purrivacy.apk",
+  "apkSizeBytes": 123206438,
+  "apkSha256": "327eaec19244b258ba0fdbf63941a62f893169346d7387ee69b648cd3cd557a0",
+  "createdAt": "2026-08-20T19:35:24.380Z",
+  "signature": "3046022100c5d96f4ab740b1e7fc833d59a9d40a7e2740be947c0d162f51a9c3b549285499022100c6aec5f025137678d07065ce3e7a1baf5741c562d010c931416b367e8a850905"
+}

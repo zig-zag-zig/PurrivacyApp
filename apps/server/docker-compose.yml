@@ -1,0 +1,49 @@
+name: ${COMPOSE_PROJECT_NAME:-purrivacy}
+
+x-purrivacy-logging: &purrivacy-logging
+  driver: local
+  options:
+    max-size: ${PURRIVACY_LOG_MAX_SIZE:-2m}
+    max-file: ${PURRIVACY_LOG_MAX_FILE:-30}
+    compress: ${PURRIVACY_LOG_COMPRESS:-true}
+
+services:
+  purrivacy:
+    build:
+      context: ../..
+      dockerfile: apps/server/Dockerfile
+    image: ${PURRIVACY_IMAGE:-purrivacy:local}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *purrivacy-logging
+    mem_limit: ${PURRIVACY_MEMORY_LIMIT:-256m}
+    memswap_limit: ${PURRIVACY_MEMORY_SWAP_LIMIT:-384m}
+    mem_reservation: ${PURRIVACY_MEMORY_RESERVATION:-64m}
+    cpus: ${PURRIVACY_CPUS:-0.5}
+    pids_limit: ${PURRIVACY_PIDS_LIMIT:-128}
+    env_file:
+      - ${PURRIVACY_ENV_FILE:-.env}
+    environment:
+      PORT: ${PORT:-3002}
+      NODE_OPTIONS: ${PURRIVACY_NODE_OPTIONS:---max-old-space-size=128}
+    ports:
+      - "${PURRIVACY_HOST_BIND_ADDRESS:-127.0.0.1}:${PURRIVACY_HOST_PORT:-3002}:${PORT:-3002}"
+    volumes:
+      - ${PURRIVACY_SECRETS_DIR:-./secrets/prod}:/var/purrivacy/secrets:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:' + (process.env.PORT || '3002') + '/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

@@ -1,0 +1,24 @@
+# Compiled JavaScript files
+lib/
+lib-test/
+lib-test-emulator/
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+*.local
+.env
+.env.*
+!.env.example
+!.env*.example
+firebase-debug.log
+firestore-debug.log
+database-debug.log
+ui-debug.log
+secrets/
+service-account*.json
+firebase-service-account*.json
+coverage/
+.pi*

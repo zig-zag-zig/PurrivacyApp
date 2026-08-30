@@ -1,0 +1,12 @@
+process.env.APP_ENV = 'e2e-test';
+process.env.NODE_ENV = 'test';
+process.env.AUTH_EMAIL_DOMAIN = 'purrivacy.test';
+process.env.LOG_LEVEL = 'error';
+process.env.MFA_KEK = '0123456789abcdef'.repeat(4);
+process.env.SENTRY_ENABLED = 'false';
+process.env.FIREBASE_PROJECT_ID = 'demo-purrivacy-e2e';
+process.env.GCLOUD_PROJECT = 'demo-purrivacy-e2e';
+process.env.FIREBASE_DATABASE_URL = 'https://demo-purrivacy-e2e-default-rtdb.firebaseio.com';
+process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+process.env.FIREBASE_DATABASE_EMULATOR_HOST = '127.0.0.1:9000';
