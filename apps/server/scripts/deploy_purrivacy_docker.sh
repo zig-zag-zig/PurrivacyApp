@@ -379,7 +379,7 @@ compose_cmd() {
   if [[ -f "$APP_DIR/apps/server/docker-compose.shared-redis.yml" ]]; then
     files+=("-f" "$APP_DIR/apps/server/docker-compose.shared-redis.yml")
   fi
-  run_as_app_user docker compose -p "$COMPOSE_PROJECT" --env-file "$APP_DIR/.env.prod" "${files[@]}" "$@"
+  run_as_app_user docker compose -p "$COMPOSE_PROJECT" --env-file "$APP_DIR/apps/server/.env.prod" "${files[@]}" "$@"
 }
 
 # When RATE_LIMIT_STORE=redis and PURRIVACY_SHARED_REDIS_NETWORK is set (e.g.
