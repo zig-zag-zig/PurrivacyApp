@@ -1,0 +1,93 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Response shape snapshots error class shapes matches snapshot for AuthError 1`] = `
+{
+  "details": {
+    "mfaRequired": true,
+  },
+  "message": "unauthorized",
+  "name": "AuthError",
+  "statusCode": 403,
+}
+`;
+
+exports[`Response shape snapshots error class shapes matches snapshot for BadRequestError 1`] = `
+{
+  "details": undefined,
+  "message": "test",
+  "name": "BadRequestError",
+  "statusCode": 400,
+}
+`;
+
+exports[`Response shape snapshots error class shapes matches snapshot for ConflictError 1`] = `
+{
+  "details": undefined,
+  "message": "conflict",
+  "name": "ConflictError",
+  "statusCode": 409,
+}
+`;
+
+exports[`Response shape snapshots error class shapes matches snapshot for NotFoundError 1`] = `
+{
+  "details": undefined,
+  "message": "not found",
+  "name": "NotFoundError",
+  "statusCode": 404,
+}
+`;
+
+exports[`Response shape snapshots error class shapes matches snapshot for RateLimitError 1`] = `
+{
+  "details": undefined,
+  "message": "too many",
+  "name": "RateLimitError",
+  "statusCode": 429,
+}
+`;
+
+exports[`Response shape snapshots error responses matches snapshot for bad request (400) 1`] = `
+{
+  "error": "Invalid input",
+}
+`;
+
+exports[`Response shape snapshots error responses matches snapshot for generic error (500) 1`] = `
+{
+  "error": "Something went wrong",
+}
+`;
+
+exports[`Response shape snapshots error responses matches snapshot for no content (204) 1`] = `
+{
+  "body": undefined,
+  "statusCode": 204,
+}
+`;
+
+exports[`Response shape snapshots success responses matches snapshot for simple success 1`] = `
+{
+  "status": "healthy",
+}
+`;
+
+exports[`Response shape snapshots success responses matches snapshot for success with data and status 1`] = `
+{
+  "body": {
+    "id": "abc",
+    "name": "test",
+  },
+  "statusCode": 201,
+}
+`;
+
+exports[`Response shape snapshots success responses matches snapshot for success with recovery codes 1`] = `
+{
+  "mfaTrusted": true,
+  "newRecoveryCodes": [
+    "CODE-A",
+    "CODE-B",
+  ],
+}
+`;

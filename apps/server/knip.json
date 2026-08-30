@@ -1,0 +1,24 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "project": [
+        "src/**/*.ts"
+    ],
+    "entry": [
+        "src/app.ts"
+    ],
+    "ignoreExportsUsedInFile": false,
+    "ignoreIssues": {
+        "src/api/rate-limit/rateLimitStoreFactory.ts": [
+            "exports"
+        ],
+        "src/features/mfa/application/mfaSetupNonce.ts": [
+            "exports"
+        ],
+        "src/features/mfa/application/mfaTransitionStore.ts": [
+            "exports"
+        ],
+        "src/infrastructure/firebase/chunkedWrites.ts": [
+            "exports"
+        ]
+    }
+}

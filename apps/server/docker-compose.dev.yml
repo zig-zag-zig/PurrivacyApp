@@ -1,0 +1,26 @@
+services:
+  purrivacy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    command: npx tsx watch src/server.ts
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.jest.json:/app/tsconfig.jest.json
+      - ${PURRIVACY_SECRETS_DIR:-./secrets/local}:/var/purrivacy/secrets:ro
+    mem_limit: 512m
+    memswap_limit: 640m
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: --max-old-space-size=384
+      PORT: 3002
+    healthcheck:
+      start_period: 30s
