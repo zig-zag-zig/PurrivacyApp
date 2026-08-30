@@ -195,6 +195,9 @@ jobs:
           PURRIVACY_REPO_URL: ${{ vars.PURRIVACY_REPO_URL || format('https://github.com/{0}.git', github.repository) }}
           PURRIVACY_DEPLOY_BRANCH: ${{ github.ref_name }}
           PAWIFY_DEPLOY_IMAGE: ${{ needs.build-test.outputs.image-ref }}
+          PURRIVACY_IMAGE_REGISTRY: ghcr.io
+          PURRIVACY_IMAGE_REGISTRY_USER: ${{ github.actor }}
+          PURRIVACY_IMAGE_REGISTRY_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
 
@@ -226,9 +229,12 @@ jobs:
           remote_branch="$(printf '%q' "$PURRIVACY_DEPLOY_BRANCH")"
           remote_prod_secret_source_dir="$(printf '%q' "/home/$VPS_USER/purrivacy-prod-secrets")"
           remote_deploy_image="$(printf '%q' "$PAWIFY_DEPLOY_IMAGE")"
+          remote_image_registry="$(printf '%q' "ghcr.io")"
+          remote_image_registry_user="$(printf '%q' "$GITHUB_ACTOR")"
+          remote_image_registry_token="$(printf '%q' "${{ github.token }}")"
 
           ssh -p "$VPS_PORT" -i ~/.ssh/purrivacy_deploy_key "$VPS_USER@$VPS_HOST" \
-            "PURRIVACY_REPO_URL=$remote_repo_url PURRIVACY_DEPLOY_BRANCH=$remote_branch PURRIVACY_SECRET_SOURCE_DIR=$remote_prod_secret_source_dir PURRIVACY_DEPLOY_IMAGE=$remote_deploy_image bash -se" <<'REMOTE'
+            "PURRIVACY_REPO_URL=$remote_repo_url PURRIVACY_DEPLOY_BRANCH=$remote_branch PURRIVACY_SECRET_SOURCE_DIR=$remote_prod_secret_source_dir PURRIVACY_DEPLOY_IMAGE=$remote_deploy_image PURRIVACY_IMAGE_REGISTRY=$remote_image_registry PURRIVACY_IMAGE_REGISTRY_USER=$remote_image_registry_user PURRIVACY_IMAGE_REGISTRY_TOKEN=$remote_image_registry_token bash -se" <<'REMOTE'
           set -Eeuo pipefail
 
           if [[ "$PURRIVACY_DEPLOY_BRANCH" != "main" ]]; then
