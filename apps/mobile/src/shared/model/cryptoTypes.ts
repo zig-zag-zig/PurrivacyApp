@@ -1,8 +1,6 @@
-export interface EncryptionBase {
-    encryptedData: string;
-    iv: string;
-    tag: string;
-}
+export type { EncryptedPayload } from '@purrivacy/shared';
+
+export type EncryptionBase = EncryptedPayload;
 
 export interface Encryption extends EncryptionBase {
     salt: string;

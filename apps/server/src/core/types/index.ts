@@ -1,3 +1,5 @@
+export type { EncryptedPayload, SaltedEncryptedPayload } from '@purrivacy/shared';
+
 export interface UserEncryptedData {
     dekPassword: SaltedEncryptedPayload;
     dekSeed: SaltedEncryptedPayload;
