@@ -1,0 +1,29 @@
+{
+    "name": "@purrivacy/shared",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Shared wire-contract types for Purrivacy API (apps/server) and Purrivacy App (apps/mobile): the encrypted payload envelope used across storage and API boundaries.",
+    "license": "0BSD",
+    "type": "commonjs",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "react-native": "src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "react-native": "./src/index.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "src",
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.2"
+    }
+}
