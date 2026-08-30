@@ -1,0 +1,80 @@
+name: Purrivacy Mobile CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: purrivacy-mobile-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: typecheck / tests / release-gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Release gate (APK release only on version bump)
+        id: gate
+        if: github.event_name == 'push'
+        run: |
+          set -Eeuo pipefail
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "Purrivacy releases run from main only." >&2
+            exit 2
+          fi
+
+          version="$(node -p "require('./app.json').expo.version")"
+          last_tag="$(git tag --list 'v*' --sort=-v:refname | head -1 || true)"
+
+          if [[ -n "$last_tag" ]] && [[ "$(git tag --list "v${version}")" ]]; then
+            echo "Version ${version} already released (${last_tag}); skipping release reminder."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version bump detected${last_tag:+: ${last_tag#v} ->}${last_tag:- }${version} — pending APK release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # APKs are built and released locally (keystore never leaves the dev machine):
+      #   cd apps/mobile && npm run build:release
+      #   gh release create v<version> Purrivacy.apk --generate-notes
+      - name: Flag pending APK release
+        if: steps.gate.outputs.should_release == 'true'
+        run: |
+          echo "::warning::Version ${{ steps.gate.outputs.version }} is bumped but no release exists yet."
+          echo "::warning::Build + upload locally: npm run build:release, then gh release create v${{ steps.gate.outputs.version }} <apk> --generate-notes"
