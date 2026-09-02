@@ -15,6 +15,7 @@ import {
   getUpdateStatusPresentation,
   UPDATE_COPY,
 } from '../model/updateCopy';
+import { MarkdownText } from './MarkdownText';
 
 type AppUpdateModalProps = {
   visible: boolean;
@@ -173,7 +174,7 @@ export const AppUpdateModal = ({
                 contentContainerStyle={styles.notesContent}
                 nestedScrollEnabled
               >
-                <CustomText style={styles.notesText}>{release.body}</CustomText>
+                <MarkdownText markdown={release.body} />
               </ScrollView>
             </View>
           ) : null}
