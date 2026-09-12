@@ -15,6 +15,49 @@ interface KeyListProps {
     testIDPrefix?: string;
 }
 
+interface KeyDetailRowProps {
+    keyPair: KeyPair;
+    index: number;
+    selected: boolean;
+    onToggleKey: (key: KeyPair) => void;
+    onLongPressKey?: (key: KeyPair) => void;
+    renderExtra: (key: KeyPair) => React.ReactNode;
+    testIDPrefix?: string;
+}
+
+/**
+ * Full-width detail row used by the virtualized key list (FlatList). Extracted
+ * so the selection modal can render rows lazily through renderItem without
+ * flattening the whole list into a single element.
+ */
+export const KeyDetailRow: React.FC<KeyDetailRowProps> = ({
+    keyPair,
+    index,
+    selected,
+    onToggleKey,
+    onLongPressKey,
+    renderExtra,
+    testIDPrefix,
+}) => (
+    <View style={[styles.keyItemWrapper, styles.detailItemWrapper]}>
+        <TouchableOpacity
+            testID={testIDPrefix ? `${testIDPrefix}.item.${index}` : undefined}
+            style={[
+                styles.detailItem,
+                selected ? styles.detailItemSelected : styles.detailItemIdle,
+            ]}
+            onPressIn={() => Keyboard.dismiss()}
+            onPress={() => {
+                setTimeout(() => onToggleKey(keyPair), 50);
+            }}
+            onLongPress={() => onLongPressKey && onLongPressKey(keyPair)}
+            activeOpacity={0.78}
+        >
+            {renderExtra(keyPair)}
+        </TouchableOpacity>
+    </View>
+);
+
 export const KeyList: React.FC<KeyListProps> = ({
     keys,
     selectedKeys,

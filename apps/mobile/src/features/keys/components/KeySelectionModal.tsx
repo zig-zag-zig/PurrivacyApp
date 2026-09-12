@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity, FlatList, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
@@ -7,7 +7,7 @@ import { CustomText } from '../../../components/CustomText';
 import { ModalToastHost } from '../../../components/ModalToastHost';
 import { theme } from '../../../styles/theme';
 import { KeyPair } from '../../../types/types';
-import { KeyList } from './KeyList';
+import { KeyDetailRow, KeyList } from './KeyList';
 import { KeySelectionDetails } from './keySelectionModal/KeySelectionDetails';
 import { useKeySelectionList } from './keySelectionModal/useKeySelectionList';
 
@@ -174,30 +174,58 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                         </View>
                     )}
 
-                    <ScrollView
-                        style={styles.keyListContainer}
-                        contentContainerStyle={styles.keyListContent}
-                        keyboardShouldPersistTaps="always"
-                    >
-                        {displayKeys.length === 0 ? (
-                            <View style={styles.noResultsContainer}>
-                                <CustomText style={styles.noResultsText}>No keys found</CustomText>
-                            </View>
-                        ) : (
-                            <KeyList
-                                keys={displayKeys}
-                                selectedKeys={[visualSelectedKeys]}
-                                onToggleKey={onToggleKey}
-                                onLongPressKey={onLongPressKey}
-                                renderExtra={searchQuery.trim() ? (key) => (
-                                    <KeySelectionDetails
-                                        keyPair={key}
-                                        selected={Boolean(visualSelectedKeys[key.fingerprint])}
-                                    />
-                                ) : undefined}
-                            />
-                        )}
-                    </ScrollView>
+                    {searchQuery.trim() ? (
+                        // Searching renders full-width detail rows; virtualize them.
+                        <FlatList
+                            style={styles.keyListContainer}
+                            contentContainerStyle={styles.keyListContent}
+                            keyboardShouldPersistTaps="always"
+                            data={displayKeys}
+                            keyExtractor={(key) => key.fingerprint}
+                            ListEmptyComponent={
+                                <View style={styles.noResultsContainer}>
+                                    <CustomText style={styles.noResultsText}>No keys found</CustomText>
+                                </View>
+                            }
+                            renderItem={({ item: key, index }) => (
+                                <KeyDetailRow
+                                    keyPair={key}
+                                    index={index}
+                                    selected={Boolean(visualSelectedKeys[key.fingerprint])}
+                                    onToggleKey={onToggleKey}
+                                    onLongPressKey={onLongPressKey}
+                                    renderExtra={(k) => (
+                                        <KeySelectionDetails
+                                            keyPair={k}
+                                            selected={Boolean(visualSelectedKeys[k.fingerprint])}
+                                        />
+                                    )}
+                                />
+                            )}
+                        />
+                    ) : (
+                        // Default (non-search) view is a wrapped chip cloud; a
+                        // ScrollView is required since flexWrap is not FlatList-
+                        // compatible. Capped by the picker's view-more flow.
+                        <ScrollView
+                            style={styles.keyListContainer}
+                            contentContainerStyle={styles.keyListContent}
+                            keyboardShouldPersistTaps="always"
+                        >
+                            {displayKeys.length === 0 ? (
+                                <View style={styles.noResultsContainer}>
+                                    <CustomText style={styles.noResultsText}>No keys found</CustomText>
+                                </View>
+                            ) : (
+                                <KeyList
+                                    keys={displayKeys}
+                                    selectedKeys={[visualSelectedKeys]}
+                                    onToggleKey={onToggleKey}
+                                    onLongPressKey={onLongPressKey}
+                                />
+                            )}
+                        </ScrollView>
+                    )}
                 </View>
             </View>
             <ModalToastHost />
