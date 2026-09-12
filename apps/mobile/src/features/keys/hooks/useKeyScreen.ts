@@ -8,6 +8,8 @@ import {
   mergeOptimisticKeys,
   sortKeysForView,
 } from '../domain/keyScreenDomain';
+import { filterVaultKeys } from '../domain/keyFilters';
+import type { VaultKeyFilter } from '../domain/keyFilters';
 import type { KeyAction } from '../model/types';
 import { initialKeyScreenState, keyScreenReducer } from '../state/keyScreenReducer';
 import { useImportKeyDefaults } from './useImportKeyDefaults';
@@ -49,6 +51,11 @@ export function useKeyScreen() {
     [visibleKeys, state.optimisticKeys, state.optimisticRemovedFingerprints],
   );
 
+  const filteredKeys = useMemo(
+    () => filterVaultKeys(displayKeys, state.vaultSearchQuery, state.vaultFilter),
+    [displayKeys, state.vaultSearchQuery, state.vaultFilter],
+  );
+
   const keyListExpansion = useKeyListExpansion(state.expandedKeyFingerprint, dispatch);
   const keyOperations = useKeyOperations({
     user,
@@ -73,6 +80,7 @@ export function useKeyScreen() {
     user,
     userDecrypted,
     sortedKeys: displayKeys,
+    filteredKeys,
     scrollRef: keyListExpansion.scrollRef,
     itemRefs: keyListExpansion.itemRefs,
     isResolvingKeys,
@@ -98,6 +106,8 @@ export function useKeyScreen() {
     onChangeExpiration: keyOperations.onChangeExpiration,
     onPickImportFile: keyOperations.onPickImportFile,
     onKeyActionChanged: (keyAction: KeyAction) => dispatch({ type: 'keyActionChanged', keyAction }),
+    onVaultSearchChanged: (vaultSearchQuery: string) => dispatch({ type: 'vaultSearchQueryChanged', vaultSearchQuery }),
+    onVaultFilterChanged: (vaultFilter: VaultKeyFilter) => dispatch({ type: 'vaultFilterChanged', vaultFilter }),
     onImportKeyChanged: (importKey: string) => dispatch({ type: 'importKeyChanged', importKey }),
     onImportPassphraseChanged: (importPassphrase: string) => {
       dispatch({ type: 'importPassphraseChanged', importPassphrase });

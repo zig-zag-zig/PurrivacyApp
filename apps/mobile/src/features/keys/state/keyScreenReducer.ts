@@ -17,7 +17,9 @@ export type KeyScreenAction =
   | { type: 'importFormReset' }
   | { type: 'optimisticKeyAdded'; key: KeyPair }
   | { type: 'optimisticKeyRemoved'; fingerprint: string }
-  | { type: 'optimisticKeysCleared' };
+  | { type: 'optimisticKeysCleared' }
+  | { type: 'vaultSearchQueryChanged'; vaultSearchQuery: string }
+  | { type: 'vaultFilterChanged'; vaultFilter: KeysUiState['vaultFilter'] };
 
 export const initialKeyScreenState: KeysUiState = {
   importKey: '',
@@ -34,6 +36,8 @@ export const initialKeyScreenState: KeysUiState = {
   expandedKeyFingerprint: null,
   optimisticKeys: [],
   optimisticRemovedFingerprints: [],
+  vaultSearchQuery: '',
+  vaultFilter: 'all',
 };
 
 export function keyScreenReducer(state: KeysUiState, action: KeyScreenAction): KeysUiState {
@@ -84,6 +88,10 @@ export function keyScreenReducer(state: KeysUiState, action: KeyScreenAction): K
       return { ...state, formResetKey: state.formResetKey + 1 };
     case 'expandedKeyFingerprintChanged':
       return { ...state, expandedKeyFingerprint: action.expandedKeyFingerprint };
+    case 'vaultSearchQueryChanged':
+      return { ...state, vaultSearchQuery: action.vaultSearchQuery };
+    case 'vaultFilterChanged':
+      return { ...state, vaultFilter: action.vaultFilter };
     case 'importFormReset':
       return {
         ...state,

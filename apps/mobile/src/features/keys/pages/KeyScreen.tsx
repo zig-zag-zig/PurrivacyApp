@@ -14,6 +14,7 @@ import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
 import { KeyItem } from '../components/KeyItem';
+import { VaultFilterBar } from '../components/VaultFilterBar';
 import { PassphraseField } from '../components/PassphraseField';
 import { useKeyScreen } from '../hooks/useKeyScreen';
 import type { KeyAction } from '../model/types';
@@ -67,10 +68,28 @@ export const KeyScreen = () => {
         ref={keyScreen.scrollRef as unknown as Ref<FlatList<KeyPair>>}
         onScroll={keyScreen.onScroll}
         scrollEventThrottle={16}
-        data={keyScreen.sortedKeys}
+        data={keyScreen.filteredKeys}
         keyExtractor={(key) => key.fingerprint}
-        ListHeaderComponent={header}
+        ListHeaderComponent={
+          <>
+            {header}
+            <VaultFilterBar
+              searchQuery={keyScreen.state.vaultSearchQuery}
+              onSearchChange={keyScreen.onVaultSearchChanged}
+              activeFilter={keyScreen.state.vaultFilter}
+              onFilterChange={keyScreen.onVaultFilterChanged}
+              testIDPrefix="purrivacy.key.vault"
+            />
+          </>
+        }
         ListEmptyComponent={
+          keyScreen.sortedKeys.length > 0 ? (
+            // Filtering produced no matches — distinct from the no-keys state.
+            <View style={styles.emptyState}>
+              <Icon name="search-off" size={34} color={theme.colors.primary} />
+              <CustomText style={styles.emptyTitle}>No keys match</CustomText>
+            </View>
+          ) : (
           <View style={styles.emptyState}>
             <Icon name="vpn-key" size={34} color={theme.colors.primary} />
             <CustomText style={styles.emptyTitle}>No keys yet</CustomText>
@@ -92,6 +111,7 @@ export const KeyScreen = () => {
               />
             </View>
           </View>
+          )
         }
         renderItem={({ item: key }) => {
           const expanded = keyScreen.state.expandedKeyFingerprint === key.fingerprint;
