@@ -28,6 +28,11 @@ vi.mock('../../../shared/hooks/useKeyPrerequisiteRedirect', () => ({
 vi.mock('../../../shared/hooks/useResetStateOnBlurSuccess', () => ({
     useResetStateOnBlurSuccess: () => undefined,
 }));
+// useComposeDraft pulls the encrypted sqlite store → expo-crypto →
+// expo-modules-core, which needs the native ExpoGlobal. It is a no-op here.
+vi.mock('../../../shared/hooks/useComposeDraft', () => ({
+    useComposeDraft: () => undefined,
+}));
 vi.mock('../../../services/pgpCryptoService', () => ({
     pgpCryptoService: {
         validatePrivateKeyPassphrase: vi.fn(async () => true),
