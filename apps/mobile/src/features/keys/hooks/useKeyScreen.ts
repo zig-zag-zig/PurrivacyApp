@@ -104,6 +104,7 @@ export function useKeyScreen() {
     onSetDefaultKey: keyOperations.onSetDefaultKey,
     onChangePassphrase: keyOperations.onChangePassphrase,
     onChangeExpiration: keyOperations.onChangeExpiration,
+    onRevokeKey: keyOperations.onRevokeKey,
     onPickImportFile: keyOperations.onPickImportFile,
     onKeyActionChanged: (keyAction: KeyAction) => dispatch({ type: 'keyActionChanged', keyAction }),
     onVaultSearchChanged: (vaultSearchQuery: string) => dispatch({ type: 'vaultSearchQueryChanged', vaultSearchQuery }),

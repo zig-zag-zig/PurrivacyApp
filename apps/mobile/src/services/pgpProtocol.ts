@@ -75,6 +75,25 @@ export interface ExtractPublicKeyRequest {
     privateKey: string;
 }
 
+/** Request payloads for `revokeKey`. */
+export interface RevokeKeyRequest {
+    privateKey: string;
+    passphrase: string;
+}
+
+/** Request payloads for `applyRevocation`. */
+export interface ApplyRevocationRequest {
+    publicKey: string;
+    revocationCertificate: string;
+}
+
+/** Result of `revokeKey`: the revoked pair plus the standalone cert. */
+export interface RevokedKeyResult {
+    privateKey: string;
+    publicKey: string;
+    revocationCertificate: string;
+}
+
 /**
  * Discriminated union of every PGP operation request sent to the WebView.
  * `operation` names the handler branch; `data` is the per-operation payload.
@@ -91,6 +110,8 @@ export interface PgpRequestMap {
     verifyDetachedSignature: { operation: 'verifyDetachedSignature'; data: VerifySignatureRequest };
     validatePrivateKeyPassphrase: { operation: 'validatePrivateKeyPassphrase'; data: ValidatePassphraseRequest };
     extractPublicKeyFromPrivate: { operation: 'extractPublicKeyFromPrivate'; data: ExtractPublicKeyRequest };
+    revokeKey: { operation: 'revokeKey'; data: RevokeKeyRequest };
+    applyRevocation: { operation: 'applyRevocation'; data: ApplyRevocationRequest };
 }
 
 export type PgpOperationName = keyof PgpRequestMap;
@@ -108,6 +129,8 @@ export interface PgpResponseMap {
     verifyDetachedSignature: boolean;
     validatePrivateKeyPassphrase: boolean;
     extractPublicKeyFromPrivate: string;
+    revokeKey: RevokedKeyResult;
+    applyRevocation: string;
 }
 
 export type PgpOperationResponse<T extends PgpOperationName> = PgpResponseMap[T];
@@ -190,6 +213,11 @@ export const isPgpOperationResultValid = (
                 typeof result.algorithm === 'string' &&
                 typeof result.expiry === 'string'
             );
+        case 'revokeKey':
+            return isArmoredKeyPair(result)
+                && typeof (result as { revocationCertificate?: unknown }).revocationCertificate === 'string';
+        case 'applyRevocation':
+            return typeof result === 'string';
         case 'verifyDetachedSignature':
         case 'validatePrivateKeyPassphrase':
             return typeof result === 'boolean';

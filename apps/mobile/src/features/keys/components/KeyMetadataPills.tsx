@@ -9,7 +9,7 @@ import type { KeyPair } from '../../../types/types';
 import { getKeyTypeDescription } from '../domain/keyUtils';
 
 type KeyMetadataPill = {
-    kind: 'metadata' | 'fingerprint';
+    kind: 'metadata' | 'fingerprint' | 'revoked';
     value: string;
 };
 
@@ -48,9 +48,14 @@ const buildMetadataPills = (keyPair: KeyPair): KeyMetadataPill[] => {
         .filter((value): value is string => value.length > 0)
         .map(value => ({ kind: 'metadata' as const, value }));
 
-    return fingerprint
+    const basePills: KeyMetadataPill[] = fingerprint
         ? [...metadataPills, { kind: 'fingerprint' as const, value: fingerprint }]
         : metadataPills;
+
+    // Revoked keys keep their metadata but lead with a status pill.
+    return keyPair.revoked
+        ? [{ kind: 'revoked' as const, value: 'Revoked' }, ...basePills]
+        : basePills;
 };
 
 export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetadataPillsProps) => {
@@ -65,6 +70,7 @@ export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetada
                     style={[
                         styles.metadataChip,
                         pill.kind === 'fingerprint' && styles.fingerprintChip,
+                        pill.kind === 'revoked' && styles.revokedChip,
                         selected && styles.selectedMetadataChip,
                         selected && pill.kind === 'fingerprint' && styles.selectedFingerprintChip,
                     ]}
@@ -73,6 +79,7 @@ export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetada
                         style={[
                             styles.metadataText,
                             pill.kind === 'fingerprint' && styles.fingerprintText,
+                            pill.kind === 'revoked' && styles.revokedText,
                             selected && styles.selectedMetadataText,
                         ]}
                     >
@@ -105,6 +112,13 @@ const styles = StyleSheet.create({
     fingerprintChip: {
         borderColor: `${theme.colors.primary}88`,
         backgroundColor: theme.colors.primaryMuted,
+    },
+    revokedChip: {
+        borderColor: theme.colors.error,
+        backgroundColor: theme.colors.errorMuted,
+    },
+    revokedText: {
+        color: theme.colors.error,
     },
     selectedMetadataChip: {
         borderColor: theme.colors.primaryStrong,

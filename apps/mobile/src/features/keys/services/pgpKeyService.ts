@@ -12,9 +12,11 @@ import {
     deleteKey,
     forgetStoredPassphrases,
     importKey,
+    revokeKey,
     setDefaultKey,
     storeSyncedPassphrase,
 } from './keyMutationService';
+import type { RevokeKeyOutcome } from './keyMutationService';
 import {
     createEncryptedUser,
     getUserDecrypted,
@@ -70,6 +72,14 @@ export class PgpKeyService {
 
     static async setDefaultKey(userId: string, fingerprint: string): Promise<void> {
         return setDefaultKey(userId, fingerprint);
+    }
+
+    static async revokeKey(
+        userId: string,
+        fingerprint: string,
+        passphrase: string,
+    ): Promise<RevokeKeyOutcome> {
+        return revokeKey(userId, fingerprint, passphrase);
     }
 
     static async storeSyncedPassphrase(userId: string, fingerprint: string, passphrase: string): Promise<void> {

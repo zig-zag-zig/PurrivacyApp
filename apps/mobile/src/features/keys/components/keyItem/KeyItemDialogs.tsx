@@ -14,6 +14,10 @@ type KeyItemDialogsProps = {
     onCancelDelete: () => void;
     onConfirmCopyPrivateKey: () => void;
     onConfirmDelete: () => void;
+    revokeConfirmVisible?: boolean;
+    revoking?: boolean;
+    onConfirmRevoke?: () => void;
+    onCancelRevoke?: () => void;
 };
 
 /**
@@ -32,6 +36,10 @@ export const KeyItemDialogs = ({
     onCancelDelete,
     onConfirmCopyPrivateKey,
     onConfirmDelete,
+    revokeConfirmVisible = false,
+    revoking = false,
+    onConfirmRevoke,
+    onCancelRevoke,
 }: KeyItemDialogsProps) => (
     <>
         <ConfirmationDialog
@@ -54,5 +62,18 @@ export const KeyItemDialogs = ({
             onConfirm={onConfirmDelete}
             onCancel={onCancelDelete}
         />
+        {onConfirmRevoke && onCancelRevoke ? (
+            <ConfirmationDialog
+                visible={revokeConfirmVisible}
+                title="Revoke key?"
+                message="This marks the key as revoked: it can still decrypt messages sent before revocation, but it can no longer be used for new encryptions. A revocation certificate is generated so you can share it. This cannot be undone."
+                itemType="key"
+                itemName={pgpKey.userId.trim()}
+                confirmLabel="Revoke"
+                loading={revoking}
+                onConfirm={onConfirmRevoke}
+                onCancel={onCancelRevoke}
+            />
+        ) : null}
     </>
 );

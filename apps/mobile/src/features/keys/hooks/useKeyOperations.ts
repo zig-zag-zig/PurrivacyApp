@@ -307,6 +307,26 @@ export function useKeyOperations({
     }
   };
 
+  const onRevokeKey = async (fingerprint: string, passphrase: string) => {
+    if (!user) return;
+
+    if (isDevTempKeyFingerprint(fingerprint)) {
+      showToast('Temporary keys cannot be revoked', 'error');
+      return;
+    }
+
+    dispatch({ type: 'loadingChanged', isLoading: true });
+    try {
+      await PgpKeyService.revokeKey(user.uid, fingerprint, passphrase);
+      refreshUserKeys();
+    } catch (error: any) {
+      // Re-throw: the caller (useKeyMutationControls) owns the error toast.
+      throw error;
+    } finally {
+      dispatch({ type: 'loadingChanged', isLoading: false });
+    }
+  };
+
   const onPickImportFile = () => {
     void pickFile(
       content => dispatch({ type: 'importKeyChanged', importKey: content }),
@@ -321,6 +341,7 @@ export function useKeyOperations({
     onSetDefaultKey,
     onChangePassphrase,
     onChangeExpiration,
+    onRevokeKey,
     onPickImportFile,
   };
 }

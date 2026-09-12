@@ -128,6 +128,7 @@ export const KeyScreen = () => {
                 onPress={() => keyScreen.onToggleExpandedKey(key.fingerprint)}
                 onSetDefault={() => keyScreen.onSetDefaultKey(key)}
                 onDelete={() => keyScreen.onDeleteKey(key)}
+                onRevoke={keyScreen.onRevokeKey}
                 expanded={expanded}
                 deleting={keyScreen.state.isDeleting}
               />

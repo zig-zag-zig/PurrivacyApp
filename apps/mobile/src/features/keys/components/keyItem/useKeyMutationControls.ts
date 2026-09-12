@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 
 import { useToast } from '../../../../app/state/ToastContext';
 import { getUserFacingErrorMessage } from '../../../../utils/errorHandling';
+import { useShareText } from '../../../../shared/hooks/useShareText';
 import type { KeyPair } from '../../../../types/types';
 
 type UseKeyMutationControlsParams = {
@@ -12,6 +13,7 @@ type UseKeyMutationControlsParams = {
     onDelete?: () => void;
     onChangePassphrase?: (fingerprint: string, oldPass: string, newPass: string, newPassConfirm: string) => Promise<void>;
     onChangeExpiry?: (fingerprint: string, passphrase: string, newExpiryDays: string) => Promise<void>;
+    onRevoke?: (fingerprint: string, passphrase: string) => Promise<void>;
 };
 
 /**
@@ -26,6 +28,7 @@ export function useKeyMutationControls({
     onDelete,
     onChangePassphrase,
     onChangeExpiry,
+    onRevoke,
 }: UseKeyMutationControlsParams) {
     const [confirmVisible, setConfirmVisible] = useState(false);
     const [deleteRequested, setDeleteRequested] = useState(false);
@@ -35,7 +38,10 @@ export function useKeyMutationControls({
     const [expiryDays, setExpiryDays] = useState('365');
     const [changingPassword, setChangingPassword] = useState(false);
     const [changingDate, setChangingDate] = useState(false);
+    const [revoking, setRevoking] = useState(false);
+    const [revokeConfirmVisible, setRevokeConfirmVisible] = useState(false);
     const { showToast } = useToast();
+    const { shareText } = useShareText();
 
     useEffect(() => {
         if (!newPass) setNewPassConfirm('');
@@ -87,6 +93,36 @@ export function useKeyMutationControls({
         }
     };
 
+    const handleRevokePress = () => {
+        if (!onRevoke || readOnly || pgpKey.revoked) return;
+        Keyboard.dismiss();
+        setRevokeConfirmVisible(true);
+    };
+
+    const confirmRevoke = async () => {
+        if (!onRevoke) return;
+        setRevokeConfirmVisible(false);
+        setRevoking(true);
+        try {
+            await onRevoke(pgpKey.fingerprint, oldPass);
+            showToast('Key revoked', 'success');
+        } catch (err: any) {
+            showToast(getUserFacingErrorMessage(err, 'Failed to revoke key'), 'error');
+        } finally {
+            setRevoking(false);
+        }
+    };
+
+    const cancelRevoke = () => {
+        if (!revoking) setRevokeConfirmVisible(false);
+    };
+
+    const shareRevocationCertificate = () => {
+        if (!pgpKey.revocationCertificate) return;
+        Keyboard.dismiss();
+        void shareText(pgpKey.revocationCertificate, 'Revocation certificate');
+    };
+
     return {
         changingDate,
         changingPassword,
@@ -98,6 +134,12 @@ export function useKeyMutationControls({
         handleChangeExpiryPress,
         handleChangePassphrasePress,
         handleDelete,
+        handleRevokePress,
+        confirmRevoke,
+        cancelRevoke,
+        revokeConfirmVisible,
+        revoking,
+        shareRevocationCertificate,
         newPass,
         newPassConfirm,
         oldPass,

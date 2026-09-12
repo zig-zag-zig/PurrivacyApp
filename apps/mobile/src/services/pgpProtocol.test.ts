@@ -121,6 +121,39 @@ describe('isPgpOperationResultValid', () => {
         expect(isPgpOperationResultValid('extractKeyMetadata', null)).toBe(false);
     });
 
+    it('accepts a valid revokeKey result', () => {
+        expect(isPgpOperationResultValid('revokeKey', {
+            privateKey: 'PRIV',
+            publicKey: 'PUB',
+            revocationCertificate: 'CERT',
+        })).toBe(true);
+        // Empty standalone cert is allowed (getRevocationCertificate may fail).
+        expect(isPgpOperationResultValid('revokeKey', {
+            privateKey: 'PRIV',
+            publicKey: 'PUB',
+            revocationCertificate: '',
+        })).toBe(true);
+    });
+
+    it('rejects a malformed revokeKey result', () => {
+        expect(isPgpOperationResultValid('revokeKey', {
+            privateKey: 'PRIV',
+            publicKey: 'PUB',
+        })).toBe(false);
+        expect(isPgpOperationResultValid('revokeKey', {
+            privateKey: 'PRIV',
+            publicKey: 'PUB',
+            revocationCertificate: 5,
+        })).toBe(false);
+        expect(isPgpOperationResultValid('revokeKey', 'armor')).toBe(false);
+    });
+
+    it('accepts an applyRevocation armored string', () => {
+        expect(isPgpOperationResultValid('applyRevocation', 'armored')).toBe(true);
+        expect(isPgpOperationResultValid('applyRevocation', 42)).toBe(false);
+        expect(isPgpOperationResultValid('applyRevocation', null)).toBe(false);
+    });
+
     it('accepts boolean results for verification operations', () => {
         expect(isPgpOperationResultValid('verifyDetachedSignature', true)).toBe(true);
         expect(isPgpOperationResultValid('verifyDetachedSignature', false)).toBe(true);

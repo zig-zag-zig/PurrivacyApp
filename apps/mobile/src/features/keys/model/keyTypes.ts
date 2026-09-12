@@ -9,6 +9,8 @@ export interface KeyPairBase {
     publicKey: string;
     isDefault: boolean;
     privateKeyPassphrase?: string | null;
+    /** Standalone armored revocation certificate for this key, if generated/imported. */
+    revocationCertificate?: string | null;
 }
 
 export type PgpAlgorithm = 'RSA' | 'ECDSA' | 'EDDSA';
@@ -31,4 +33,6 @@ export interface KeyMetadata {
     expiry: string;
     userId: string;
     privateKeyIsUnlocked?: boolean;
+    /** True when the key's primary is revoked (self-signature revocation). */
+    revoked?: boolean;
 }

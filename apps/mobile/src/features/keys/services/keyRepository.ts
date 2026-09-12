@@ -142,6 +142,9 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
       recordId: keyRecord.recordId,
       privateKeyPassphrase:
         privateKey !== null ? decryptedKey.privateKeyPassphrase ?? null : null,
+      // Standalone cert isn't derivable from the armored key; carry it through
+      // the encrypted payload. `revoked` comes from fresh metadata extraction.
+      revocationCertificate: decryptedKey.revocationCertificate ?? null,
     };
 
     decryptedKeys.push(key);

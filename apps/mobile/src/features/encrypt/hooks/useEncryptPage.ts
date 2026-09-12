@@ -3,6 +3,7 @@ import { useCallback, useEffect, useReducer } from 'react';
 import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
+import { useMemo } from 'react';
 import { useToast } from '../../../app/state/ToastContext';
 import type { EncryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
 import { useFilePicker } from '../../../shared/hooks/useFilePicker';
@@ -31,7 +32,12 @@ export function useEncryptPage() {
   const { secureCopy } = useSecureCopy();
 
   const pickFile = useFilePicker(['.txt']);
-  const keySelectionKeys = visibleKeys;
+  // Exclude revoked keys from the recipient picker: they cannot be encrypted
+  // to (the WebView also refuses), and offering them is a footgun.
+  const keySelectionKeys = useMemo(
+    () => visibleKeys.filter(key => !key.revoked),
+    [visibleKeys],
+  );
   const shouldRedirectToKeys = Boolean(userDecrypted && !isAuthLoading && keySelectionKeys.length === 0);
 
   const { isRedirecting: isRedirectingToKeys } = useKeyPrerequisiteRedirect(
@@ -158,8 +164,11 @@ export function useEncryptPage() {
       dispatch({ type: 'markSuccessful' });
       showToast('Encryption successful!', 'success');
 
-    } catch {
-      showToast('Failed to encrypt the message', 'error');
+    } catch (error: any) {
+      const message = typeof error?.message === 'string' && error.message.toLowerCase().includes('revoked')
+        ? error.message
+        : 'Failed to encrypt the message';
+      showToast(message, 'error');
     } finally {
       dispatch({ type: 'encryptFinished' });
     }

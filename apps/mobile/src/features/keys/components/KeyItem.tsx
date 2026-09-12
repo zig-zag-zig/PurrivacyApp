@@ -21,6 +21,7 @@ type KeyItemProps = {
     readOnly?: boolean;
     onChangePassphrase?: (fingerprint: string, oldPass: string, newPass: string, newPassConfirm: string) => Promise<void>;
     onChangeExpiry?: (fingerprint: string, passphrase: string, newExpiryDays: string) => Promise<void>;
+    onRevoke?: (fingerprint: string, passphrase: string) => Promise<void>;
 };
 
 /**
@@ -30,7 +31,7 @@ type KeyItemProps = {
  * presentation (KeyItemSummary/KeyPublicKeySection) are extracted
  * submodules; props, testIDs and rendered output are unchanged.
  */
-export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, readOnly = false, onChangePassphrase, onChangeExpiry, deleting = false }: KeyItemProps) => {
+export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, readOnly = false, onChangePassphrase, onChangeExpiry, onRevoke, deleting = false }: KeyItemProps) => {
     const reveal = useKeyReveal(pgpKey, expanded);
     const mutation = useKeyMutationControls({
         pgpKey,
@@ -39,6 +40,7 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
         onDelete,
         onChangePassphrase,
         onChangeExpiry,
+        onRevoke,
     });
 
     const canManageKey = !readOnly;
@@ -87,6 +89,10 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                 deleteConfirmVisible={mutation.confirmVisible}
                 onConfirmDelete={mutation.confirmDelete}
                 onCancelDelete={mutation.cancelDelete}
+                revokeConfirmVisible={mutation.revokeConfirmVisible}
+                revoking={mutation.revoking}
+                onConfirmRevoke={mutation.confirmRevoke}
+                onCancelRevoke={mutation.cancelRevoke}
             />
         </View>
     );

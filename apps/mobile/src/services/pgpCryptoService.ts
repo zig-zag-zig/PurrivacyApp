@@ -4,6 +4,7 @@ import type {
     PgpOperationName,
     PgpOperationResponse,
     PgpRequestMap,
+    RevokedKeyResult,
 } from "./pgpProtocol";
 
 /**
@@ -203,6 +204,23 @@ class PgpCryptoService {
 
     async extractPublicKeyFromPrivate(privateKey: string): Promise<string> {
         return this.executeOperation('extractPublicKeyFromPrivate', { privateKey });
+    }
+
+    /**
+     * Revoke an own private key. Returns the revoked armored pair (with the
+     * revocation signature embedded in the public key) and the standalone
+     * revocation certificate for sharing.
+     */
+    async revokeKey(privateKey: string, passphrase: string): Promise<RevokedKeyResult> {
+        return this.executeOperation('revokeKey', { privateKey, passphrase });
+    }
+
+    /**
+     * Merge an imported revocation certificate into a stored armored public key
+     * so the keyring marks it revoked.
+     */
+    async applyRevocation(publicKey: string, revocationCertificate: string): Promise<string> {
+        return this.executeOperation('applyRevocation', { publicKey, revocationCertificate });
     }
 
     // Debug method to check service status

@@ -29,5 +29,8 @@ export const KeyMutationControls = ({ pgpKey, mutation }: KeyMutationControlsPro
         onChangePassphrase={mutation.handleChangePassphrasePress}
         onChangeExpiry={mutation.handleChangeExpiryPress}
         storedPassphraseValue={pgpKey.privateKeyPassphrase}
+        onRevoke={mutation.handleRevokePress}
+        onShareRevocation={mutation.shareRevocationCertificate}
+        revoking={mutation.revoking}
     />
 );

@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import Icon from '@expo/vector-icons/MaterialIcons';
+
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
 import { InputField } from '../../../components/InputField';
@@ -26,6 +28,9 @@ type KeyManagementFormProps = {
     onOldPassChange: (value: string) => void;
     pgpKey: KeyPair;
     storedPassphraseValue?: string | null;
+    onRevoke?: () => void;
+    onShareRevocation?: () => void;
+    revoking?: boolean;
 };
 
 const SURFACE_LABEL_BACKPLATE_PROPS = {
@@ -48,6 +53,9 @@ export const KeyManagementForm = ({
     onOldPassChange,
     pgpKey,
     storedPassphraseValue,
+    onRevoke,
+    onShareRevocation,
+    revoking,
 }: KeyManagementFormProps) => (
     <View style={styles.manageKeySection}>
         <CustomText style={styles.sectionTitle}>Manage key</CustomText>
@@ -86,6 +94,50 @@ export const KeyManagementForm = ({
                     style={styles.actionButton}
                 />
             </View>
+        </View>
+
+        <View style={styles.formGroup}>
+            <CustomText style={styles.groupLabel}>Revocation</CustomText>
+            {pgpKey.revoked ? (
+                <>
+                    <CustomText style={styles.revokedNote}>
+                        This key is revoked. It can still decrypt messages sent before revocation,
+                        but new encryptions to it are refused.
+                    </CustomText>
+                    {pgpKey.revocationCertificate && onShareRevocation ? (
+                        <View style={styles.actionRow}>
+                            <Button
+                                label="Share revocation certificate"
+                                onPress={onShareRevocation}
+                                size="compact"
+                                variant="secondary"
+                                style={styles.actionButton}
+                                icon={<Icon name="share" size={18} color={theme.colors.primary} />}
+                            />
+                        </View>
+                    ) : null}
+                </>
+            ) : (
+                <>
+                    <CustomText style={styles.revokedNote}>
+                        Revoking marks this key as unusable for new encryptions and produces a
+                        revocation certificate you can share so others stop using it. The key is
+                        kept so old messages still decrypt. This cannot be undone.
+                    </CustomText>
+                    <View style={styles.actionRow}>
+                        <Button
+                            label="Revoke key"
+                            onPress={onRevoke ?? (() => undefined)}
+                            disabled={!onRevoke || (pgpKey.privateKeyIsUnlocked === false && !oldPass)}
+                            loading={revoking}
+                            size="compact"
+                            variant="danger"
+                            style={styles.actionButton}
+                            icon={<Icon name="block" size={18} color={theme.colors.onPrimary} />}
+                        />
+                    </View>
+                </>
+            )}
         </View>
 
         <View style={styles.formGroup}>
@@ -141,5 +193,10 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         flex: 1,
+    },
+    revokedNote: {
+        ...commonStyles.textCaption,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
     },
 });

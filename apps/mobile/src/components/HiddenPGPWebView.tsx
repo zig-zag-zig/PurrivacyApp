@@ -164,6 +164,13 @@ const PGP_HTML = `
               (data.publicKeys || []).map(k => openpgp.readKey({ armoredKey: k }))
             );
 
+            // Refuse to encrypt to a revoked recipient key.
+            for (const k of keys) {
+              if (typeof k.isRevoked === 'function' && await k.isRevoked()) {
+                throw new Error('Cannot encrypt: a selected recipient key is revoked.');
+              }
+            }
+
             const msg = await openpgp.createMessage({ text: data.content });
 
             let signingKey;
@@ -244,7 +251,11 @@ const PGP_HTML = `
               } catch {}
               const expiry = formatExpiry(exp);
               const privateKeyIsUnlocked = typeof key.isDecrypted !== 'function' ? undefined : key.isDecrypted() !== null ? key.isDecrypted() : undefined;
-              result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked };
+              let revoked = false;
+              try {
+                revoked = typeof key.isRevoked === 'function' ? await key.isRevoked() : false;
+              } catch {}
+              result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked, revoked };
             } catch (err) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
               return;
@@ -329,6 +340,38 @@ const PGP_HTML = `
           case 'extractPublicKeyFromPrivate': {
             const pk = await openpgp.readPrivateKey({ armoredKey: data.privateKey });
             result = pk.toPublic().armor();
+            break;
+          }
+
+          case 'revokeKey': {
+            // Revoke an own private key. openpgp.revokeKey needs the decrypted
+            // private key; it returns the revoked key pair and embeds the
+            // revocation signature in the public key certificate. We also
+            // return the standalone revocation certificate so it can be shared
+            // on its own.
+            const unlocked = await getUnlockedPrivateKey(data.privateKey, openpgp, data.passphrase);
+            const { privateKey, publicKey } = await openpgp.revokeKey({
+              key: unlocked,
+              format: 'armored',
+            });
+            let revocationCertificate = '';
+            try {
+              const revokedKey = await openpgp.readKey({ armoredKey: publicKey });
+              revocationCertificate = typeof revokedKey.getRevocationCertificate === 'function'
+                ? await revokedKey.getRevocationCertificate()
+                : '';
+            } catch {}
+            result = { privateKey, publicKey, revocationCertificate };
+            break;
+          }
+
+          case 'applyRevocation': {
+            // Merge an imported revocation certificate into a stored public key
+            // so the keyring marks it revoked. Accepts armored revocation cert
+            // or an armored public key that already embeds a revocation sig.
+            const pub = await openpgp.readKey({ armoredKey: data.publicKey });
+            const applied = await pub.applyRevocation({ armoredRevocationCertificate: data.revocationCertificate });
+            result = applied.armor();
             break;
           }
 
