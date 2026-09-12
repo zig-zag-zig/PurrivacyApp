@@ -4,6 +4,7 @@ import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { CustomText } from '../../../components/CustomText';
 import { useCopyFeedback } from '../../../shared/hooks/useCopyFeedback';
+import { useShareText } from '../../../shared/hooks/useShareText';
 import { CopyableResultBlock } from '../../../shared/ui/CopyableResultBlock';
 
 interface EncryptedResultProps {
@@ -23,6 +24,7 @@ export const EncryptedResult: React.FC<EncryptedResultProps> = React.memo(({
 }) => {
     const resultCopyFeedback = useCopyFeedback();
     const signatureCopyFeedback = useCopyFeedback();
+    const { shareText } = useShareText();
 
     const handleCopyResult = () => {
         onCopy();
@@ -41,6 +43,9 @@ export const EncryptedResult: React.FC<EncryptedResultProps> = React.memo(({
                 copied={resultCopyFeedback.copied}
                 copyTestID={testIDPrefix ? `${testIDPrefix}.copy` : undefined}
                 onCopy={handleCopyResult}
+                onShare={() => { void shareText(encryptedContent, 'Encrypted message'); }}
+                shareTestID={testIDPrefix ? `${testIDPrefix}.share` : undefined}
+                shareAccessibilityLabel="Share encrypted result"
             >
                 <CustomText
                     testID={testIDPrefix ? `${testIDPrefix}.text` : undefined}
@@ -59,6 +64,9 @@ export const EncryptedResult: React.FC<EncryptedResultProps> = React.memo(({
                         copied={signatureCopyFeedback.copied}
                         copyTestID={testIDPrefix ? `${testIDPrefix}.signature.copy` : undefined}
                         onCopy={handleCopySignature}
+                        onShare={() => { void shareText(signature, 'Signature'); }}
+                        shareTestID={testIDPrefix ? `${testIDPrefix}.signature.share` : undefined}
+                        shareAccessibilityLabel="Share signature"
                     >
                         <CustomText
                             testID={testIDPrefix ? `${testIDPrefix}.signature.text` : undefined}

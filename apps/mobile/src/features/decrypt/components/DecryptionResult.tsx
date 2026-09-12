@@ -6,6 +6,7 @@ import { theme } from '../../../styles/theme';
 import { SecureTextDisplay } from '../../keys/components/SecureTextDisplay';
 import { CustomText } from '../../../components/CustomText';
 import { useCopyFeedback } from '../../../shared/hooks/useCopyFeedback';
+import { useShareText } from '../../../shared/hooks/useShareText';
 import { CopyableResultBlock } from '../../../shared/ui/CopyableResultBlock';
 
 interface DecryptionResultProps {
@@ -24,6 +25,7 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
     testIDPrefix,
 }) => {
     const copyFeedback = useCopyFeedback();
+    const { shareText } = useShareText();
 
     const handleCopy = () => {
         onCopy();
@@ -37,6 +39,9 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
                 copied={copyFeedback.copied}
                 copyTestID={testIDPrefix ? `${testIDPrefix}.copy` : undefined}
                 onCopy={handleCopy}
+                onShare={() => { void shareText(decryptedContent, 'Decrypted message'); }}
+                shareTestID={testIDPrefix ? `${testIDPrefix}.share` : undefined}
+                shareAccessibilityLabel="Share decrypted result"
                 contentStyle={commonStyles.flex}
             >
                 <SecureTextDisplay
