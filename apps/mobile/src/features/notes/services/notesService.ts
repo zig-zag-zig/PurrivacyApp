@@ -2,6 +2,8 @@ import { ApiClient } from '../../../api/client';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
 import type { EncryptionBase } from '../../../types/types';
+import { NOTE_BODY_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH } from '../model/noteTypes';
+import type { SecureNote } from '../model/noteTypes';
 
 /**
  * Secure notes. A note is stored as an ordinary encrypted key-record whose
@@ -14,15 +16,6 @@ import type { EncryptionBase } from '../../../types/types';
  */
 
 export const NOTE_RECORD_TYPE = 'note';
-
-export interface SecureNote {
-  /** Stable id we generate; also the `recordId` once persisted. */
-  id: string;
-  title: string;
-  body: string;
-  /** epoch ms */
-  updatedAt: number;
-}
 
 /** Encrypted-payload shape written into the record. */
 interface NotePayload extends SecureNote {
@@ -58,11 +51,18 @@ export function sortNotes(notes: SecureNote[]): SecureNote[] {
   return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+const validateNote = (note: { title: string; body: string }): void => {
+  if (!note.title.trim()) throw new Error('Note title is required');
+  if (note.title.length > NOTE_TITLE_MAX_LENGTH) throw new Error('Note title is too long');
+  if (note.body.length > NOTE_BODY_MAX_LENGTH) throw new Error('Note body is too long');
+};
+
 export async function createNote(
   userId: string,
   note: { title: string; body: string },
 ): Promise<SecureNote> {
   if (userId.trim() === '') throw new Error('userId cannot be empty');
+  validateNote(note);
 
   const payload: NotePayload = {
     type: NOTE_RECORD_TYPE,
@@ -81,6 +81,7 @@ export async function updateNote(
   note: SecureNote,
 ): Promise<void> {
   if (userId.trim() === '') throw new Error('userId cannot be empty');
+  validateNote(note);
 
   const payload: NotePayload = {
     type: NOTE_RECORD_TYPE,

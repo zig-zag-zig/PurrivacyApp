@@ -79,26 +79,31 @@ interface FileHandleLike {
 async function pullSessionToFile(
     sessionId: string,
     outFile: File,
-): Promise<number> {
+ ): Promise<{ totalBytes: number; verified?: boolean | null }> {
     const handle = outFile.open(FileMode.WriteOnly) as FileHandleLike;
     let written = 0;
+    let verified: boolean | null | undefined;
     try {
         for (;;) {
-            const { base64, done } = await pgpCryptoService.execute('fileOpResultChunk', {
+            const result = await pgpCryptoService.execute('fileOpResultChunk', {
                 sessionId,
                 maxLength: CHUNK_BYTES,
             });
+            const { base64, done } = result;
             if (base64.length) {
                 const bytes = base64ToBytes(base64);
                 handle.writeBytes(bytes);
                 written += bytes.length;
             }
-            if (done) break;
+            if (done) {
+                verified = result.verified;
+                break;
+            }
         }
     } finally {
         handle.close();
     }
-    return written;
+    return { totalBytes: written, verified };
 }
 
 export interface FileEncryptResult {
@@ -148,7 +153,7 @@ export const fileCryptoService = {
             // handles each bridge call async, so a pending output pull doesn't
             // block incoming input chunks — the two interleave naturally.
             const feed = feedFileToSession(sourceFileUri, sessionId);
-            const totalBytes = await pullSessionToFile(sessionId, outFile);
+            const { totalBytes } = await pullSessionToFile(sessionId, outFile);
             await feed;
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
@@ -172,6 +177,8 @@ export const fileCryptoService = {
         const sessionId = newSessionId();
         try {
             await pgpCryptoService.execute('fileOpBegin', { sessionId });
+            // Start feeding before parsing the streaming message.
+            const feed = feedFileToSession(sourceFileUri, sessionId);
             const { filename, verified } = await pgpCryptoService.execute('fileOpDecrypt', {
                 sessionId,
                 privateKey,
@@ -183,12 +190,11 @@ export const fileCryptoService = {
             const outFile = new File(Paths.cache, `purrivacy-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 
-            const feed = feedFileToSession(sourceFileUri, sessionId);
-            const totalBytes = await pullSessionToFile(sessionId, outFile);
+            const pulled = await pullSessionToFile(sessionId, outFile);
             await feed;
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
-            return { fileUri: outFile.uri, fileName: outName, totalBytes, verified };
+            return { fileUri: outFile.uri, fileName: outName, totalBytes: pulled.totalBytes, verified: pulled.verified ?? verified };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
             throw error;

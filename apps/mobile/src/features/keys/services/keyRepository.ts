@@ -12,7 +12,8 @@ import type { KeyMetadata } from '../../../types/types';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
-import { NOTE_RECORD_TYPE, type SecureNote } from '../../notes/services/notesService';
+import { NOTE_RECORD_TYPE } from '../../notes/services/notesService';
+import type { SecureNote } from '../../notes/model/noteTypes';
 
 type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {
   /** Discriminant: 'note' for secure-note records, absent for real keys. */

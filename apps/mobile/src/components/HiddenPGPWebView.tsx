@@ -486,13 +486,16 @@ const PGP_HTML = `
               format: 'binary',
             });
 
-            let verified = null;
+            // Verification is intentionally deferred until the output stream
+            // has been fully consumed; awaiting it here can deadlock streaming.
             if (verificationKeys && signatures && signatures.length) {
-              try { await signatures[0].verified; verified = true; } catch { verified = false; }
+              sess.verificationPromise = signatures[0].verified
+                .then(() => true)
+                .catch(() => false);
             }
 
             sess.reader = dec.getReader();
-            result = { ok: true, filename: filename || '', verified };
+            result = { ok: true, filename: filename || '', verified: null };
             break;
           }
 
@@ -517,6 +520,9 @@ const PGP_HTML = `
             const slice = acc.length > max ? acc.subarray(0, max) : acc;
             if (acc.length > max) sess.pending = acc.subarray(max);
             const doneOut = streamDone && !sess.pending;
+            if (doneOut && sess.verificationPromise) {
+              result.verified = await sess.verificationPromise;
+            }
             let bin = '';
             for (let i = 0; i < slice.length; i++) bin += String.fromCharCode(slice[i]);
             result = { base64: btoa(bin), done: doneOut };

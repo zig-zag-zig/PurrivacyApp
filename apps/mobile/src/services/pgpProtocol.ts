@@ -133,6 +133,7 @@ export interface FileOpResultChunk {
     base64: string;
     /** True when the output stream is exhausted — no more chunks follow. */
     done: boolean;
+    verified?: boolean | null;
 }
 
 /**
@@ -295,7 +296,8 @@ export const isPgpOperationResultValid = (
         case 'fileOpResultChunk':
             return isRecord(result)
                 && typeof result.base64 === 'string'
-                && typeof result.done === 'boolean';
+                && typeof result.done === 'boolean'
+                && (result.verified == null || typeof result.verified === 'boolean');
         case 'verifyDetachedSignature':
         case 'validatePrivateKeyPassphrase':
             return typeof result === 'boolean';

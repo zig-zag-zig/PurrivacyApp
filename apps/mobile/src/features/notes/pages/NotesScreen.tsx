@@ -11,7 +11,8 @@ import { ConfirmationDialog } from '../../settings/components/ConfirmationDialog
 import { useToast } from '../../../app/state/ToastContext';
 import { useAuth } from '../../auth/state/AuthContext';
 import { theme } from '../../../styles/theme';
-import { createNote, deleteNote, sortNotes, updateNote, type SecureNote } from '../services/notesService';
+import { createNote, deleteNote, sortNotes, updateNote } from '../services/notesService';
+import type { SecureNote } from '../model/noteTypes';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 
 /**

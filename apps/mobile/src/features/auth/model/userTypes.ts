@@ -1,6 +1,6 @@
 import type { Encryption, EncryptionBase } from '../../../shared/model/cryptoTypes';
 import type { KeyPairWithRecordId } from '../../keys/model/keyTypes';
-import type { SecureNote } from '../../notes/services/notesService';
+import type { SecureNote } from '../../notes/model/noteTypes';
 
 interface UserBase {
     dekPassword: Encryption;
