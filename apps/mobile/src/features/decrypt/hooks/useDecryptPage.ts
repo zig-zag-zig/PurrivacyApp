@@ -7,7 +7,7 @@ import { useToast } from '../../../app/state/ToastContext';
 import type { DecryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
 import { useFilePicker } from '../../../shared/hooks/useFilePicker';
 import { useKeyPrerequisiteRedirect } from '../../../shared/hooks/useKeyPrerequisiteRedirect';
-import { useComposeDraft } from '../../../shared/hooks/useComposeDraft';
+import { useEncryptedComposeDraft } from '../../../services/drafts';
 import { useResetStateOnBlurSuccess } from '../../../shared/hooks/useResetStateOnBlurSuccess';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
@@ -50,7 +50,7 @@ export function useDecryptPage() {
 
   // Persist the pasted ciphertext as an encrypted draft so an interrupted or
   // failed decrypt doesn't lose it. Cleared on success.
-  useComposeDraft({
+  useEncryptedComposeDraft({
     userId: user?.uid,
     slot: 'decrypt',
     value: state.encryptedContent,

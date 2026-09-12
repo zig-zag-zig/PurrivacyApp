@@ -3,7 +3,7 @@ import { useCallback, useEffect, useReducer } from 'react';
 import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
-import { useComposeDraft } from '../../../shared/hooks/useComposeDraft';
+import { useEncryptedComposeDraft } from '../../../services/drafts';
 import { useMemo } from 'react';
 import { useToast } from '../../../app/state/ToastContext';
 import type { EncryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
@@ -55,7 +55,7 @@ export function useEncryptPage() {
 
   // Persist the compose field as an encrypted draft so a failed encrypt or an
   // app background doesn't lose a long message. Cleared on success.
-  useComposeDraft({
+  useEncryptedComposeDraft({
     userId: user?.uid,
     slot: 'encrypt',
     value: state.content,
