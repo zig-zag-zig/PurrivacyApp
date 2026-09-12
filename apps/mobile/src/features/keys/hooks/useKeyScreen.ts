@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
@@ -10,6 +10,7 @@ import {
 } from '../domain/keyScreenDomain';
 import { filterVaultKeys } from '../domain/keyFilters';
 import type { VaultKeyFilter } from '../domain/keyFilters';
+import { isKeyExpired, isKeyExpiringSoon } from '../domain/keyExpiry';
 import type { KeyAction } from '../model/types';
 import { initialKeyScreenState, keyScreenReducer } from '../state/keyScreenReducer';
 import { useImportKeyDefaults } from './useImportKeyDefaults';
@@ -56,6 +57,22 @@ export function useKeyScreen() {
     [displayKeys, state.vaultSearchQuery, state.vaultFilter],
   );
 
+  // Expiry dashboard (client-side): count keys needing attention and let the
+  // user dismiss the banner for the session.
+  const [expiryBannerDismissed, setExpiryBannerDismissed] = useState(false);
+  const expiryCounts = useMemo(() => {
+    let expiring = 0;
+    let expired = 0;
+    for (const key of displayKeys) {
+      if (isKeyExpired(key)) {
+        expired += 1;
+      } else if (isKeyExpiringSoon(key)) {
+        expiring += 1;
+      }
+    }
+    return { expiring, expired };
+  }, [displayKeys]);
+
   const keyListExpansion = useKeyListExpansion(state.expandedKeyFingerprint, dispatch);
   const keyOperations = useKeyOperations({
     user,
@@ -81,6 +98,8 @@ export function useKeyScreen() {
     userDecrypted,
     sortedKeys: displayKeys,
     filteredKeys,
+    expiryCounts,
+    showExpiryBanner: !expiryBannerDismissed && (expiryCounts.expiring > 0 || expiryCounts.expired > 0),
     scrollRef: keyListExpansion.scrollRef,
     itemRefs: keyListExpansion.itemRefs,
     isResolvingKeys,
@@ -109,6 +128,8 @@ export function useKeyScreen() {
     onKeyActionChanged: (keyAction: KeyAction) => dispatch({ type: 'keyActionChanged', keyAction }),
     onVaultSearchChanged: (vaultSearchQuery: string) => dispatch({ type: 'vaultSearchQueryChanged', vaultSearchQuery }),
     onVaultFilterChanged: (vaultFilter: VaultKeyFilter) => dispatch({ type: 'vaultFilterChanged', vaultFilter }),
+    onShowExpiringKeys: () => dispatch({ type: 'vaultFilterChanged', vaultFilter: 'expiring' }),
+    onDismissExpiryBanner: () => setExpiryBannerDismissed(true),
     onImportKeyChanged: (importKey: string) => dispatch({ type: 'importKeyChanged', importKey }),
     onImportPassphraseChanged: (importPassphrase: string) => {
       dispatch({ type: 'importPassphraseChanged', importPassphrase });

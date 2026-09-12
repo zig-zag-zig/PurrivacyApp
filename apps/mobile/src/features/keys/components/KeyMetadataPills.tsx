@@ -6,10 +6,11 @@ import { CustomText } from '../../../components/CustomText';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import type { KeyPair } from '../../../types/types';
+import { EXPIRING_SOON_DAYS, parseKeyExpiry } from '../domain/keyExpiry';
 import { getKeyTypeDescription } from '../domain/keyUtils';
 
 type KeyMetadataPill = {
-    kind: 'metadata' | 'fingerprint' | 'revoked';
+    kind: 'metadata' | 'fingerprint' | 'revoked' | 'expiring' | 'expired';
     value: string;
 };
 
@@ -48,14 +49,24 @@ const buildMetadataPills = (keyPair: KeyPair): KeyMetadataPill[] => {
         .filter((value): value is string => value.length > 0)
         .map(value => ({ kind: 'metadata' as const, value }));
 
-    const basePills: KeyMetadataPill[] = fingerprint
-        ? [...metadataPills, { kind: 'fingerprint' as const, value: fingerprint }]
-        : metadataPills;
+    // Surface expiry state as a leading status pill. A revoked key already
+    // leads with 'Revoked'; expiry is appended after it.
+    const expiryStatus = parseKeyExpiry(keyPair.expiry);
+    const statusPills: KeyMetadataPill[] = [];
+    if (keyPair.revoked) {
+        statusPills.push({ kind: 'revoked', value: 'Revoked' });
+    }
+    if (expiryStatus.kind === 'expired') {
+        statusPills.push({ kind: 'expired', value: `Expired ${expiryStatus.daysAgo}d ago` });
+    } else if (expiryStatus.kind === 'expiring' && expiryStatus.daysLeft <= EXPIRING_SOON_DAYS) {
+        statusPills.push({ kind: 'expiring', value: `Expires in ${expiryStatus.daysLeft}d` });
+    }
 
-    // Revoked keys keep their metadata but lead with a status pill.
-    return keyPair.revoked
-        ? [{ kind: 'revoked' as const, value: 'Revoked' }, ...basePills]
-        : basePills;
+    const basePills: KeyMetadataPill[] = fingerprint
+        ? [...statusPills, ...metadataPills, { kind: 'fingerprint' as const, value: fingerprint }]
+        : [...statusPills, ...metadataPills];
+
+    return basePills;
 };
 
 export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetadataPillsProps) => {
@@ -71,6 +82,8 @@ export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetada
                         styles.metadataChip,
                         pill.kind === 'fingerprint' && styles.fingerprintChip,
                         pill.kind === 'revoked' && styles.revokedChip,
+                        pill.kind === 'expiring' && styles.expiringChip,
+                        pill.kind === 'expired' && styles.revokedChip,
                         selected && styles.selectedMetadataChip,
                         selected && pill.kind === 'fingerprint' && styles.selectedFingerprintChip,
                     ]}
@@ -80,6 +93,8 @@ export const KeyMetadataPills = ({ keyPair, selected = false, style }: KeyMetada
                             styles.metadataText,
                             pill.kind === 'fingerprint' && styles.fingerprintText,
                             pill.kind === 'revoked' && styles.revokedText,
+                            pill.kind === 'expiring' && styles.expiringText,
+                            pill.kind === 'expired' && styles.revokedText,
                             selected && styles.selectedMetadataText,
                         ]}
                     >
@@ -119,6 +134,13 @@ const styles = StyleSheet.create({
     },
     revokedText: {
         color: theme.colors.error,
+    },
+    expiringChip: {
+        borderColor: theme.colors.warning,
+        backgroundColor: `${theme.colors.warning}1A`,
+    },
+    expiringText: {
+        color: theme.colors.warning,
     },
     selectedMetadataChip: {
         borderColor: theme.colors.primaryStrong,

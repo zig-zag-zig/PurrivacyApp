@@ -15,6 +15,7 @@ import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
 import { KeyItem } from '../components/KeyItem';
 import { VaultFilterBar } from '../components/VaultFilterBar';
+import { ExpiryBanner } from '../components/ExpiryBanner';
 import { PassphraseField } from '../components/PassphraseField';
 import { useKeyScreen } from '../hooks/useKeyScreen';
 import type { KeyAction } from '../model/types';
@@ -73,6 +74,15 @@ export const KeyScreen = () => {
         ListHeaderComponent={
           <>
             {header}
+            {keyScreen.showExpiryBanner ? (
+              <ExpiryBanner
+                expiringCount={keyScreen.expiryCounts.expiring}
+                expiredCount={keyScreen.expiryCounts.expired}
+                onShowExpiring={keyScreen.onShowExpiringKeys}
+                onDismiss={keyScreen.onDismissExpiryBanner}
+                testIDPrefix="purrivacy.key.expiry"
+              />
+            ) : null}
             <VaultFilterBar
               searchQuery={keyScreen.state.vaultSearchQuery}
               onSearchChange={keyScreen.onVaultSearchChanged}
