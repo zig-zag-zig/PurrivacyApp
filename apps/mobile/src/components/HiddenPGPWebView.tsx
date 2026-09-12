@@ -419,6 +419,7 @@ const PGP_HTML = `
             const bin = atob(data.base64);
             const bytes = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            if (sess.queue.length >= 4) throw new Error('fileOpChunk: input queue is full');
             sess.queue.push(bytes);
             // Wake the generator if it's waiting on a chunk.
             const w = sess.waiters.shift();

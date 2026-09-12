@@ -20,6 +20,12 @@ const CHUNK_BYTES = 256 * 1024;
 // the session buffer unboundedly — apply backpressure once this many are
 // pending consumption by the crypto stream.
 const MAX_QUEUED_CHUNKS = 4;
+export const MAX_FILE_BYTES = 100 * 1024 * 1024;
+
+const sanitizeFileName = (name: string, fallback: string): string => {
+    const base = name.split(/[\\/]/).pop()?.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\.\./g, '').trim();
+    return (base || fallback).slice(0, 180);
+};
 
 const bytesToBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 const base64ToBytes = (b64: string): Uint8Array => Uint8Array.from(Buffer.from(b64, 'base64'));
@@ -33,6 +39,8 @@ const newSessionId = (): string =>
  */
 async function feedFileToSession(fileUri: string, sessionId: string): Promise<void> {
     const source = new File(fileUri);
+    const info = source.info();
+    if (info.size !== undefined && info.size > MAX_FILE_BYTES) throw new Error('File is larger than the 100 MB limit');
     const reader = source.stream().getReader();
     const waitForCapacity = async () => {
         // Apply backpressure: hold off pushing while the WebView already has
@@ -145,7 +153,8 @@ export const fileCryptoService = {
                 signOptions,
             });
 
-            const outName = `${sourceFileName.replace(/\.[^.]*$/, '') || 'encrypted'}.pgp`;
+            const safeName = sanitizeFileName(sourceFileName, 'file');
+            const outName = `${safeName.replace(/\.[^.]*$/, '') || 'encrypted'}.pgp`;
             const outFile = new File(Paths.cache, `purrivacy-${Date.now()}-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 
@@ -186,7 +195,7 @@ export const fileCryptoService = {
                 publicKeyForVerification,
             });
 
-            const outName = filename || `decrypted-${Date.now()}.bin`;
+            const outName = sanitizeFileName(filename, `decrypted-${Date.now()}.bin`);
             const outFile = new File(Paths.cache, `purrivacy-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 

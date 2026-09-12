@@ -12,7 +12,7 @@ import type { KeyMetadata } from '../../../types/types';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
-import { NOTE_RECORD_TYPE } from '../../notes/services/notesService';
+import { NOTE_RECORD_TYPE } from '../../notes/model/noteTypes';
 import type { SecureNote } from '../../notes/model/noteTypes';
 
 type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {

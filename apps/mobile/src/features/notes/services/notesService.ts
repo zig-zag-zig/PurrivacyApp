@@ -2,7 +2,7 @@ import { ApiClient } from '../../../api/client';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
 import type { EncryptionBase } from '../../../types/types';
-import { NOTE_BODY_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH } from '../model/noteTypes';
+import { NOTE_BODY_MAX_LENGTH, NOTE_RECORD_TYPE, NOTE_TITLE_MAX_LENGTH } from '../model/noteTypes';
 import type { SecureNote } from '../model/noteTypes';
 
 /**
@@ -14,8 +14,6 @@ import type { SecureNote } from '../model/noteTypes';
  *
  * Scope is deliberately narrow per the roadmap: flat list + editor + delete.
  */
-
-export const NOTE_RECORD_TYPE = 'note';
 
 /** Encrypted-payload shape written into the record. */
 interface NotePayload extends SecureNote {
