@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ScrollView } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
@@ -13,10 +13,13 @@ import { KeySelection } from '../../keys/components/KeySelection';
 import { SettingsOption } from '../../../shared/ui/SettingsOption';
 import { EncryptedResult } from '../components/EncryptedResult';
 import { useEncryptPage } from '../hooks/useEncryptPage';
+import { FileCryptoPanel } from '../../fileCrypto/components/FileCryptoPanel';
+import { SegmentedActionTabs } from '../../../shared/ui/SegmentedActionTabs';
 
 export const EncryptScreen = () => {
   const encryptPage = useEncryptPage();
   const scrollRef = useRef<ScrollView>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('text');
   useGlobalSpinner(encryptPage.isLoadingOverlay, { backgroundMode: 'opaque' });
 
   useEffect(() => {
@@ -38,9 +41,23 @@ export const EncryptScreen = () => {
       <AppScreenHeader
         eyebrow="Compose securely"
         icon="lock-plus-outline"
-        title="Encrypt a message"
+        title="Encrypt"
       />
 
+      <SegmentedActionTabs
+        tabs={[
+          { action: 'text', icon: 'text-fields', label: 'Text' },
+          { action: 'file', icon: 'attach-file', label: 'File' },
+        ]}
+        value={inputMode}
+        onChange={setInputMode}
+        testIDPrefix="purrivacy.encrypt.mode"
+      />
+
+      {inputMode === 'file' ? (
+        <FileCryptoPanel mode="encrypt" testIDPrefix="purrivacy.encrypt.file" />
+      ) : (
+      <>
       <InputField
         label="Text to Encrypt"
         testID="purrivacy.encrypt.content"
@@ -124,6 +141,8 @@ export const EncryptScreen = () => {
           onCopySignature={encryptPage.onCopySignature}
           testIDPrefix="purrivacy.encrypt.result"
         />
+      )}
+      </>
       )}
     </ScreenContainer>
   );

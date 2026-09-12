@@ -96,6 +96,18 @@ class PgpCryptoService {
         });
     }
 
+    /**
+     * Public, low-level operation runner. The per-op convenience methods call
+     * this; it is exposed for orchestrated ops (e.g. chunked file sessions in
+     * fileCryptoService) that issue several calls against one operation set.
+     */
+    async execute<T extends PgpOperationName>(
+        operation: T,
+        data: PgpRequestMap[T]['data'],
+    ): Promise<PgpOperationResponse<T>> {
+        return this.executeOperation(operation, data);
+    }
+
     private async executeOperation<T extends PgpOperationName>(
         operation: T,
         data: PgpRequestMap[T]['data'],

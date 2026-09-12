@@ -375,6 +375,116 @@ const PGP_HTML = `
             break;
           }
 
+          // ---- Chunked file ops ----
+          // Binary payloads are too large for a single injectJavaScript call, so
+          // bytes move in base64 chunks into a session buffer; the op then
+          // produces an output buffer read back in chunks. Sessions are keyed by
+          // an id the caller supplies so concurrent reads can interleave.
+          case 'fileOpBegin': {
+            if (!window.__fileSessions) window.__fileSessions = {};
+            window.__fileSessions[data.sessionId] = { chunks: [], out: null };
+            result = { ok: true };
+            break;
+          }
+
+          case 'fileOpChunk': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpChunk: unknown session');
+            // base64 → bytes, appended. Decoding happens in the WebView so the
+            // bridge only ever carries strings.
+            const bin = atob(data.base64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            sess.chunks.push(bytes);
+            result = { received: bytes.length };
+            break;
+          }
+
+          case 'fileOpEncrypt': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpEncrypt: unknown session');
+            const total = sess.chunks.reduce((n, c) => n + c.length, 0);
+            const dataBytes = new Uint8Array(total);
+            let off = 0;
+            for (const c of sess.chunks) { dataBytes.set(c, off); off += c.length; }
+
+            const keys = await Promise.all(
+              (data.publicKeys || []).map(k => openpgp.readKey({ armoredKey: k }))
+            );
+            for (const k of keys) {
+              if (typeof k.isRevoked === 'function' && await k.isRevoked()) {
+                throw new Error('Cannot encrypt: a selected recipient key is revoked.');
+              }
+            }
+
+            let signingKey;
+            if (data.signOptions) {
+              signingKey = await getUnlockedPrivateKey(data.signOptions.privateKey, openpgp, data.signOptions.passphrase);
+            }
+
+            const msg = await openpgp.createMessage({
+              binary: dataBytes,
+              filename: data.filename || 'file',
+              date: new Date(),
+            });
+            const params = { message: msg, encryptionKeys: keys, format: 'binary' };
+            if (signingKey) params.signingKeys = signingKey;
+            const out = await openpgp.encrypt(params);
+            sess.out = out instanceof Uint8Array ? out : new Uint8Array(out);
+            sess.chunks = [];
+            result = { totalBytes: sess.out.length };
+            break;
+          }
+
+          case 'fileOpDecrypt': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpDecrypt: unknown session');
+            const total = sess.chunks.reduce((n, c) => n + c.length, 0);
+            const cipherBytes = new Uint8Array(total);
+            let off = 0;
+            for (const c of sess.chunks) { cipherBytes.set(c, off); off += c.length; }
+
+            const unlocked = await getUnlockedPrivateKey(data.privateKey, openpgp, data.passphrase);
+            const enc = await openpgp.readMessage({ binaryMessage: cipherBytes });
+            const verificationKeys = data.publicKeyForVerification
+              ? await openpgp.readKey({ armoredKey: data.publicKeyForVerification })
+              : undefined;
+
+            const { data: dec, filename, signatures } = await openpgp.decrypt({
+              message: enc,
+              decryptionKeys: unlocked,
+              verificationKeys,
+              format: 'binary',
+            });
+
+            let verified = null;
+            if (verificationKeys && signatures && signatures.length) {
+              try { await signatures[0].verified; verified = true; } catch { verified = false; }
+            }
+
+            sess.out = dec instanceof Uint8Array ? dec : new Uint8Array(dec);
+            sess.chunks = [];
+            result = { totalBytes: sess.out.length, filename: filename || '', verified };
+            break;
+          }
+
+          case 'fileOpResultChunk': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess || !sess.out) throw new Error('fileOpResultChunk: no output');
+            const slice = sess.out.subarray(data.offset, data.offset + data.length);
+            // bytes → base64 for the bridge.
+            let bin = '';
+            for (let i = 0; i < slice.length; i++) bin += String.fromCharCode(slice[i]);
+            result = { base64: btoa(bin) };
+            break;
+          }
+
+          case 'fileOpEnd': {
+            if (window.__fileSessions) delete window.__fileSessions[data.sessionId];
+            result = { ok: true };
+            break;
+          }
+
           default:
             throw new Error('Unknown operation: ' + operation);
         }

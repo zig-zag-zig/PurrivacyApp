@@ -94,6 +94,38 @@ export interface RevokedKeyResult {
     revocationCertificate: string;
 }
 
+// ---- Chunked file ops ----
+// Binary payloads can't cross injectJavaScript in one shot; bytes move in
+// base64 chunks into a per-session WebView buffer, the op runs, and output is
+// read back in chunks. `sessionId` is caller-chosen.
+
+export interface FileOpBeginRequest { sessionId: string; }
+export interface FileOpChunkRequest { sessionId: string; base64: string; }
+export interface FileOpEncryptRequest {
+    sessionId: string;
+    publicKeys: string[];
+    filename: string;
+    signOptions?: PrivateKeyAndPassphrase;
+}
+export interface FileOpDecryptRequest {
+    sessionId: string;
+    privateKey: string;
+    passphrase: string;
+    publicKeyForVerification?: string;
+}
+export interface FileOpResultChunkRequest { sessionId: string; offset: number; length: number; }
+export interface FileOpEndRequest { sessionId: string; }
+
+export interface FileOpEncryptResult { totalBytes: number; }
+export interface FileOpDecryptResult {
+    totalBytes: number;
+    filename: string;
+    verified: boolean | null;
+}
+export interface FileOpChunkAck { received: number; }
+export interface FileOpOk { ok: true; }
+export interface FileOpResultChunk { base64: string; }
+
 /**
  * Discriminated union of every PGP operation request sent to the WebView.
  * `operation` names the handler branch; `data` is the per-operation payload.
@@ -112,6 +144,12 @@ export interface PgpRequestMap {
     extractPublicKeyFromPrivate: { operation: 'extractPublicKeyFromPrivate'; data: ExtractPublicKeyRequest };
     revokeKey: { operation: 'revokeKey'; data: RevokeKeyRequest };
     applyRevocation: { operation: 'applyRevocation'; data: ApplyRevocationRequest };
+    fileOpBegin: { operation: 'fileOpBegin'; data: FileOpBeginRequest };
+    fileOpChunk: { operation: 'fileOpChunk'; data: FileOpChunkRequest };
+    fileOpEncrypt: { operation: 'fileOpEncrypt'; data: FileOpEncryptRequest };
+    fileOpDecrypt: { operation: 'fileOpDecrypt'; data: FileOpDecryptRequest };
+    fileOpResultChunk: { operation: 'fileOpResultChunk'; data: FileOpResultChunkRequest };
+    fileOpEnd: { operation: 'fileOpEnd'; data: FileOpEndRequest };
 }
 
 export type PgpOperationName = keyof PgpRequestMap;
@@ -131,6 +169,12 @@ export interface PgpResponseMap {
     extractPublicKeyFromPrivate: string;
     revokeKey: RevokedKeyResult;
     applyRevocation: string;
+    fileOpBegin: FileOpOk;
+    fileOpChunk: FileOpChunkAck;
+    fileOpEncrypt: FileOpEncryptResult;
+    fileOpDecrypt: FileOpDecryptResult;
+    fileOpResultChunk: FileOpResultChunk;
+    fileOpEnd: FileOpOk;
 }
 
 export type PgpOperationResponse<T extends PgpOperationName> = PgpResponseMap[T];
@@ -218,6 +262,20 @@ export const isPgpOperationResultValid = (
                 && typeof (result as { revocationCertificate?: unknown }).revocationCertificate === 'string';
         case 'applyRevocation':
             return typeof result === 'string';
+        case 'fileOpBegin':
+        case 'fileOpEnd':
+            return isRecord(result) && result.ok === true;
+        case 'fileOpChunk':
+            return isRecord(result) && typeof result.received === 'number';
+        case 'fileOpEncrypt':
+            return isRecord(result) && typeof result.totalBytes === 'number';
+        case 'fileOpDecrypt':
+            return isRecord(result)
+                && typeof result.totalBytes === 'number'
+                && typeof result.filename === 'string'
+                && (result.verified == null || typeof result.verified === 'boolean');
+        case 'fileOpResultChunk':
+            return isRecord(result) && typeof result.base64 === 'string';
         case 'verifyDetachedSignature':
         case 'validatePrivateKeyPassphrase':
             return typeof result === 'boolean';
