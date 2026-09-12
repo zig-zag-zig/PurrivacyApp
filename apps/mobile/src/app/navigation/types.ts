@@ -21,6 +21,7 @@ export type TabParamList = {
     Key: { text?: string; action?: 'create' | 'import' } | undefined;
     Encrypt: { text?: string } | undefined;
     Decrypt: { text?: string } | undefined;
+    Notes: undefined;
     Settings: undefined;
 };
 

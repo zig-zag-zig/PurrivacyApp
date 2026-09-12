@@ -13,7 +13,10 @@ import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
 
-type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase;
+type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {
+  /** Discriminant: 'note' for secure-note records, absent for real keys. */
+  type?: string;
+};
 type StorageKeyPayload = KeyPair & {
   privateKeyPassphrase?: string | null;
 };
@@ -125,6 +128,11 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
       await AuthService.decrypt(userId, keyRecord.encryptedData, dek, keyRecord.iv, false, keyRecord.tag),
     ) as DecryptedKeyPayload;
 
+    // Note records share the key-records store; skip non-key payloads so the
+    // keyring never sees them. A genuine key record must still have publicKey.
+    if (decryptedKey.type === 'note') {
+      continue;
+    }
     const privateKey = decryptedKey.privateKey ?? null;
     const publicKey = decryptedKey.publicKey;
     if (!publicKey) {
