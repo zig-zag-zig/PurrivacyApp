@@ -158,6 +158,7 @@ export const DecryptScreen = () => {
             onCopy={decryptPage.onCopy}
             embeddedSignatureStatus={decryptPage.state.embeddedSignatureStatus}
             detachedSignatureStatus={decryptPage.state.detachedSignatureStatus}
+            senderVerified={decryptPage.senderVerified}
             testIDPrefix="purrivacy.decrypt.result"
           />
         )}

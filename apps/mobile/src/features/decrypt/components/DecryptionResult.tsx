@@ -14,6 +14,11 @@ interface DecryptionResultProps {
     onCopy: () => void;
     embeddedSignatureStatus?: 'valid' | 'invalid' | 'unknown';
     detachedSignatureStatus?: 'valid' | 'invalid' | 'unknown';
+    /**
+     * Whether the selected sender key carries the user's `verified` claim.
+     * `undefined` = no sender selected / not applicable.
+     */
+    senderVerified?: boolean;
     testIDPrefix?: string;
 }
 
@@ -22,6 +27,7 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
     onCopy,
     embeddedSignatureStatus = 'unknown',
     detachedSignatureStatus,
+    senderVerified,
     testIDPrefix,
 }) => {
     const copyFeedback = useCopyFeedback();
@@ -74,6 +80,19 @@ export const DecryptionResult: React.FC<DecryptionResultProps> = ({
                     />
                     <CustomText style={[commonStyles.textBody, { marginLeft: theme.spacing.xs, color: detachedSignatureStatus === 'valid' ? theme.colors.success : theme.colors.error }]}>
                         {detachedSignatureStatus === 'valid' ? 'Detached signature valid' : 'Detached signature invalid'}
+                    </CustomText>
+                </View>
+            ) : null}
+
+            {senderVerified !== undefined && embeddedSignatureStatus === 'valid' ? (
+                <View style={commonStyles.signatureRow}>
+                    <Icon
+                        name={senderVerified ? 'verified-user' : 'help-outline'}
+                        size={18}
+                        color={senderVerified ? theme.colors.success : theme.colors.warning}
+                    />
+                    <CustomText style={[commonStyles.textBody, { marginLeft: theme.spacing.xs, color: senderVerified ? theme.colors.success : theme.colors.warning }]}>
+                        {senderVerified ? 'Sender verified' : 'Sender key not verified'}
                     </CustomText>
                 </View>
             ) : null}

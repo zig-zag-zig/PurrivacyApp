@@ -7,6 +7,7 @@ import { KeyItemSummary } from './keyItem/KeyItemSummary';
 import { KeyMutationControls } from './keyItem/KeyMutationControls';
 import { KeyPublicKeySection } from './keyItem/KeyPublicKeySection';
 import { KeyRevealSection } from './keyItem/KeyRevealSection';
+import { VerifyFingerprintSection } from './keyItem/VerifyFingerprintSection';
 import { useKeyMutationControls } from './keyItem/useKeyMutationControls';
 import { useKeyReveal } from './keyItem/useKeyReveal';
 import { styles } from './keyItem/styles';
@@ -77,6 +78,8 @@ export const KeyItem = ({ pgpKey, onDelete, onSetDefault, onPress, expanded, rea
                     )}
 
                     <KeyPublicKeySection pgpKey={pgpKey} />
+
+                    <VerifyFingerprintSection pgpKey={pgpKey} />
                 </View>
             )}
             <KeyItemDialogs

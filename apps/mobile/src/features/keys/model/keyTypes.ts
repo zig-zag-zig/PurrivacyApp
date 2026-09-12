@@ -11,6 +11,13 @@ export interface KeyPairBase {
     privateKeyPassphrase?: string | null;
     /** Standalone armored revocation certificate for this key, if generated/imported. */
     revocationCertificate?: string | null;
+    /**
+     * True once the user has compared this public key's fingerprint against a
+     * trusted source (the contact's own out-of-band channel). It's a device
+     * claim stored on the record, not derivable from the armor, so it travels
+     * with the encrypted payload like revocationCertificate.
+     */
+    verified?: boolean;
 }
 
 export type PgpAlgorithm = 'RSA' | 'ECDSA' | 'EDDSA';

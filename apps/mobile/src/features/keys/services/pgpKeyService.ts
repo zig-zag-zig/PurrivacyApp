@@ -14,6 +14,7 @@ import {
     importKey,
     revokeKey,
     setDefaultKey,
+    setKeyVerified,
     storeSyncedPassphrase,
 } from './keyMutationService';
 import type { RevokeKeyOutcome } from './keyMutationService';
@@ -72,6 +73,10 @@ export class PgpKeyService {
 
     static async setDefaultKey(userId: string, fingerprint: string): Promise<void> {
         return setDefaultKey(userId, fingerprint);
+    }
+
+    static async setKeyVerified(userId: string, fingerprint: string, verified: boolean): Promise<void> {
+        return setKeyVerified(userId, fingerprint, verified);
     }
 
     static async revokeKey(

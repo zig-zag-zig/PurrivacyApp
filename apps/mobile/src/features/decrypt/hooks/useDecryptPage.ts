@@ -201,6 +201,15 @@ export function useDecryptPage() {
     );
   };
 
+  // The selected sender key (decrypt 'Sender' picker) is a KeyPair in
+  // visibleKeys; surface its `verified` flag so the result can show trust.
+  const senderKeyFingerprint = hasSelectedKeys(state.selectedPublicKeys)
+    ? getFirstSelectedKeyId(state.selectedPublicKeys)
+    : undefined;
+  const senderVerified = senderKeyFingerprint
+    ? visibleKeys.find(k => k.fingerprint === senderKeyFingerprint)?.verified === true
+    : undefined;
+
   return {
     state,
     userDecrypted,
@@ -208,6 +217,7 @@ export function useDecryptPage() {
     isLoadingOverlay: !userDecrypted || isAuthLoading,
     privateKeys,
     publicKeys: keySelectionKeys,
+    senderVerified,
     isDecryptDisabled: !hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting,
     canDecrypt:
       !(!hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting)

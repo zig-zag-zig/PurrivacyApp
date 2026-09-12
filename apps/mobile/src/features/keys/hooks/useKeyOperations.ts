@@ -327,6 +327,19 @@ export function useKeyOperations({
     }
   };
 
+  const onSetKeyVerified = async (fingerprint: string, verified: boolean) => {
+    if (!user) return;
+    dispatch({ type: 'loadingChanged', isLoading: true });
+    try {
+      await PgpKeyService.setKeyVerified(user.uid, fingerprint, verified);
+      refreshUserKeys();
+    } catch (error: any) {
+      throw error;
+    } finally {
+      dispatch({ type: 'loadingChanged', isLoading: false });
+    }
+  };
+
   const onPickImportFile = () => {
     void pickFile(
       content => dispatch({ type: 'importKeyChanged', importKey: content }),
@@ -342,6 +355,7 @@ export function useKeyOperations({
     onChangePassphrase,
     onChangeExpiration,
     onRevokeKey,
+    onSetKeyVerified,
     onPickImportFile,
   };
 }

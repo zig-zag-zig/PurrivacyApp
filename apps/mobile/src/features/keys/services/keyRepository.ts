@@ -153,6 +153,8 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
       // Standalone cert isn't derivable from the armored key; carry it through
       // the encrypted payload. `revoked` comes from fresh metadata extraction.
       revocationCertificate: decryptedKey.revocationCertificate ?? null,
+      // Verified is a device-side claim, not derivable from armor either.
+      verified: decryptedKey.verified === true,
     };
 
     decryptedKeys.push(key);

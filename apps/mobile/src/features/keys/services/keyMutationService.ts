@@ -376,6 +376,33 @@ export async function setDefaultKey(userId: string, fingerprint: string): Promis
   }
 }
 
+/**
+ * Set or clear the `verified` claim on a public-key record. `verified` is a
+ * device-side attestation that the user compared the fingerprint against a
+ * trusted channel; it isn't derivable from the armor, so it's re-encrypted
+ * back onto the record. Only meaningful for public keys (contacts).
+ */
+export async function setKeyVerified(
+  userId: string,
+  fingerprint: string,
+  verified: boolean,
+): Promise<void> {
+  try {
+    const user = await getUserDecrypted(userId);
+    if (!user) return;
+
+    const key = user.keys.find(existingKey => existingKey.fingerprint === fingerprint);
+    if (!key) {
+      throw new Error('Key not found');
+    }
+
+    await updateEncryptedKeyRecord(userId, { ...key, verified });
+  } catch (error) {
+    logger.warn('set key verified failed', { error });
+    throw new Error('Failed to update verified status');
+  }
+}
+
 export async function storeSyncedPassphrase(
   userId: string,
   fingerprint: string,
