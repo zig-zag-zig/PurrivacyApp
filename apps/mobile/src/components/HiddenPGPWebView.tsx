@@ -375,14 +375,40 @@ const PGP_HTML = `
             break;
           }
 
-          // ---- Chunked file ops ----
-          // Binary payloads are too large for a single injectJavaScript call, so
-          // bytes move in base64 chunks into a session buffer; the op then
-          // produces an output buffer read back in chunks. Sessions are keyed by
-          // an id the caller supplies so concurrent reads can interleave.
+          // ---- Streaming file ops ----
+          // Bytes cross the bridge as base64 chunks. On the WebView side the
+          // input is an async-generator ReadableStream fed by a queue, and the
+          // output is a stream reader — so the WebView never buffers the whole
+          // file; backpressure is pull-based (the caller reads one chunk, then
+          // the next is only produced on demand).
           case 'fileOpBegin': {
             if (!window.__fileSessions) window.__fileSessions = {};
-            window.__fileSessions[data.sessionId] = { chunks: [], out: null };
+            const waiters = [];
+            const queue = [];
+            const session = {
+              queue,
+              waiters,
+              done: false,
+              reader: null,
+              pending: null,
+              error: null,
+              // ReadableStream the literal-data packet reads from. pull() blocks
+              // until a chunk is pushed or the stream is closed — openpgp
+              // accepts a web ReadableStream, not a bare async generator.
+              feed: function () {
+                return new ReadableStream({
+                  async pull(controller) {
+                    for (;;) {
+                      if (queue.length) { controller.enqueue(queue.shift()); return; }
+                      if (session.done) { controller.close(); return; }
+                      if (session.error) { controller.error(session.error); return; }
+                      await new Promise(resolve => waiters.push(resolve));
+                    }
+                  },
+                });
+              },
+            };
+            window.__fileSessions[data.sessionId] = session;
             result = { ok: true };
             break;
           }
@@ -390,23 +416,29 @@ const PGP_HTML = `
           case 'fileOpChunk': {
             const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
             if (!sess) throw new Error('fileOpChunk: unknown session');
-            // base64 → bytes, appended. Decoding happens in the WebView so the
-            // bridge only ever carries strings.
             const bin = atob(data.base64);
             const bytes = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            sess.chunks.push(bytes);
+            sess.queue.push(bytes);
+            // Wake the generator if it's waiting on a chunk.
+            const w = sess.waiters.shift();
+            if (w) w();
             result = { received: bytes.length };
+            break;
+          }
+
+          // Report pending input depth so the feeder can apply backpressure
+          // (hold off pushing while the WebView still has queued chunks).
+          case 'fileOpStatus': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpStatus: unknown session');
+            result = { queueDepth: sess.queue.length, inputDone: sess.done === true };
             break;
           }
 
           case 'fileOpEncrypt': {
             const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
             if (!sess) throw new Error('fileOpEncrypt: unknown session');
-            const total = sess.chunks.reduce((n, c) => n + c.length, 0);
-            const dataBytes = new Uint8Array(total);
-            let off = 0;
-            for (const c of sess.chunks) { dataBytes.set(c, off); off += c.length; }
 
             const keys = await Promise.all(
               (data.publicKeys || []).map(k => openpgp.readKey({ armoredKey: k }))
@@ -422,30 +454,27 @@ const PGP_HTML = `
               signingKey = await getUnlockedPrivateKey(data.signOptions.privateKey, openpgp, data.signOptions.passphrase);
             }
 
+            // Stream input → ciphertext stream. Output is a reader kept on the
+            // session; the caller drains it via fileOpResultChunk.
             const msg = await openpgp.createMessage({
-              binary: dataBytes,
+              binary: sess.feed(),
               filename: data.filename || 'file',
               date: new Date(),
             });
             const params = { message: msg, encryptionKeys: keys, format: 'binary' };
             if (signingKey) params.signingKeys = signingKey;
             const out = await openpgp.encrypt(params);
-            sess.out = out instanceof Uint8Array ? out : new Uint8Array(out);
-            sess.chunks = [];
-            result = { totalBytes: sess.out.length };
+            sess.reader = out.getReader();
+            result = { ok: true };
             break;
           }
 
           case 'fileOpDecrypt': {
             const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
             if (!sess) throw new Error('fileOpDecrypt: unknown session');
-            const total = sess.chunks.reduce((n, c) => n + c.length, 0);
-            const cipherBytes = new Uint8Array(total);
-            let off = 0;
-            for (const c of sess.chunks) { cipherBytes.set(c, off); off += c.length; }
 
             const unlocked = await getUnlockedPrivateKey(data.privateKey, openpgp, data.passphrase);
-            const enc = await openpgp.readMessage({ binaryMessage: cipherBytes });
+            const enc = await openpgp.readMessage({ binaryMessage: sess.feed() });
             const verificationKeys = data.publicKeyForVerification
               ? await openpgp.readKey({ armoredKey: data.publicKeyForVerification })
               : undefined;
@@ -462,25 +491,57 @@ const PGP_HTML = `
               try { await signatures[0].verified; verified = true; } catch { verified = false; }
             }
 
-            sess.out = dec instanceof Uint8Array ? dec : new Uint8Array(dec);
-            sess.chunks = [];
-            result = { totalBytes: sess.out.length, filename: filename || '', verified };
+            sess.reader = dec.getReader();
+            result = { ok: true, filename: filename || '', verified };
             break;
           }
 
+          // Pull-based output: read the next chunk off the session's reader.
+          // done:true when the stream is exhausted. Never buffers the file;
+          // 'pending' carries only the sub-maxLength tail between pulls.
           case 'fileOpResultChunk': {
             const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
-            if (!sess || !sess.out) throw new Error('fileOpResultChunk: no output');
-            const slice = sess.out.subarray(data.offset, data.offset + data.length);
-            // bytes → base64 for the bridge.
+            if (!sess || !sess.reader) throw new Error('fileOpResultChunk: no output');
+            const max = data.maxLength || 262144;
+            // Accumulate pending + freshly-read bytes until we have >= max or EOF.
+            let acc = sess.pending || new Uint8Array(0);
+            sess.pending = null;
+            let streamDone = false;
+            while (acc.length < max) {
+              const { done, value } = await sess.reader.read();
+              if (done || !value) { streamDone = true; break; }
+              const merged = new Uint8Array(acc.length + value.length);
+              merged.set(acc, 0); merged.set(value, acc.length);
+              acc = merged;
+            }
+            const slice = acc.length > max ? acc.subarray(0, max) : acc;
+            if (acc.length > max) sess.pending = acc.subarray(max);
+            const doneOut = streamDone && !sess.pending;
             let bin = '';
             for (let i = 0; i < slice.length; i++) bin += String.fromCharCode(slice[i]);
-            result = { base64: btoa(bin) };
+            result = { base64: btoa(bin), done: doneOut };
+            break;
+          }
+
+          // Signal end-of-input: closes the feeder stream but keeps the session
+          // (and its output reader) alive so the caller can drain the result.
+          case 'fileOpFinishInput': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpFinishInput: unknown session');
+            sess.done = true;
+            const w = sess.waiters.shift(); if (w) w();
+            result = { ok: true };
             break;
           }
 
           case 'fileOpEnd': {
-            if (window.__fileSessions) delete window.__fileSessions[data.sessionId];
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (sess) {
+              try { if (sess.reader) await sess.reader.cancel(); } catch {}
+              sess.done = true;
+              const w = sess.waiters.shift(); if (w) w();
+              delete window.__fileSessions[data.sessionId];
+            }
             result = { ok: true };
             break;
           }

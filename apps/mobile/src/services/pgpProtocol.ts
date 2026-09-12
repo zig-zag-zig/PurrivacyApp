@@ -113,18 +113,27 @@ export interface FileOpDecryptRequest {
     passphrase: string;
     publicKeyForVerification?: string;
 }
-export interface FileOpResultChunkRequest { sessionId: string; offset: number; length: number; }
+// Result streaming is pull-based: the caller asks for the next chunk and the
+// WebView reads one buffer off the output stream — it never buffers the whole
+// file. `maxLength` bounds each pull.
+export interface FileOpResultChunkRequest { sessionId: string; maxLength: number; }
+export interface FileOpFinishInputRequest { sessionId: string; }
 export interface FileOpEndRequest { sessionId: string; }
+export interface FileOpStatusRequest { sessionId: string; }
 
-export interface FileOpEncryptResult { totalBytes: number; }
+export interface FileOpEncryptResult { ok: true; }
 export interface FileOpDecryptResult {
-    totalBytes: number;
+    ok: true;
     filename: string;
     verified: boolean | null;
 }
 export interface FileOpChunkAck { received: number; }
 export interface FileOpOk { ok: true; }
-export interface FileOpResultChunk { base64: string; }
+export interface FileOpResultChunk {
+    base64: string;
+    /** True when the output stream is exhausted — no more chunks follow. */
+    done: boolean;
+}
 
 /**
  * Discriminated union of every PGP operation request sent to the WebView.
@@ -149,6 +158,8 @@ export interface PgpRequestMap {
     fileOpEncrypt: { operation: 'fileOpEncrypt'; data: FileOpEncryptRequest };
     fileOpDecrypt: { operation: 'fileOpDecrypt'; data: FileOpDecryptRequest };
     fileOpResultChunk: { operation: 'fileOpResultChunk'; data: FileOpResultChunkRequest };
+    fileOpFinishInput: { operation: 'fileOpFinishInput'; data: FileOpFinishInputRequest };
+    fileOpStatus: { operation: 'fileOpStatus'; data: FileOpStatusRequest };
     fileOpEnd: { operation: 'fileOpEnd'; data: FileOpEndRequest };
 }
 
@@ -174,6 +185,8 @@ export interface PgpResponseMap {
     fileOpEncrypt: FileOpEncryptResult;
     fileOpDecrypt: FileOpDecryptResult;
     fileOpResultChunk: FileOpResultChunk;
+    fileOpFinishInput: FileOpOk;
+    fileOpStatus: { queueDepth: number; inputDone: boolean };
     fileOpEnd: FileOpOk;
 }
 
@@ -263,19 +276,26 @@ export const isPgpOperationResultValid = (
         case 'applyRevocation':
             return typeof result === 'string';
         case 'fileOpBegin':
+        case 'fileOpFinishInput':
         case 'fileOpEnd':
             return isRecord(result) && result.ok === true;
+        case 'fileOpStatus':
+            return isRecord(result)
+                && typeof result.queueDepth === 'number'
+                && typeof result.inputDone === 'boolean';
         case 'fileOpChunk':
             return isRecord(result) && typeof result.received === 'number';
         case 'fileOpEncrypt':
-            return isRecord(result) && typeof result.totalBytes === 'number';
+            return isRecord(result) && result.ok === true;
         case 'fileOpDecrypt':
             return isRecord(result)
-                && typeof result.totalBytes === 'number'
+                && result.ok === true
                 && typeof result.filename === 'string'
                 && (result.verified == null || typeof result.verified === 'boolean');
         case 'fileOpResultChunk':
-            return isRecord(result) && typeof result.base64 === 'string';
+            return isRecord(result)
+                && typeof result.base64 === 'string'
+                && typeof result.done === 'boolean';
         case 'verifyDetachedSignature':
         case 'validatePrivateKeyPassphrase':
             return typeof result === 'boolean';

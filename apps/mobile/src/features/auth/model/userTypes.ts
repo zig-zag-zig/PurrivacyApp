@@ -1,5 +1,6 @@
 import type { Encryption, EncryptionBase } from '../../../shared/model/cryptoTypes';
 import type { KeyPairWithRecordId } from '../../keys/model/keyTypes';
+import type { SecureNote } from '../../notes/services/notesService';
 
 interface UserBase {
     dekPassword: Encryption;
@@ -32,6 +33,12 @@ export interface UserCreatePayload extends UserEncrypted {
 
 export interface UserDecrypted extends UserBase {
     keys: KeyPairWithRecordId[];
+    /**
+     * Secure notes decrypted in the same pass as `keys` — note records share
+     * the key-records store, so getUserDecrypted already pays the decrypt cost;
+     * piggybacking avoids a second fetch/decrypt sweep.
+     */
+    notes: SecureNote[];
     passphraseStorageEnabled?: boolean;
 }
 

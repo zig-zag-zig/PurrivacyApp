@@ -12,10 +12,15 @@ import type { KeyMetadata } from '../../../types/types';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
+import { NOTE_RECORD_TYPE, type SecureNote } from '../../notes/services/notesService';
 
 type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {
   /** Discriminant: 'note' for secure-note records, absent for real keys. */
   type?: string;
+  // Note payload fields (present only when type === 'note').
+  title?: string;
+  body?: string;
+  updatedAt?: number;
 };
 type StorageKeyPayload = KeyPair & {
   privateKeyPassphrase?: string | null;
@@ -122,15 +127,23 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
   const keyRecords = await ApiClient.fetchAllKeyRecords();
   const dek = await getAvailableDek(userId);
   const decryptedKeys: KeyPairWithRecordId[] = [];
+  const decryptedNotes: SecureNote[] = [];
 
   for (const keyRecord of keyRecords) {
     const decryptedKey = JSON.parse(
       await AuthService.decrypt(userId, keyRecord.encryptedData, dek, keyRecord.iv, false, keyRecord.tag),
     ) as DecryptedKeyPayload;
 
-    // Note records share the key-records store; skip non-key payloads so the
-    // keyring never sees them. A genuine key record must still have publicKey.
-    if (decryptedKey.type === 'note') {
+    // Note records share the key-records store; collect them here so the
+    // keyring and notes share a single fetch+decrypt pass instead of each
+    // decrypting the full set independently.
+    if (decryptedKey.type === NOTE_RECORD_TYPE) {
+      decryptedNotes.push({
+        id: keyRecord.recordId,
+        title: decryptedKey.title ?? '',
+        body: decryptedKey.body ?? '',
+        updatedAt: decryptedKey.updatedAt ?? 0,
+      });
       continue;
     }
     const privateKey = decryptedKey.privateKey ?? null;
@@ -160,5 +173,10 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
     decryptedKeys.push(key);
   }
 
-  return { ...userEncrypted, keys: decryptedKeys };
+  return {
+    ...userEncrypted,
+    keys: decryptedKeys,
+    // Newest first.
+    notes: decryptedNotes.sort((a, b) => b.updatedAt - a.updatedAt),
+  };
 }

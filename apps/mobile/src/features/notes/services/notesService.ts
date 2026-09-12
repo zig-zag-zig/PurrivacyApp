@@ -46,39 +46,16 @@ const encryptNote = async (userId: string, payload: NotePayload): Promise<Encryp
 };
 
 /**
- * Fetch all records and decrypt only the notes. Note records coexist with key
- * records in the same per-user store; this decrypts the same set the keyring
- * does but keeps only `type === 'note'` payloads.
+ * Notes are decrypted in the same sweep as keys — `getUserDecrypted` already
+ * decrypts every record and splits out `type === 'note'` payloads into
+ * `userDecrypted.notes`. Consumers read that list (via useAuth) rather than a
+ * second fetch+decrypt, and call `loadUser()` to refresh after a mutation.
+ *
+ * This helper exists only to refresh on demand; the list itself comes from
+ * `userDecrypted.notes`.
  */
-export async function fetchNotes(userId: string): Promise<SecureNote[]> {
-  if (userId.trim() === '') return [];
-
-  const keyRecords = await ApiClient.fetchAllKeyRecords();
-  const dek = await getAvailableDek(userId);
-  const notes: SecureNote[] = [];
-
-  for (const record of keyRecords) {
-    let decrypted: { type?: string } & Partial<SecureNote>;
-    try {
-      decrypted = JSON.parse(
-        await AuthService.decrypt(userId, record.encryptedData, dek, record.iv, false, record.tag),
-      );
-    } catch {
-      // A record that fails to decrypt isn't a note — the keyring path will
-      // surface genuine key-record corruption separately.
-      continue;
-    }
-    if (decrypted.type !== NOTE_RECORD_TYPE) continue;
-    notes.push({
-      id: record.recordId,
-      title: decrypted.title ?? '',
-      body: decrypted.body ?? '',
-      updatedAt: decrypted.updatedAt ?? 0,
-    });
-  }
-
-  // Newest first.
-  return notes.sort((a, b) => b.updatedAt - a.updatedAt);
+export function sortNotes(notes: SecureNote[]): SecureNote[] {
+  return [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function createNote(

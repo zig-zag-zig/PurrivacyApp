@@ -234,6 +234,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     appStateIsBackground: state.appStateIsBackground,
     lastSignedInUser: state.lastSignedInUser,
     signInWithFirebaseCustomToken,
+    loadUser,
     createSession,
     setLastUsedBiometricSignIn,
     toggleBiometric,
@@ -269,6 +270,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoginWithReauthenticateWithCredential,
     clearSecureStore,
     initializeBiometricState,
+    loadUser,
   ]);
 
   return (

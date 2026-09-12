@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
@@ -11,38 +11,29 @@ import { ConfirmationDialog } from '../../settings/components/ConfirmationDialog
 import { useToast } from '../../../app/state/ToastContext';
 import { useAuth } from '../../auth/state/AuthContext';
 import { theme } from '../../../styles/theme';
-import { createNote, deleteNote, fetchNotes, updateNote, type SecureNote } from '../services/notesService';
+import { createNote, deleteNote, sortNotes, updateNote, type SecureNote } from '../services/notesService';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 
 /**
  * Secure notes — flat list + editor + delete only. Notes are encrypted
  * key-records (type:'note') riding the same per-user DEK pipeline as keys; the
- * server only ever stores ciphertext.
+ * server only ever stores ciphertext. The list comes from `userDecrypted.notes`
+ * — decrypted in the same sweep as keys — so no second decrypt pass happens
+ * here; `loadUser()` refreshes after a mutation.
  */
 export const NotesScreen = () => {
-  const { user } = useAuth();
+  const { user, userDecrypted, loadUser } = useAuth();
   const { showToast } = useToast();
   const userId = user?.uid ?? '';
 
-  const [notes, setNotes] = useState<SecureNote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const notes = sortNotes(userDecrypted?.notes ?? []);
   const [editing, setEditing] = useState<{ id: string | null; title: string; body: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SecureNote | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!userId) return;
-    setLoading(true);
-    try {
-      setNotes(await fetchNotes(userId));
-    } catch (error) {
-      showToast(getUserFacingErrorMessage(error, 'Failed to load notes'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, showToast]);
-
-  useEffect(() => { load(); }, [load]);
+    await loadUser();
+  }, [loadUser]);
 
   const startNew = () => setEditing({ id: null, title: '', body: '' });
   const startEdit = (note: SecureNote) => setEditing({ id: note.id, title: note.title, body: note.body });
@@ -117,9 +108,7 @@ export const NotesScreen = () => {
       <AppScreenHeader eyebrow="Encrypted vault" icon="note-text-outline" title="Secure notes" />
       <Button label="New note" onPress={startNew} icon={<Icon name="add" size={20} color={theme.colors.onPrimary} />} testID="purrivacy.notes.new" />
 
-      {loading ? (
-        <CustomText style={styles.meta}>Loading…</CustomText>
-      ) : notes.length === 0 ? (
+      {notes.length === 0 ? (
         <View style={styles.empty}>
           <Icon name="note-add" size={40} color={theme.colors.textMuted} />
           <CustomText style={styles.emptyText}>No notes yet. Notes are end-to-end encrypted like your keys.</CustomText>
