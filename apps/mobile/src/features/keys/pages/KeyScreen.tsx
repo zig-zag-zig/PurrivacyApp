@@ -11,6 +11,7 @@ import { ScreenList } from '../../../components/ScreenList';
 import type { KeyPair } from '../../../types/types';
 import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
+import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
 import { KeyItem } from '../components/KeyItem';
@@ -43,6 +44,10 @@ export const KeyScreen = () => {
     return <ScreenContainer>{null}</ScreenContainer>;
   }
 
+  // Keep the title + action tabs mounted in a stable, non-virtualized header
+  // above whichever body renders. Virtualizing the action tabs inside a
+  // FlatList header made them racy/unreachable for E2E tooling — the tabs must
+  // always be present and tappable regardless of list mount timing.
   const header = (
     <>
       <AppScreenHeader
@@ -62,36 +67,37 @@ export const KeyScreen = () => {
   if (keyScreen.state.keyAction === 'view' && keyScreen.user) {
     // The vault list grows unboundedly; virtualize it. The list also owns
     // scrolling so expanded KeyItem rows (which mount native isolated inputs)
-    // recycle off-screen instead of all staying mounted.
+    // recycle off-screen instead of all staying mounted. The action tabs live
+    // in the fixed header above so they are never subject to list mounting.
     return (
-      <ScreenList
-        testID="purrivacy.key.screen"
-        ref={keyScreen.scrollRef as unknown as Ref<FlatList<KeyPair>>}
-        onScroll={keyScreen.onScroll}
-        scrollEventThrottle={16}
-        data={keyScreen.filteredKeys}
-        keyExtractor={(key) => key.fingerprint}
-        ListHeaderComponent={
-          <>
-            {header}
-            {keyScreen.showExpiryBanner ? (
-              <ExpiryBanner
-                expiringCount={keyScreen.expiryCounts.expiring}
-                expiredCount={keyScreen.expiryCounts.expired}
-                onShowExpiring={keyScreen.onShowExpiringKeys}
-                onDismiss={keyScreen.onDismissExpiryBanner}
-                testIDPrefix="purrivacy.key.expiry"
+      <View style={styles.screenColumn} testID="purrivacy.key.screen">
+        <View style={styles.fixedHeader}>{header}</View>
+        <ScreenList
+          ref={keyScreen.scrollRef as unknown as Ref<FlatList<KeyPair>>}
+          onScroll={keyScreen.onScroll}
+          scrollEventThrottle={16}
+          data={keyScreen.filteredKeys}
+          keyExtractor={(key) => key.fingerprint}
+          ListHeaderComponent={
+            <>
+              {keyScreen.showExpiryBanner ? (
+                <ExpiryBanner
+                  expiringCount={keyScreen.expiryCounts.expiring}
+                  expiredCount={keyScreen.expiryCounts.expired}
+                  onShowExpiring={keyScreen.onShowExpiringKeys}
+                  onDismiss={keyScreen.onDismissExpiryBanner}
+                  testIDPrefix="purrivacy.key.expiry"
+                />
+              ) : null}
+              <VaultFilterBar
+                searchQuery={keyScreen.state.vaultSearchQuery}
+                onSearchChange={keyScreen.onVaultSearchChanged}
+                activeFilter={keyScreen.state.vaultFilter}
+                onFilterChange={keyScreen.onVaultFilterChanged}
+                testIDPrefix="purrivacy.key.vault"
               />
-            ) : null}
-            <VaultFilterBar
-              searchQuery={keyScreen.state.vaultSearchQuery}
-              onSearchChange={keyScreen.onVaultSearchChanged}
-              activeFilter={keyScreen.state.vaultFilter}
-              onFilterChange={keyScreen.onVaultFilterChanged}
-              testIDPrefix="purrivacy.key.vault"
-            />
-          </>
-        }
+            </>
+          }
         ListEmptyComponent={
           keyScreen.sortedKeys.length > 0 ? (
             // Filtering produced no matches — distinct from the no-keys state.
@@ -145,7 +151,8 @@ export const KeyScreen = () => {
             </View>
           );
         }}
-      />
+        />
+      </View>
     );
   }
 
@@ -227,6 +234,15 @@ export const KeyScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Fixed, non-scrolling header column so the action tabs are always mounted
+  // and tappable; only the list body virtualizes below it.
+  screenColumn: {
+    ...commonStyles.container,
+  },
+  fixedHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+  },
   emptyState: {
     alignItems: 'center',
     gap: theme.spacing.md,

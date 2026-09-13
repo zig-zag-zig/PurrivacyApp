@@ -5,7 +5,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 
 const appRoot = path.resolve(__dirname, '..');
-const backendRoot = path.resolve(appRoot, '..', 'Purrivacy');
+const backendRoot = path.resolve(appRoot, '..', 'server');
 const backendPort = Number(process.env.PURRIVACY_E2E_BACKEND_PORT || 5000);
 const firebaseProject = process.env.PURRIVACY_E2E_FIREBASE_PROJECT || 'demo-purrivacy-e2e';
 const firebaseAuthHost = process.env.PURRIVACY_E2E_FIREBASE_AUTH_HOST || '127.0.0.1:9099';
