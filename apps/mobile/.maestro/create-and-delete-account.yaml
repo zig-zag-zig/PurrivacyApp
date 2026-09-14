@@ -1,0 +1,66 @@
+appId: vip.chi_chi.purrivacy
+env:
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+---
+# Full lifecycle: register a brand-new user (with a key), then delete the
+# account through the real backend, landing back on the sign-in screen.
+# Uses a unique username each run via the register subflow's TEST_USERNAME.
+
+- runFlow:
+    file: subflows/register-create-key-fixed.yaml
+    env:
+      TEST_USERNAME: "e2e-del-${Date.now()}"
+
+# Dismiss the passphrase-storage consent modal so the tab bar is reachable.
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.passphraseStorage.store"
+    timeout: 30000
+- tapOn:
+    id: "purrivacy.passphraseStorage.store"
+
+# We are now on the key vault with a key created. Navigate to Settings.
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+
+# Open the Delete Account confirmation
+- scrollUntilVisible:
+    element:
+      text: "Delete Account"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    text: "Delete Account"
+# Wait for the confirm dialog, then tap its Delete button.
+- extendedWaitUntil:
+    visible:
+      text: "Delete"
+    timeout: 15000
+- tapOn:
+    text: "Delete"
+
+# Security delete form — the field is near the top; wait for it then enter.
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.security.currentPassword"
+    timeout: 30000
+- tapOn:
+    id: "purrivacy.security.currentPassword"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.security.deleteSubmit"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.security.deleteSubmit"
+
+# After deletion the app should return to the sign-in screen.
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 60000

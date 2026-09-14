@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 import { File, FileMode, Paths } from 'expo-file-system';
 
 import { pgpCryptoService } from './pgpCryptoService';
+import { createSha256Hasher } from '../features/updates/services/updateSigning';
 import type { PrivateKeyAndPassphrase } from '../types/types';
 
 /**
@@ -37,11 +38,9 @@ const newSessionId = (): string =>
  * Stream a source file into the WebView session as base64 chunks, then signal
  * end-of-input. The session must already exist (`fileOpBegin` done by caller).
  */
-async function feedFileToSession(fileUri: string, sessionId: string): Promise<void> {
-    const source = new File(fileUri);
-    const info = source.info();
-    if (info.size !== undefined && info.size > MAX_FILE_BYTES) throw new Error('File is larger than the 100 MB limit');
-    const reader = source.stream().getReader();
+async function feedFileToSession(fileUri: string, sessionId: string): Promise<string> {
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    const hasher = createSha256Hasher();
     const waitForCapacity = async () => {
         // Apply backpressure: hold off pushing while the WebView already has
         // MAX_QUEUED_CHUNKS buffered, so a large file can't fill its heap.
@@ -52,6 +51,12 @@ async function feedFileToSession(fileUri: string, sessionId: string): Promise<vo
         }
     };
     try {
+        const source = new File(fileUri);
+        const info = source.info();
+        if (info.size !== undefined && info.size > MAX_FILE_BYTES) {
+            throw new Error('File is larger than the 100 MB limit');
+        }
+        reader = source.stream().getReader();
         for (;;) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -59,6 +64,7 @@ async function feedFileToSession(fileUri: string, sessionId: string): Promise<vo
             // Feed in CHUNK_BYTES slices regardless of the stream's chunking.
             for (let off = 0; off < value.length; off += CHUNK_BYTES) {
                 const slice = value.subarray(off, Math.min(off + CHUNK_BYTES, value.length));
+                hasher.update(slice);
                 await waitForCapacity();
                 await pgpCryptoService.execute('fileOpChunk', {
                     sessionId,
@@ -66,8 +72,13 @@ async function feedFileToSession(fileUri: string, sessionId: string): Promise<vo
                 });
             }
         }
+        return hasher.digestHex();
     } finally {
-        reader.releaseLock();
+        // Always close the input side — otherwise the crypto stream waits for
+        // more input forever and the output pull deadlocks.
+        if (reader) {
+            try { reader.releaseLock(); } catch { /* ignore */ }
+        }
         await pgpCryptoService.execute('fileOpFinishInput', { sessionId }).catch(() => {});
     }
 }
@@ -87,8 +98,9 @@ interface FileHandleLike {
 async function pullSessionToFile(
     sessionId: string,
     outFile: File,
- ): Promise<{ totalBytes: number; verified?: boolean | null }> {
+ ): Promise<{ totalBytes: number; verified?: boolean | null; sha256: string }> {
     const handle = outFile.open(FileMode.WriteOnly) as FileHandleLike;
+    const hasher = createSha256Hasher();
     let written = 0;
     let verified: boolean | null | undefined;
     try {
@@ -101,6 +113,7 @@ async function pullSessionToFile(
             if (base64.length) {
                 const bytes = base64ToBytes(base64);
                 handle.writeBytes(bytes);
+                hasher.update(bytes);
                 written += bytes.length;
             }
             if (done) {
@@ -111,7 +124,7 @@ async function pullSessionToFile(
     } finally {
         handle.close();
     }
-    return { totalBytes: written, verified };
+    return { totalBytes: written, verified, sha256: hasher.digestHex() };
 }
 
 export interface FileEncryptResult {
@@ -119,6 +132,10 @@ export interface FileEncryptResult {
     fileUri: string;
     fileName: string;
     totalBytes: number;
+    /** SHA-256 of the produced ciphertext (hex). */
+    sha256: string;
+    /** SHA-256 of the plaintext that was encrypted (hex). */
+    sourceSha256: string;
 }
 
 export interface FileDecryptResult {
@@ -127,6 +144,42 @@ export interface FileDecryptResult {
     fileName: string;
     totalBytes: number;
     verified: boolean | null;
+    /** SHA-256 of the decrypted bytes (hex) — compare against the source. */
+    sha256: string;
+}
+
+/**
+ * E2E helper: write a deterministic file of `sizeBytes` to the app cache.
+ * Content is byte[i] = (i * 31 + 7) & 0xff, so the host can compute the
+ * expected SHA-256 independently and verify the roundtrip byte-for-byte
+ * without needing to read a file from outside the app sandbox.
+ */
+export function writeDeterministicTestFile(sizeBytes: number): { uri: string; name: string; size: number; sha256: string } {
+    const bytes = new Uint8Array(sizeBytes);
+    for (let i = 0; i < sizeBytes; i += 1) bytes[i] = (i * 31 + 7) & 0xff;
+    const hasher = createSha256Hasher();
+    hasher.update(bytes);
+    const sha256 = hasher.digestHex();
+    const file = new File(Paths.cache, `e2e-test-${sizeBytes}.bin`);
+    file.create({ intermediates: true, overwrite: true });
+    const handle = file.open(FileMode.WriteOnly) as FileHandleLike;
+    try {
+        handle.writeBytes(bytes);
+    } finally {
+        handle.close();
+    }
+    return { uri: file.uri, name: `e2e-test-${sizeBytes}.bin`, size: sizeBytes, sha256 };
+}
+
+/**
+ * The most recent encrypt output, for the e2e decrypt step (which cannot open
+ * the system picker). Carries the plaintext SHA-256 so the decrypt result can
+ * be verified in-app, without any host/env round-trip.
+ */
+let lastEncryptedFile: { uri: string; name: string; sourceSha256: string } | null = null;
+
+export function getLastEncryptedFile(): { uri: string; name: string; sourceSha256: string } | null {
+    return lastEncryptedFile;
 }
 
 export const fileCryptoService = {
@@ -162,11 +215,16 @@ export const fileCryptoService = {
             // handles each bridge call async, so a pending output pull doesn't
             // block incoming input chunks — the two interleave naturally.
             const feed = feedFileToSession(sourceFileUri, sessionId);
-            const { totalBytes } = await pullSessionToFile(sessionId, outFile);
-            await feed;
+            const pull = pullSessionToFile(sessionId, outFile);
+            // Observe both so a feed failure surfaces instead of hiding behind
+            // the pull's timeout, and so neither rejects unhandled.
+            feed.catch(() => {});
+            pull.catch(() => {});
+            const [sourceSha256, { totalBytes, sha256 }] = await Promise.all([feed, pull]);
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
-            return { fileUri: outFile.uri, fileName: outName, totalBytes };
+            lastEncryptedFile = { uri: outFile.uri, name: outName, sourceSha256 };
+            return { fileUri: outFile.uri, fileName: outName, totalBytes, sha256, sourceSha256 };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
             throw error;
@@ -188,6 +246,7 @@ export const fileCryptoService = {
             await pgpCryptoService.execute('fileOpBegin', { sessionId });
             // Start feeding before parsing the streaming message.
             const feed = feedFileToSession(sourceFileUri, sessionId);
+            feed.catch(() => {});
             const { filename, verified } = await pgpCryptoService.execute('fileOpDecrypt', {
                 sessionId,
                 privateKey,
@@ -199,11 +258,12 @@ export const fileCryptoService = {
             const outFile = new File(Paths.cache, `purrivacy-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 
-            const pulled = await pullSessionToFile(sessionId, outFile);
-            await feed;
+            const pull = pullSessionToFile(sessionId, outFile);
+            pull.catch(() => {});
+            const [, pulled] = await Promise.all([feed, pull]);
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
-            return { fileUri: outFile.uri, fileName: outName, totalBytes: pulled.totalBytes, verified: pulled.verified ?? verified };
+            return { fileUri: outFile.uri, fileName: outName, totalBytes: pulled.totalBytes, verified: pulled.verified ?? verified, sha256: pulled.sha256 };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
             throw error;

@@ -34,9 +34,12 @@ env:
     commands:
       - tapOn:
           id: "purrivacy.signup.submit"
-- extendedWaitUntil:
-    visible:
+# seed.saved sits below the 24-word card; scroll to it rather than asserting
+# it is already on screen (viewport-dependent).
+- scrollUntilVisible:
+    element:
       id: "purrivacy.seed.saved"
+    direction: DOWN
     timeout: 30000
 - copyTextFrom:
     text: "^[a-z]+$"

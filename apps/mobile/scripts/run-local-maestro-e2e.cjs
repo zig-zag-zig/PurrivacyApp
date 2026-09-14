@@ -40,6 +40,11 @@ function getMaestroTargets() {
   if (explicitFlow) {
     return [explicitFlow];
   }
+  // --flows a.yaml,b.yaml runs several flows in one session.
+  const explicitFlows = getArgValue('--flows');
+  if (explicitFlows) {
+    return explicitFlows.split(',').map(f => f.trim()).filter(Boolean);
+  }
 
   return process.argv.includes('--smoke') ? ['.maestro/smoke.yaml'] : defaultMaestroTargets;
 }
@@ -167,6 +172,26 @@ async function runInsideEmulators() {
   try {
     await waitForUrl(`http://127.0.0.1:${backendPort}/v1/health`);
     runSync('node', ['scripts/seed-e2e-fixtures.cjs'], { cwd: appRoot, env: backendEnv });
+    // Optionally push local fixture files onto the device before the flows
+    // (file crypto e2e reads them via a device path). Format:
+    //   PURRIVACY_E2E_PUSH_FILES=local1:/sdcard/Download/a.bin,local2:/sdcard/Download/b.bin
+    const pushSpec = process.env.PURRIVACY_E2E_PUSH_FILES;
+    if (pushSpec) {
+      const deviceId = process.env.ANDROID_SERIAL;
+      if (!deviceId) throw new CommandError('[e2e] PURRIVACY_E2E_PUSH_FILES requires a connected device (ANDROID_SERIAL)');
+      for (const pair of pushSpec.split(',')) {
+        const [src, dest] = pair.split(':').map(s => s.trim());
+        if (!src || !dest) continue;
+        console.log(`[e2e] pushing ${src} -> ${dest}`);
+        // Ensure the destination dir exists (the app's external files dir is
+        // wiped on uninstall and recreated empty on install).
+        const destDir = dest.split('/').slice(0, -1).join('/');
+        if (destDir) {
+          runSync('adb', ['-s', deviceId, 'shell', 'mkdir', '-p', destDir], { cwd: appRoot, env: backendEnv });
+        }
+        runSync('adb', ['-s', deviceId, 'push', src, dest], { cwd: appRoot, env: backendEnv });
+      }
+    }
     runSync('node', ['scripts/run-maestro.cjs', ...maestroTargets], { cwd: appRoot, env: backendEnv });
   } finally {
     process.off('SIGINT', onSigint);
@@ -188,6 +213,10 @@ if (!insideEmulators) {
   const explicitFlow = getArgValue('--flow');
   if (explicitFlow) {
     commandArgs.push('--flow', explicitFlow);
+  }
+  const explicitFlows = getArgValue('--flows');
+  if (explicitFlows) {
+    commandArgs.push('--flows', explicitFlows);
   }
   const command = commandArgs.map(arg => JSON.stringify(arg)).join(' ');
 

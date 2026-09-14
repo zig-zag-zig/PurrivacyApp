@@ -21,7 +21,8 @@
     "build:release": "npm run verify && npm run doctor && node scripts/with-env.cjs production -- node scripts/android-local-build.cjs release",
     "build:release:install": "npm run verify && npm run doctor && node scripts/with-env.cjs production -- node scripts/android-local-build.cjs release --install",
     "e2e": "npm run verify && node scripts/run-local-android-e2e.cjs",
-    "e2e:smoke": "npm run verify && node scripts/run-local-android-e2e.cjs --smoke"
+    "e2e:smoke": "npm run verify && node scripts/run-local-android-e2e.cjs --smoke",
+    "e2e:file-notes": "node scripts/run-e2e-file-notes.cjs"
   },
   "expo": {
     "doctor": {

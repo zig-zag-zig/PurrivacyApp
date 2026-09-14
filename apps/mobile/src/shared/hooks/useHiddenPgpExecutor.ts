@@ -47,10 +47,16 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
                 'createDetachedSignature',
                 'verifyDetachedSignature',
                 'extractPublicKeyFromPrivate',
+                // File ops unlock a private key (PBKDF2) and stream large data;
+                // fileOpResultChunk can block while the output stream produces
+                // the next chunk, so it needs a generous cap too.
+                'fileOpEncrypt',
+                'fileOpDecrypt',
+                'fileOpResultChunk',
             ]);
             let timeoutMs = 30000; // default (light ops)
             if (CRYPTO_HEAVY_OPS.has(operation)) {
-                timeoutMs = 90000;
+                timeoutMs = 120000;
             } else if (operation === 'generateKeyPair') {
                 const bits = (data as PgpRequestMap['generateKeyPair']['data'] | undefined)?.bitStrength;
                 if (bits !== undefined && bits >= 4096) timeoutMs = 180000;

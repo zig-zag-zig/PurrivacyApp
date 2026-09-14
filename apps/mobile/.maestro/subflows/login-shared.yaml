@@ -1,0 +1,28 @@
+appId: vip.chi_chi.purrivacy
+---
+# Sign in as the seeded shared fixture user (e2e-shared). The user and its key
+# are created by seed-e2e-fixtures.cjs before flows run; the key passphrase is
+# the register subflow's KEY_PASSPHRASE default (maestroe2epassphrase123).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${FIXTURE_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${FIXTURE_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000

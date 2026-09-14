@@ -78,6 +78,7 @@ export const SecurityForm: React.FC<SecurityFormProps> = ({
                 showToggleSecureText
                 textContentType="password"
                 error={formErrors.currentPassword}
+                testID="purrivacy.security.currentPassword"
             />
 
             {type === 'password' && (
@@ -113,6 +114,7 @@ export const SecurityForm: React.FC<SecurityFormProps> = ({
                 onPress={onSubmit}
                 loading={isLoading}
                 style={type === 'delete' ? { backgroundColor: theme.colors.error } : undefined}
+                testID={type === 'delete' ? 'purrivacy.security.deleteSubmit' : 'purrivacy.security.submit'}
             />
         </View>
     );

@@ -1,0 +1,104 @@
+appId: vip.chi_chi.purrivacy
+env:
+  # E2E_SIZE_LABEL selects a size preset in the panel (256KB | 256KB1 | 1MB |
+  # 10MB | 50MB). E2E_FILE_SHA256 is the SHA-256 of that deterministic content
+  # (byte[i] = (i*31+7)&0xff), computed on the host by the runner.
+  E2E_SIZE_LABEL: "1MB"
+  E2E_FILE_SHA256: ""
+---
+# File encryption roundtrip against the real WebView bridge + real backend.
+# The app generates a deterministic binary file in its sandbox, encrypts it to
+# .pgp, then decrypts that file back. The decrypted SHA-256 must equal the
+# independently-computed source SHA-256 (byte-for-byte roundtrip).
+
+- runFlow:
+    file: subflows/login-shared.yaml
+    env:
+      FIXTURE_USERNAME: "e2e-shared"
+      FIXTURE_PASSWORD: "Purrivacy-e2e-password-123"
+
+# --- Encrypt ---
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.mode.file"
+# Select the test file size, then "Choose a file" (e2e: generates it in-sandbox)
+- tapOn:
+    id: "purrivacy.encrypt.file.size.${E2E_SIZE_LABEL}"
+- tapOn:
+    id: "purrivacy.encrypt.file.pick"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.encrypt.file.recipients.item.0"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.file.recipients.item.0"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.encrypt.file.run"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.file.run"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.encrypt.file.sha256"
+    direction: DOWN
+    timeout: 120000
+- copyTextFrom:
+    id: "purrivacy.encrypt.file.sha256"
+- evalScript: ${output.cipherSha = maestro.copiedText}
+
+# --- Decrypt (reuses the .pgp the encrypt step produced) ---
+- tapOn:
+    id: "purrivacy.tab.decrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.decrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.mode.file"
+- tapOn:
+    id: "purrivacy.decrypt.file.pick"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.file.key.item.0"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.file.key.item.0"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.file.key.passphrase"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.file.key.passphrase"
+- inputText: "maestroe2epassphrase123"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.file.run"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.decrypt.file.run"
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.decrypt.file.verdict"
+    direction: DOWN
+    timeout: 120000
+- assertVisible:
+    text: "MATCH"
+- copyTextFrom:
+    id: "purrivacy.decrypt.file.sha256"
+- evalScript: ${output.decryptedSha = maestro.copiedText}
+
+# The panel compares the decrypted SHA-256 against the plaintext SHA-256 it
+# recorded during encrypt and renders MATCH/MISMATCH — a byte-for-byte check
+# of the real streaming pipeline.

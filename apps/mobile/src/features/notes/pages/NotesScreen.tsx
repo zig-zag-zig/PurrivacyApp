@@ -115,13 +115,13 @@ export const NotesScreen = () => {
           <CustomText style={styles.emptyText}>No notes yet. Notes are end-to-end encrypted like your keys.</CustomText>
         </View>
       ) : (
-        notes.map(note => (
-          <TouchableOpacity key={note.id} style={styles.noteCard} onPress={() => startEdit(note)} testID={`purrivacy.notes.item.${note.id}`}>
+        notes.map((note, index) => (
+          <TouchableOpacity key={note.id} style={styles.noteCard} onPress={() => startEdit(note)} testID={`purrivacy.notes.item.${index}`}>
             <View style={styles.noteText}>
               <CustomText style={styles.noteTitle} numberOfLines={1}>{note.title}</CustomText>
               {note.body ? <CustomText style={styles.notePreview} numberOfLines={2}>{note.body}</CustomText> : null}
             </View>
-            <TouchableOpacity onPress={() => setDeleteTarget(note)} hitSlop={8} testID={`purrivacy.notes.delete.${note.id}`}>
+            <TouchableOpacity onPress={() => setDeleteTarget(note)} hitSlop={8} testID={`purrivacy.notes.delete.${index}`}>
               <Icon name="delete-outline" size={22} color={theme.colors.error} />
             </TouchableOpacity>
           </TouchableOpacity>
