@@ -13,3 +13,4 @@ Thumbs.db
 
 # Scratch logs dropped at repo root
 /*.log
+test-*.bin
