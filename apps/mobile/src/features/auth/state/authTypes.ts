@@ -27,4 +27,6 @@ export type AuthContextType = {
   signInWithFirebaseCustomToken: (customToken: string, legitCustomTokenSignIn: boolean) => Promise<User>;
   createSession: () => Promise<void>;
   initializeBiometricState: () => Promise<{ available: boolean; enabled: boolean; }>;
+  /** Re-fetch + decrypt the user's records (keys + notes) from the server. */
+  loadUser: () => Promise<UserDecrypted | null>;
 };

@@ -28,6 +28,8 @@ import { UpdateProvider } from './src/features/updates/state/UpdateContext';
 import { initErrorMonitoring, wrapWithErrorMonitoring } from './src/services/monitoring/sentry';
 import { PassphraseBannerOverlayProvider } from './src/features/keys/components/PassphraseBannerOverlay';
 import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
+import { OperationCenterProvider } from './src/app/state/OperationCenterContext';
+import { OperationCenterUI } from './src/app/components/OperationCenterUI';
 import { usePassphraseStorageAutoSync } from './src/features/security/hooks/usePassphraseStorageAutoSync';
 import { useStartupUpdateCheck } from './src/app/hooks/useStartupUpdateCheck';
 import { useShareIntentRouting } from './src/app/hooks/useShareIntentRouting';
@@ -82,6 +84,7 @@ const AppContent = () => {
                     onTouchStart={() => user?.uid ? resetSessionTimer(user.uid, lock) : {}}
                 >
                     <StackNavigator />
+                    <OperationCenterUI />
                 </SafeAreaView>
             ) : null}
             {!showStartupLoading && user ? (
@@ -100,6 +103,7 @@ function App() {
                 <ErrorBoundary>
                     <GlobalSpinnerProvider>
                         <ToastProvider>
+                            <OperationCenterProvider>
                             <AuthProvider>
                                 <MfaProvider>
                                     <ModalProvider>
@@ -113,6 +117,7 @@ function App() {
                                     </ModalProvider>
                                 </MfaProvider>
                             </AuthProvider>
+                            </OperationCenterProvider>
                         </ToastProvider>
                     </GlobalSpinnerProvider>
                 </ErrorBoundary>

@@ -206,6 +206,11 @@ export const commonStyles = StyleSheet.create({
         borderWidth: 1,
         borderColor: theme.colors.dividerStrong,
     },
+    buttonDanger: {
+        backgroundColor: theme.colors.errorMuted,
+        borderWidth: 1,
+        borderColor: theme.colors.error,
+    },
     disabled: {
         opacity: 0.46,
     },

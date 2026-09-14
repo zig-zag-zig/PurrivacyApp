@@ -17,7 +17,7 @@ type ButtonSize = 'default' | 'compact';
 type ButtonProps = {
     label?: string;
     onPress: () => void;
-    variant?: 'primary' | 'secondary';
+    variant?: 'primary' | 'secondary' | 'danger';
     loading?: boolean;
     icon?: React.ReactNode;
     disabled?: boolean;
@@ -48,6 +48,8 @@ export const Button = ({
         switch (variant) {
             case 'primary':
                 return commonStyles.buttonPrimary;
+            case 'danger':
+                return commonStyles.buttonDanger;
             default:
                 return commonStyles.buttonSecondary;
         }
@@ -55,6 +57,7 @@ export const Button = ({
 
     const getTextColor = () => {
         if (variant === 'primary') return theme.colors.onPrimary;
+        if (variant === 'danger') return theme.colors.error;
         if (disabled && !loading) return theme.colors.textMuted;
         return theme.colors.text;
     };

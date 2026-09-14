@@ -118,10 +118,11 @@ async function enableMfaViaApi() {
 
   console.log(`[fixtures] MFA enabled for ${MFA_USERNAME} (secret ${secret.slice(0, 4)}…, code ${code})`);
 
-  // Persist one fresh single-use recovery code so the mfa-login-recovery-code
-  // auxiliary flow can sign in WITHOUT a TOTP oracle. Codes are one-time use:
-  // re-seed before re-running that flow.
-  return recoveryCodes[0];
+  // Persist one fresh single-use recovery code (for the mfa-login-recovery-code
+  // flow) AND the TOTP secret, so the auxiliary runner can mint a FRESH code
+  // before each run — recovery codes are single-use, so without this the flow
+  // could only pass once per seed.
+  return { recoveryCode: recoveryCodes[0], secret };
 }
 
 async function main() {
@@ -146,8 +147,11 @@ async function main() {
   }
 
   let mfaRecoveryCode = null;
+  let mfaSecret = null;
   try {
-    mfaRecoveryCode = await enableMfaViaApi();
+    const mfaFixture = await enableMfaViaApi();
+    mfaRecoveryCode = mfaFixture.recoveryCode;
+    mfaSecret = mfaFixture.secret;
   } catch (error) {
     console.error(error.message);
     process.exit(1);
@@ -155,7 +159,12 @@ async function main() {
 
   const fixtures = {
     shared: { username: 'e2e-shared', password: 'Purrivacy-e2e-password-123' },
-    mfa: { username: MFA_USERNAME, password: MFA_PASSWORD, recoveryCode: mfaRecoveryCode },
+    mfa: {
+      username: MFA_USERNAME,
+      password: MFA_PASSWORD,
+      recoveryCode: mfaRecoveryCode,
+      secret: mfaSecret,
+    },
   };
   fs.writeFileSync(FIXTURES_FILE, JSON.stringify(fixtures, null, 2));
   console.log('[fixtures] done');

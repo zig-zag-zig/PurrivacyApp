@@ -1,0 +1,67 @@
+appId: vip.chi_chi.purrivacy
+---
+# Secure notes CRUD against the real backend (notes ride the encrypted
+# key-records pipeline). Create → appears in list → edit → delete → gone.
+
+- runFlow:
+    file: subflows/login-shared.yaml
+    env:
+      FIXTURE_USERNAME: "e2e-shared"
+      FIXTURE_PASSWORD: "Purrivacy-e2e-password-123"
+
+- tapOn:
+    id: "purrivacy.tab.notes"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.screen"
+    timeout: 15000
+
+# Create
+- tapOn:
+    id: "purrivacy.notes.new"
+- tapOn:
+    id: "purrivacy.notes.title"
+- inputText: "E2E Note Title"
+- tapOn:
+    id: "purrivacy.notes.body"
+- inputText: "E2E note body content"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.notes.save"
+- extendedWaitUntil:
+    visible:
+      text: "E2E Note Title"
+    timeout: 20000
+
+# Edit it
+- tapOn:
+    text: "E2E Note Title"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.title"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.notes.body"
+- inputText: "edited body"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.notes.save"
+- extendedWaitUntil:
+    visible:
+      text: "E2E Note Title"
+    timeout: 20000
+
+# Delete it — index-based testID for the first (only) note's delete control.
+- tapOn:
+    id: "purrivacy.notes.delete.0"
+- extendedWaitUntil:
+    visible:
+      text: "Delete note?"
+    timeout: 15000
+# Confirm in the dialog
+- tapOn:
+    text: "Delete"
+- extendedWaitUntil:
+    notVisible:
+      text: "E2E Note Title"
+    timeout: 20000

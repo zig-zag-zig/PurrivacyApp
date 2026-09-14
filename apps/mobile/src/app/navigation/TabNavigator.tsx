@@ -7,6 +7,7 @@ import { TabParamList } from './types';
 import { DecryptScreen } from '../../features/decrypt/pages/DecryptScreen';
 import { EncryptScreen } from '../../features/encrypt/pages/EncryptScreen';
 import { KeyScreen } from '../../features/keys/pages/KeyScreen';
+import { NotesScreen } from '../../features/notes/pages/NotesScreen';
 import { SettingsScreen } from '../../features/settings/pages/SettingsScreen';
 import { theme } from '../../styles/theme';
 
@@ -18,6 +19,7 @@ const tabIcons: Record<keyof TabParamList, React.ComponentProps<typeof Icon>['na
   Key: 'key-chain-variant',
   Encrypt: 'lock-outline',
   Decrypt: 'lock-open-variant-outline',
+  Notes: 'note-text-outline',
   Settings: 'tune-variant',
 };
 
@@ -71,6 +73,11 @@ export const TabNavigator = () => {
         name="Decrypt"
         component={DecryptScreen}
         options={{ tabBarButtonTestID: 'purrivacy.tab.decrypt', title: 'Decrypt' }}
+      />
+      <Tab.Screen
+        name="Notes"
+        component={NotesScreen}
+        options={{ tabBarButtonTestID: 'purrivacy.tab.notes', title: 'Notes' }}
       />
       <Tab.Screen
         name="Settings"

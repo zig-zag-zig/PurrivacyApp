@@ -72,6 +72,11 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    sectionHeaderActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+    },
     sectionTitle: {
         ...commonStyles.textBody,
         color: theme.colors.text,

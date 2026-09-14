@@ -1,4 +1,5 @@
-import { Keyboard, StyleSheet, View } from 'react-native';
+import type { Ref } from 'react';
+import { Keyboard, StyleSheet, View, type FlatList, type ScrollView } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
 import { Button } from '../../../components/Button';
@@ -6,11 +7,16 @@ import { CustomText } from '../../../components/CustomText';
 import { FilePickerIcon } from '../../../components/FilePickerIcon';
 import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
+import { ScreenList } from '../../../components/ScreenList';
+import type { KeyPair } from '../../../types/types';
 import { AppScreenHeader } from '../../../components/AppScreenHeader';
 import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
+import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { CreateKeyForm } from '../components/CreateKeyForm';
 import { KeyItem } from '../components/KeyItem';
+import { VaultFilterBar } from '../components/VaultFilterBar';
+import { ExpiryBanner } from '../components/ExpiryBanner';
 import { PassphraseField } from '../components/PassphraseField';
 import { useKeyScreen } from '../hooks/useKeyScreen';
 import type { KeyAction } from '../model/types';
@@ -38,78 +44,126 @@ export const KeyScreen = () => {
     return <ScreenContainer>{null}</ScreenContainer>;
   }
 
-  return (
-    <ScreenContainer
-      testID="purrivacy.key.screen"
-      ref={keyScreen.scrollRef}
-      onScroll={keyScreen.onScroll}
-      scrollEventThrottle={16}
-    >
+  // Keep the title + action tabs mounted in a stable, non-virtualized header
+  // above whichever body renders. Virtualizing the action tabs inside a
+  // FlatList header made them racy/unreachable for E2E tooling — the tabs must
+  // always be present and tappable regardless of list mount timing.
+  const header = (
+    <>
       <AppScreenHeader
         eyebrow="Encrypted workspace"
         icon="key-chain-variant"
         title="Key vault"
       />
-
       <SegmentedActionTabs
         tabs={keyActionTabs}
         value={keyScreen.state.keyAction}
         onChange={handleKeyActionChange}
         testIDPrefix="purrivacy.key.action"
       />
+    </>
+  );
 
-      {keyScreen.state.keyAction === 'view' && keyScreen.user && (
-        <>
-          {keyScreen.sortedKeys.map(key => {
-            const expanded = keyScreen.state.expandedKeyFingerprint === key.fingerprint;
-
-            return (
-              <View
-                key={key.fingerprint}
-                ref={node => {
-                  keyScreen.itemRefs.current[key.fingerprint] = node;
-                }}
-              >
-                <KeyItem
-                  key={`${key.fingerprint}:${expanded ? 'expanded' : 'collapsed'}`}
-                  pgpKey={key}
-                  onChangePassphrase={keyScreen.onChangePassphrase}
-                  onChangeExpiry={keyScreen.onChangeExpiration}
-                  onPress={() => keyScreen.onToggleExpandedKey(key.fingerprint)}
-                  onSetDefault={() => keyScreen.onSetDefaultKey(key)}
-                  onDelete={() => keyScreen.onDeleteKey(key)}
-                  expanded={expanded}
-                  deleting={keyScreen.state.isDeleting}
+  if (keyScreen.state.keyAction === 'view' && keyScreen.user) {
+    // The vault list grows unboundedly; virtualize it. The list also owns
+    // scrolling so expanded KeyItem rows (which mount native isolated inputs)
+    // recycle off-screen instead of all staying mounted. The action tabs live
+    // in the fixed header above so they are never subject to list mounting.
+    return (
+      <View style={styles.screenColumn} testID="purrivacy.key.screen">
+        <View style={styles.fixedHeader}>{header}</View>
+        <ScreenList
+          ref={keyScreen.scrollRef as unknown as Ref<FlatList<KeyPair>>}
+          onScroll={keyScreen.onScroll}
+          scrollEventThrottle={16}
+          data={keyScreen.filteredKeys}
+          keyExtractor={(key) => key.fingerprint}
+          ListHeaderComponent={
+            <>
+              {keyScreen.showExpiryBanner ? (
+                <ExpiryBanner
+                  expiringCount={keyScreen.expiryCounts.expiring}
+                  expiredCount={keyScreen.expiryCounts.expired}
+                  onShowExpiring={keyScreen.onShowExpiringKeys}
+                  onDismiss={keyScreen.onDismissExpiryBanner}
+                  testIDPrefix="purrivacy.key.expiry"
                 />
-              </View>
-            );
-          })}
-
-          {keyScreen.sortedKeys.length === 0 && (
+              ) : null}
+              <VaultFilterBar
+                searchQuery={keyScreen.state.vaultSearchQuery}
+                onSearchChange={keyScreen.onVaultSearchChanged}
+                activeFilter={keyScreen.state.vaultFilter}
+                onFilterChange={keyScreen.onVaultFilterChanged}
+                testIDPrefix="purrivacy.key.vault"
+              />
+            </>
+          }
+        ListEmptyComponent={
+          keyScreen.sortedKeys.length > 0 ? (
+            // Filtering produced no matches — distinct from the no-keys state.
             <View style={styles.emptyState}>
-              <Icon name="vpn-key" size={34} color={theme.colors.primary} />
-              <CustomText style={styles.emptyTitle}>No keys yet</CustomText>
-              <View style={styles.emptyActions}>
-                <Button
-                  label="Generate"
-                  testID="purrivacy.key.empty.generate"
-                  onPress={() => handleKeyActionChange('create')}
-                  icon={<Icon name="add" size={20} color={theme.colors.onPrimary} />}
-                  style={styles.emptyButton}
-                />
-                <Button
-                  label="Import"
-                  testID="purrivacy.key.empty.import"
-                  onPress={() => handleKeyActionChange('import')}
-                  variant="secondary"
-                  icon={<Icon name="file-upload" size={20} color={theme.colors.primary} />}
-                  style={styles.emptyButton}
-                />
-              </View>
+              <Icon name="search-off" size={34} color={theme.colors.primary} />
+              <CustomText style={styles.emptyTitle}>No keys match</CustomText>
             </View>
-          )}
-        </>
-      )}
+          ) : (
+          <View style={styles.emptyState}>
+            <Icon name="vpn-key" size={34} color={theme.colors.primary} />
+            <CustomText style={styles.emptyTitle}>No keys yet</CustomText>
+            <View style={styles.emptyActions}>
+              <Button
+                label="Generate"
+                testID="purrivacy.key.empty.generate"
+                onPress={() => handleKeyActionChange('create')}
+                icon={<Icon name="add" size={20} color={theme.colors.onPrimary} />}
+                style={styles.emptyButton}
+              />
+              <Button
+                label="Import"
+                testID="purrivacy.key.empty.import"
+                onPress={() => handleKeyActionChange('import')}
+                variant="secondary"
+                icon={<Icon name="file-upload" size={20} color={theme.colors.primary} />}
+                style={styles.emptyButton}
+              />
+            </View>
+          </View>
+          )
+        }
+        renderItem={({ item: key }) => {
+          const expanded = keyScreen.state.expandedKeyFingerprint === key.fingerprint;
+          return (
+            <View
+              ref={node => {
+                keyScreen.itemRefs.current[key.fingerprint] = node;
+              }}
+            >
+              <KeyItem
+                pgpKey={key}
+                onChangePassphrase={keyScreen.onChangePassphrase}
+                onChangeExpiry={keyScreen.onChangeExpiration}
+                onPress={() => keyScreen.onToggleExpandedKey(key.fingerprint)}
+                onSetDefault={() => keyScreen.onSetDefaultKey(key)}
+                onDelete={() => keyScreen.onDeleteKey(key)}
+                onRevoke={keyScreen.onRevokeKey}
+                expanded={expanded}
+                deleting={keyScreen.state.isDeleting}
+              />
+            </View>
+          );
+        }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <ScreenContainer
+      testID="purrivacy.key.screen"
+      ref={keyScreen.scrollRef as unknown as Ref<ScrollView>}
+      onScroll={keyScreen.onScroll}
+      scrollEventThrottle={16}
+    >
+      {header}
 
       <View style={{ display: keyScreen.state.keyAction === 'create' ? 'flex' : 'none' }}>
         <CreateKeyForm
@@ -180,6 +234,15 @@ export const KeyScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Fixed, non-scrolling header column so the action tabs are always mounted
+  // and tappable; only the list body virtualizes below it.
+  screenColumn: {
+    ...commonStyles.container,
+  },
+  fixedHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+  },
   emptyState: {
     alignItems: 'center',
     gap: theme.spacing.md,

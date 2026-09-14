@@ -28,6 +28,12 @@ interface KeySelectionProps {
     setSignMessage?: React.Dispatch<React.SetStateAction<boolean>>;
     showSignMessageSwitch?: boolean;
     passphraseBannerMode?: 'stored' | 'generate' | 'none';
+    /**
+     * Extra controls rendered inside the selected-key card (e.g. the
+     * "append public key" toggle on the encrypt sender card), so related
+     * options sit with the key they apply to instead of floating below it.
+     */
+    cardExtraContent?: React.ReactNode;
     testIDPrefix?: string;
 }
 
@@ -50,6 +56,7 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
     setSignMessage,
     showSignMessageSwitch = false,
     passphraseBannerMode,
+    cardExtraContent,
     testIDPrefix,
 }) => {
     const { user } = useAuth();
@@ -238,6 +245,7 @@ export const KeySelection: React.FC<KeySelectionProps> = ({
                                         }}
                                     /> : null
                                 }
+                                {cardExtraContent}
                                 {showSignMessageSwitch && signMessage !== undefined && signMessage === false && setSignMessage ?
                                     null :
                                     <PassphraseField

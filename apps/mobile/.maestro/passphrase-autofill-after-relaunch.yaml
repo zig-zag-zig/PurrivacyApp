@@ -30,12 +30,7 @@ env:
 - hideKeyboard
 - tapOn:
     id: "purrivacy.encrypt.recipients.item.0"
-- tapOn:
-    id: "purrivacy.encrypt.submit"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.encrypt.result.text"
-    timeout: 90000
+- runFlow: subflows/encrypt-text-copy-result.yaml
 # Relaunch WITHOUT clearing app state (session + stored passphrase persist)
 - launchApp:
     clearState: false
@@ -98,15 +93,7 @@ env:
 - hideKeyboard
 - tapOn:
     id: "purrivacy.encrypt.recipients.item.0"
-- tapOn:
-    id: "purrivacy.encrypt.submit"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.encrypt.result.text"
-    timeout: 90000
-- copyTextFrom:
-    id: "purrivacy.encrypt.result.text"
-- evalScript: ${output.afterRelaunch = maestro.copiedText}
+- runFlow: subflows/encrypt-text-copy-result.yaml
 - assertTrue:
-    condition: ${output.afterRelaunch.includes('BEGIN PGP MESSAGE')}
+    condition: ${output.encrypted.includes('BEGIN PGP MESSAGE')}
     label: Encrypt succeeded after relaunch with the auto-filled stored passphrase

@@ -69,6 +69,63 @@ const fixtures = () => {
   return JSON.parse(fs.readFileSync(FIXTURES_FILE, 'utf8'));
 };
 
+// --- TOTP (RFC 6238) — mirrors the seeder so the runner can mint a fresh
+// recovery code without a UI TOTP oracle. ---
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Decode(input) {
+  const cleaned = input.toUpperCase().replace(/=+$/g, '');
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const ch of cleaned) {
+    const idx = BASE32_ALPHABET.indexOf(ch);
+    if (idx === -1) throw new Error(`invalid base32 char: ${ch}`);
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(bytes);
+}
+function totp(secretB32, timestampMs = Date.now()) {
+  const counter = Math.floor(timestampMs / 30000);
+  const counterBuf = Buffer.alloc(8);
+  counterBuf.writeBigUInt64BE(BigInt(counter));
+  const key = base32Decode(secretB32);
+  const hmac = crypto.createHmac('sha1', key).update(counterBuf).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = ((hmac[offset] & 0x7f) << 24 | (hmac[offset + 1] & 0xff) << 16 | (hmac[offset + 2] & 0xff) << 8 | (hmac[offset + 3] & 0xff)) % 1000000;
+  return String(code).padStart(6, '0');
+}
+
+/**
+ * Mint a fresh single-use MFA recovery code.
+ *
+ * Recovery codes are consumed by the mfa-login-recovery-code flow, so without
+ * this the flow could only pass once per seed — i.e. the suite was not
+ * repeatable. Uses the persisted TOTP secret to satisfy sensitive-MFA
+ * verification on the regenerate endpoint.
+ */
+async function regenerateMfaRecoveryCode({ username, password, secret }) {
+  const idToken = await firebaseSignIn(`${username}@${EMAIL_DOMAIN}`, password);
+  // The MFA-enabled user needs a code both to create the session and to pass
+  // the sensitive-operation check on the regenerate endpoint.
+  const accessToken = await createBackendSession(idToken, totp(secret));
+  const res = await fetch(`http://127.0.0.1:${BACKEND_PORT}/v1/mfa/recovery-codes/regenerate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ mfaCode: totp(secret) }),
+  });
+  const body = await res.json().catch(() => null);
+  const codes = body?.recoveryCodes;
+  if (res.status >= 400 || !Array.isArray(codes) || codes.length === 0) {
+    throw new Error(`recovery code regeneration failed: ${res.status} ${JSON.stringify(body)}`);
+  }
+  return codes[0];
+}
+
 // --- REST helpers (mirror the seeder) ---
 async function firebaseSignIn(email, password) {
   const res = await fetch(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-e2e-key`, {
@@ -83,11 +140,14 @@ async function firebaseSignIn(email, password) {
   return body.idToken;
 }
 
-async function createBackendSession(idToken) {
+async function createBackendSession(idToken, mfaCode) {
+  const payload = { platform: 'e2e-aux-runner' };
+  // Users with MFA enabled cannot create a session without a valid code.
+  if (mfaCode) payload.mfaCode = mfaCode;
   const res = await fetch(`http://127.0.0.1:${BACKEND_PORT}/v1/auth/session`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ platform: 'e2e-aux-runner' }),
+    body: JSON.stringify(payload),
   });
   const body = await res.json().catch(() => null);
   if (res.status >= 400 || !body?.accessToken) {
@@ -127,7 +187,7 @@ async function main() {
   }
 
   const f = fixtures();
-  const recoveryCode = f.mfa?.recoveryCode || '';
+  let recoveryCode = f.mfa?.recoveryCode || '';
   if (!recoveryCode && flows.includes('mfa-login-recovery-code')) {
     console.error('[aux-e2e] no mfa.recoveryCode in fixtures.json — re-run scripts/seed-e2e-fixtures.cjs');
     process.exit(2);
@@ -135,6 +195,23 @@ async function main() {
 
   const results = [];
   for (const flow of flows) {
+    // Recovery codes are single-use, so mint a fresh one each run to keep the
+    // suite repeatable (otherwise it only passes on a freshly seeded stack).
+    if (flow === 'mfa-login-recovery-code' && f.mfa?.secret) {
+      try {
+        recoveryCode = await regenerateMfaRecoveryCode({
+          username: f.mfa.username,
+          password: f.mfa.password,
+          secret: f.mfa.secret,
+        });
+        console.log('[aux-e2e] minted a fresh MFA recovery code');
+      } catch (error) {
+        console.error(`[aux-e2e] ${error.message}`);
+        results.push({ flow, ok: false, reason: 'recovery code regeneration failed' });
+        continue;
+      }
+    }
+
     const env = {
       ...process.env,
       E2E_USERNAME: freshUsername(),

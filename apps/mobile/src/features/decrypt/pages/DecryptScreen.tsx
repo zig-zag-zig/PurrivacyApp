@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import type { ScrollView } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -13,12 +13,14 @@ import { useGlobalSpinner } from '../../../app/state/GlobalSpinnerContext';
 import { theme } from '../../../styles/theme';
 import { KeySelection } from '../../keys/components/KeySelection';
 import { SettingsOption } from '../../../shared/ui/SettingsOption';
-import { DecryptionResult } from '../components/DecryptionResult';
 import { useDecryptPage } from '../hooks/useDecryptPage';
+import { FileCryptoPanel } from '../../fileCrypto/components/FileCryptoPanel';
+import { SegmentedActionTabs } from '../../../shared/ui/SegmentedActionTabs';
 
 export const DecryptScreen = () => {
   const decryptPage = useDecryptPage();
   const scrollRef = useRef<ScrollView>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('text');
   useGlobalSpinner(decryptPage.isLoadingOverlay, { backgroundMode: 'opaque' });
 
   useEffect(() => {
@@ -40,9 +42,22 @@ export const DecryptScreen = () => {
       <AppScreenHeader
         eyebrow="Reveal safely"
         icon="lock-open-check-outline"
-        title="Decrypt a message"
+        title="Decrypt"
       />
 
+      <SegmentedActionTabs
+        tabs={[
+          { action: 'text', icon: 'text-fields', label: 'Text' },
+          { action: 'file', icon: 'attach-file', label: 'File' },
+        ]}
+        value={inputMode}
+        onChange={setInputMode}
+        testIDPrefix="purrivacy.decrypt.mode"
+      />
+
+      {inputMode === 'file' ? (
+        <FileCryptoPanel mode="decrypt" testIDPrefix="purrivacy.decrypt.file" />
+      ) : (
       <AutofillDisabledView style={styles.autofillScope}>
         <InputField
           label="Encrypted Content"
@@ -136,16 +151,8 @@ export const DecryptScreen = () => {
           icon={<Icon name="lock-open" size={20} color={theme.colors.onPrimary} />}
         />
 
-        {decryptPage.state.decryptedContent && (
-          <DecryptionResult
-            decryptedContent={decryptPage.state.decryptedContent}
-            onCopy={decryptPage.onCopy}
-            embeddedSignatureStatus={decryptPage.state.embeddedSignatureStatus}
-            detachedSignatureStatus={decryptPage.state.detachedSignatureStatus}
-            testIDPrefix="purrivacy.decrypt.result"
-          />
-        )}
       </AutofillDisabledView>
+      )}
     </ScreenContainer>
   );
 };

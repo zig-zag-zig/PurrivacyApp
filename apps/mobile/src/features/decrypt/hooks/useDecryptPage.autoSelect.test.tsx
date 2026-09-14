@@ -35,6 +35,15 @@ vi.mock('../../../services/pgpCryptoService', () => ({
         extractKeyMetadata: vi.fn(),
     },
 }));
+// The hook registers long operations with the app-wide operation center; the
+// mock runs the work inline so the page still performs the decrypt call.
+vi.mock('../../../app/state/OperationCenterContext', () => ({
+    useOperationCenter: () => ({
+        beginOperation: async (input: { run: (api: unknown) => Promise<unknown> }) =>
+            input.run({ setPhase: vi.fn(), setProgress: vi.fn(), succeed: vi.fn() }),
+    }),
+    useLatestOperation: () => undefined,
+}));
 
 const makeKey = (fingerprint: string, overrides: Record<string, unknown> = {}) => ({
     fingerprint,

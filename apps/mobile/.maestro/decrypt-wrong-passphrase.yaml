@@ -47,15 +47,7 @@ env:
 - hideKeyboard
 - tapOn:
     id: "purrivacy.encrypt.recipients.item.0"
-- tapOn:
-    id: "purrivacy.encrypt.submit"
-- extendedWaitUntil:
-    visible:
-      id: "purrivacy.encrypt.result.text"
-    timeout: 90000
-- copyTextFrom:
-    id: "purrivacy.encrypt.result.text"
-- evalScript: ${output.encrypted = maestro.copiedText}
+- runFlow: subflows/encrypt-text-copy-result.yaml
 # Decrypt with the WRONG passphrase
 - tapOn:
     id: "purrivacy.tab.decrypt"
@@ -75,6 +67,7 @@ env:
     timeout: 15000
 - tapOn:
     id: "purrivacy.decrypt.recipient.passphrase"
+- eraseText
 - inputText: ${WRONG_PASSPHRASE}
 - hideKeyboard
 - scrollUntilVisible:
@@ -88,7 +81,5 @@ env:
 - extendedWaitUntil:
     visible: "Incorrect passphrase for the selected private key"
     timeout: 30000
-- assertNotVisible:
-    id: "purrivacy.decrypt.result.text"
 - assertVisible:
     id: "purrivacy.decrypt.encryptedContent"

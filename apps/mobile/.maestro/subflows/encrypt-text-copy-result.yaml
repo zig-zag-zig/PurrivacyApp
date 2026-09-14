@@ -1,0 +1,34 @@
+appId: vip.chi_chi.purrivacy
+---
+# Encrypts the filled composer, then reads the ciphertext out of the Activity
+# modal into ${output.encrypted}. Text results live in the modal now (the
+# composer clears on success), so every flow that needs the ciphertext goes
+# through here instead of duplicating the modal steps.
+#
+# Preconditions: encrypt composer has content and at least one recipient
+# selected.
+- tapOn:
+    id: "purrivacy.encrypt.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.pill"
+    timeout: 90000
+- tapOn:
+    id: "purrivacy.ops.pill"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.row.text-encrypt"
+    timeout: 20000
+- tapOn:
+    id: "purrivacy.ops.row.text-encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.result.encrypted.text"
+    timeout: 20000
+- copyTextFrom:
+    id: "purrivacy.ops.result.encrypted.text"
+- evalScript: ${output.encrypted = maestro.copiedText}
+- tapOn:
+    id: "purrivacy.ops.back"
+- tapOn:
+    id: "purrivacy.ops.closeIcon"

@@ -8,6 +8,7 @@ import { useToast } from '../../../../app/state/ToastContext';
 import { SUCCESS_MESSAGES } from '../../../../utils/errorHandling';
 import { useCopyFeedback } from '../../../../shared/hooks/useCopyFeedback';
 import { useSecureCopy } from '../../../../shared/hooks/useSecureCopy';
+import { useShareText } from '../../../../shared/hooks/useShareText';
 import type { KeyPair } from '../../../../types/types';
 import { KeyMaterialBlock } from '../KeyMaterialBlock';
 import { styles } from './styles';
@@ -23,6 +24,7 @@ type KeyPublicKeySectionProps = {
 export const KeyPublicKeySection = ({ pgpKey }: KeyPublicKeySectionProps) => {
     const publicKeyCopyFeedback = useCopyFeedback();
     const { secureCopy } = useSecureCopy();
+    const { shareText } = useShareText();
     const { showToast } = useToast();
 
     const handleCopyPublicKey = () => {
@@ -32,17 +34,32 @@ export const KeyPublicKeySection = ({ pgpKey }: KeyPublicKeySectionProps) => {
         showToast(SUCCESS_MESSAGES.PUBLIC_KEY_COPIED, 'success');
     };
 
+    const handleSharePublicKey = () => {
+        Keyboard.dismiss();
+        void shareText(pgpKey.publicKey || '', 'Public key');
+    };
+
     return (
         <View style={styles.publicKeySection}>
             <View style={styles.sectionHeader}>
                 <CustomText style={styles.sectionTitle}>Public key</CustomText>
-                <TouchableOpacity
-                    onPress={handleCopyPublicKey}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Copy public key"
-                >
-                    <Icon name="content-copy" size={20} color={theme.colors.primary} />
-                </TouchableOpacity>
+                <View style={styles.sectionHeaderActions}>
+                    <TouchableOpacity
+                        onPress={handleSharePublicKey}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Share public key"
+                        testID="purrivacy.key.publicKey.share"
+                    >
+                        <Icon name="share" size={20} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={handleCopyPublicKey}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Copy public key"
+                    >
+                        <Icon name="content-copy" size={20} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                </View>
             </View>
             <KeyMaterialBlock
                 text={pgpKey.publicKey || ''}

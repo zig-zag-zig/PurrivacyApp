@@ -4,9 +4,20 @@ import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
 import { useToast } from '../../../app/state/ToastContext';
+import { useOperationCenter } from '../../../app/state/OperationCenterContext';
+
+/** "Alice, Bob" or "Alice, Bob +2 more" — compact recipient/sender list for
+ * the operation card, with overflow collapsed instead of wrapping forever. */
+const formatKeyUserIds = (userIds: (string | undefined)[]): string => {
+    const clean = userIds.map(u => (u ?? '').trim()).filter(Boolean);
+    if (clean.length === 0) return '';
+    if (clean.length <= 2) return clean.join(', ');
+    return `${clean.slice(0, 2).join(', ')} +${clean.length - 2} more`;
+};
 import type { DecryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
 import { useFilePicker } from '../../../shared/hooks/useFilePicker';
 import { useKeyPrerequisiteRedirect } from '../../../shared/hooks/useKeyPrerequisiteRedirect';
+import { useEncryptedComposeDraft } from '../../../services/drafts';
 import { useResetStateOnBlurSuccess } from '../../../shared/hooks/useResetStateOnBlurSuccess';
 import { SUCCESS_MESSAGES } from '../../../utils/errorHandling';
 import { validateDecryptionForm } from '../../../utils/validation';
@@ -28,6 +39,7 @@ export function useDecryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { user, isAuthLoading, userDecrypted, visibleKeys } = useAuth();
   const { showToast } = useToast();
+  const { beginOperation } = useOperationCenter();
   const [state, dispatch] = useReducer(decryptReducer, initialDecryptState);
 
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'message');
@@ -46,6 +58,16 @@ export function useDecryptPage() {
     state.wasSuccessful,
     () => dispatch({ type: 'resetAfterSuccess' }),
   );
+
+  // Persist the pasted ciphertext as an encrypted draft so an interrupted or
+  // failed decrypt doesn't lose it. Cleared on success.
+  useEncryptedComposeDraft({
+    userId: user?.uid,
+    slot: 'decrypt',
+    value: state.encryptedContent,
+    shouldClear: state.wasSuccessful,
+    onRestore: draft => dispatch({ type: 'encryptedContentChanged', content: draft }),
+  });
 
   useEffect(() => {
     if (!hasSelectedKeys(state.selectedPublicKeys)) {
@@ -122,46 +144,76 @@ export function useDecryptPage() {
         }
       }
 
-      const result = await pgpCryptoService.decryptMessage(
-        normalizedEncryptedContent,
-        state.selectedPrivateKey[privateKeyId || ''],
-        state.passphrase,
-        hasSelectedKeys(state.selectedPublicKeys) ? publicKeyArmored : undefined,
-      );
+      const senderUserIds = Object.keys(state.selectedPublicKeys)
+        .map(fp => keySelectionKeys.find(key => key.fingerprint === fp)?.userId);
+      const recipientUserId = privateKeyId
+        ? privateKeys.find(key => key.fingerprint === privateKeyId)?.userId
+        : undefined;
+      const operationDetail = [
+        senderUserIds.length ? `From ${formatKeyUserIds(senderUserIds)}` : null,
+        recipientUserId ? `To ${recipientUserId.trim()}` : null,
+      ].filter(Boolean).join(' · ');
 
-      dispatch({ type: 'decryptedContentSet', content: result.decrypted });
+      const { decrypted, embeddedStatus, detachedStatus } = await beginOperation({
+        kind: 'text-decrypt',
+        title: 'Decrypting message',
+        detail: operationDetail || undefined,
+        run: async api => {
+          const result = await pgpCryptoService.decryptMessage(
+            normalizedEncryptedContent,
+            state.selectedPrivateKey[privateKeyId || ''],
+            state.passphrase,
+            hasSelectedKeys(state.selectedPublicKeys) ? publicKeyArmored : undefined,
+          );
 
-      if (hasSelectedKeys(state.selectedPublicKeys)) {
-        if (state.useDetachedVerification) {
-          if (detachedSignature.length > 0 && publicKeyArmored) {
-            const isValid = await pgpCryptoService.verifyDetachedSignature(
-              detachedSignature,
-              result.decrypted,
-              publicKeyArmored,
-            );
+          // Resolve signature status inside the operation so the modal shows
+          // the verification outcome alongside the decrypted result.
+          let nextEmbeddedStatus: 'valid' | 'invalid' | 'unknown' = 'unknown';
+          let nextDetachedStatus: 'valid' | 'invalid' | 'unknown' = 'unknown';
 
-            dispatch({
-              type: 'detachedSignatureStatusChanged',
-              status: isValid ? 'valid' : 'invalid',
-            });
-          } else {
-            dispatch({ type: 'detachedSignatureStatusChanged', status: 'unknown' });
+          if (hasSelectedKeys(state.selectedPublicKeys)) {
+            if (state.useDetachedVerification) {
+              if (detachedSignature.length > 0 && publicKeyArmored) {
+                const isValid = await pgpCryptoService.verifyDetachedSignature(
+                  detachedSignature,
+                  result.decrypted,
+                  publicKeyArmored,
+                );
+                nextDetachedStatus = isValid ? 'valid' : 'invalid';
+              } else {
+                nextDetachedStatus = 'unknown';
+              }
+            }
+
+            nextEmbeddedStatus = result.verified === true
+              ? 'valid'
+              : result.verified === false
+                ? 'invalid'
+                : 'unknown';
           }
-        }
 
-        const embeddedStatus = result.verified === true
-          ? 'valid'
-          : result.verified === false
-            ? 'invalid'
-            : 'unknown';
+          api.succeed(
+            {
+              decryptedContent: result.decrypted,
+              embeddedSignatureStatus: nextEmbeddedStatus,
+              detachedSignatureStatus: nextDetachedStatus,
+            },
+            'Message decrypted',
+          );
+          return {
+            decrypted: result.decrypted,
+            embeddedStatus: nextEmbeddedStatus,
+            detachedStatus: nextDetachedStatus,
+          };
+        },
+      });
 
-        dispatch({ type: 'embeddedSignatureStatusChanged', status: embeddedStatus });
-      } else {
-        dispatch({ type: 'embeddedSignatureStatusChanged', status: 'unknown' });
-        dispatch({ type: 'detachedSignatureStatusChanged', status: 'unknown' });
-      }
-
-      dispatch({ type: 'markSuccessful' });
+      dispatch({ type: 'decryptedContentSet', content: decrypted });
+      dispatch({ type: 'embeddedSignatureStatusChanged', status: embeddedStatus });
+      dispatch({ type: 'detachedSignatureStatusChanged', status: detachedStatus });
+      // Result lives in the operation modal; clear the composer so the
+      // ciphertext and passphrase don't linger on screen.
+      dispatch({ type: 'resetAfterSuccess' });
       showToast('Decryption successful!', 'success');
 
     } catch {
@@ -190,6 +242,15 @@ export function useDecryptPage() {
     );
   };
 
+  // The selected sender key (decrypt 'Sender' picker) is a KeyPair in
+  // visibleKeys; surface its `verified` flag so the result can show trust.
+  const senderKeyFingerprint = hasSelectedKeys(state.selectedPublicKeys)
+    ? getFirstSelectedKeyId(state.selectedPublicKeys)
+    : undefined;
+  const senderVerified = senderKeyFingerprint
+    ? visibleKeys.find(k => k.fingerprint === senderKeyFingerprint)?.verified === true
+    : undefined;
+
   return {
     state,
     userDecrypted,
@@ -197,6 +258,7 @@ export function useDecryptPage() {
     isLoadingOverlay: !userDecrypted || isAuthLoading,
     privateKeys,
     publicKeys: keySelectionKeys,
+    senderVerified,
     isDecryptDisabled: !hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting,
     canDecrypt:
       !(!hasSelectedKeys(state.selectedPrivateKey) || state.isDecrypting)

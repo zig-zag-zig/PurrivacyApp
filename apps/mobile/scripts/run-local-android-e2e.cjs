@@ -6,22 +6,26 @@ const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
-const allowedArgs = new Set(['--clean', '--dry-run', '--smoke']);
+const allowedArgs = new Set(['--clean', '--dry-run', '--smoke', '--flows']);
 const defaultAvdName = 'PurrivacyE2E';
 
-// Parse known flags and collect --flow <value> pairs
+// Parse known flags and collect --flow <value> / --flows <list> pairs
 const clean = args.includes('--clean');
 const dryRun = args.includes('--dry-run');
 const smoke = args.includes('--smoke');
 const flowIndex = args.indexOf('--flow');
 const flow = flowIndex !== -1 ? args[flowIndex + 1] : null;
+const flowsIndex = args.indexOf('--flows');
+const flowsList = flowsIndex !== -1 ? args[flowsIndex + 1] : null;
 
 for (const arg of args) {
   if (arg === '--flow') continue; // handled separately
   if (flowIndex !== -1 && arg === flow) continue; // the flow value
+  if (arg === '--flows') continue; // handled separately
+  if (flowsIndex !== -1 && arg === flowsList) continue; // the flows list value
   if (!allowedArgs.has(arg)) {
     console.error(`[e2e] Unknown option: ${arg}`);
-    console.error('[e2e] Usage: node scripts/run-local-android-e2e.cjs [--clean] [--smoke] [--dry-run] [--flow <path>]');
+    console.error('[e2e] Usage: node scripts/run-local-android-e2e.cjs [--clean] [--smoke] [--dry-run] [--flow <path>] [--flows <csv>]');
     process.exit(2);
   }
 }
@@ -301,6 +305,9 @@ if (smoke) {
 }
 if (flow) {
   maestroArgs.push('--flow', flow);
+}
+if (flowsList) {
+  maestroArgs.push('--flows', flowsList);
 }
 
 let emulatorState = null;

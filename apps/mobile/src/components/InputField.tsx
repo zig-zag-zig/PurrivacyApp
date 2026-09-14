@@ -73,8 +73,13 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
             preserveFocusOnBlurMs = 0,
             helperText,
             enableAutofill = false,
-            labelTopBackgroundColor = theme.colors.background,
-            labelBottomBackgroundColor = theme.colors.surface,
+            // The label backplate masks the input's top border so the label
+            // reads as "notched" into the outline. Top half sits over whatever
+            // is behind the field → transparent by default (card-hosted fields
+            // pass the card color explicitly). Bottom half sits over the
+            // field's own fill → must match surfaceElevated.
+            labelTopBackgroundColor = 'transparent',
+            labelBottomBackgroundColor = theme.colors.surfaceElevated,
             onInputLayout,
             onInputWrapperRef,
             onInputTouchStart,

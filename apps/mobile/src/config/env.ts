@@ -183,6 +183,7 @@ const rawEnv = {
   EXPO_PUBLIC_API_VERSION: process.env.EXPO_PUBLIC_API_VERSION,
   EXPO_PUBLIC_AUTH_EMAIL_DOMAIN: process.env.EXPO_PUBLIC_AUTH_EMAIL_DOMAIN,
   EXPO_PUBLIC_DEV_TEMP_KEY_COUNT: process.env.EXPO_PUBLIC_DEV_TEMP_KEY_COUNT,
+  EXPO_PUBLIC_E2E_REAL_FILE_PICKER: process.env.EXPO_PUBLIC_E2E_REAL_FILE_PICKER,
   EXPO_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: process.env.EXPO_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST,
   EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
   EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -199,6 +200,13 @@ export const ENV = {
   apiVersion: parseApiVersion(rawEnv.EXPO_PUBLIC_API_VERSION, deriveApiVersionFromAppVersion()),
   appBuildVersion: Constants.nativeBuildVersion ?? null,
   appEnv,
+  /**
+   * Test hook: e2e builds normally bypass the system document picker (the SAF
+   * UI is not driveable), which leaves the real pick path uncovered. Setting
+   * EXPO_PUBLIC_E2E_REAL_FILE_PICKER=1 at build time restores the real picker
+   * on an e2e build so that path can be exercised end-to-end.
+   */
+  e2eRealFilePicker: rawEnv.EXPO_PUBLIC_E2E_REAL_FILE_PICKER === '1',
   appVersion: resolveAppVersion(),
   authEmailDomain: parseAuthEmailDomain(getRequiredEnv('EXPO_PUBLIC_AUTH_EMAIL_DOMAIN')),
   devTempKeyCount: parseNumberEnv(rawEnv.EXPO_PUBLIC_DEV_TEMP_KEY_COUNT, 0, 0),

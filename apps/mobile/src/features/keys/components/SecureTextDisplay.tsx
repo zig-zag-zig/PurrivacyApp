@@ -11,6 +11,11 @@ interface SecureTextDisplayProps extends TextInputProps {
     secure?: boolean;
     revealDuration?: number;
     onChangeText?: (text: string) => void;
+    /**
+     * Extra controls rendered in the same row as the reveal (eye) button, so
+     * callers can add related actions (e.g. delete) that line up with it.
+     */
+    extraActions?: React.ReactNode;
 }
 
 export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
@@ -18,6 +23,7 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
     secure = true,
     revealDuration = 30000,
     onChangeText,
+    extraActions,
     style,
     ...props
 }) => {
@@ -105,6 +111,7 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
                     />
                 </TouchableOpacity>
             )}
+            {extraActions ? <View style={styles.extraActions}>{extraActions}</View> : null}
         </View>
     );
 };
@@ -118,4 +125,9 @@ const styles = StyleSheet.create({
         borderColor: theme.colors.divider,
     },
     iconButton: commonStyles.iconButton,
+    extraActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: theme.spacing.sm,
+    },
 });

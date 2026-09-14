@@ -164,6 +164,13 @@ const PGP_HTML = `
               (data.publicKeys || []).map(k => openpgp.readKey({ armoredKey: k }))
             );
 
+            // Refuse to encrypt to a revoked recipient key.
+            for (const k of keys) {
+              if (typeof k.isRevoked === 'function' && await k.isRevoked()) {
+                throw new Error('Cannot encrypt: a selected recipient key is revoked.');
+              }
+            }
+
             const msg = await openpgp.createMessage({ text: data.content });
 
             let signingKey;
@@ -244,7 +251,11 @@ const PGP_HTML = `
               } catch {}
               const expiry = formatExpiry(exp);
               const privateKeyIsUnlocked = typeof key.isDecrypted !== 'function' ? undefined : key.isDecrypted() !== null ? key.isDecrypted() : undefined;
-              result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked };
+              let revoked = false;
+              try {
+                revoked = typeof key.isRevoked === 'function' ? await key.isRevoked() : false;
+              } catch {}
+              result = { fingerprint, userId, algorithm, bitStrength, curve, expiry, privateKeyIsUnlocked, revoked };
             } catch (err) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
               return;
@@ -332,12 +343,303 @@ const PGP_HTML = `
             break;
           }
 
+          case 'revokeKey': {
+            // Revoke an own private key. openpgp.revokeKey needs the decrypted
+            // private key; it returns the revoked key pair and embeds the
+            // revocation signature in the public key certificate. We also
+            // return the standalone revocation certificate so it can be shared
+            // on its own.
+            const unlocked = await getUnlockedPrivateKey(data.privateKey, openpgp, data.passphrase);
+            const { privateKey, publicKey } = await openpgp.revokeKey({
+              key: unlocked,
+              format: 'armored',
+            });
+            let revocationCertificate = '';
+            try {
+              const revokedKey = await openpgp.readKey({ armoredKey: publicKey });
+              revocationCertificate = typeof revokedKey.getRevocationCertificate === 'function'
+                ? await revokedKey.getRevocationCertificate()
+                : '';
+            } catch {}
+            result = { privateKey, publicKey, revocationCertificate };
+            break;
+          }
+
+          case 'applyRevocation': {
+            // Merge an imported revocation certificate into a stored public key
+            // so the keyring marks it revoked. Accepts armored revocation cert
+            // or an armored public key that already embeds a revocation sig.
+            const pub = await openpgp.readKey({ armoredKey: data.publicKey });
+            const applied = await pub.applyRevocation({ armoredRevocationCertificate: data.revocationCertificate });
+            result = applied.armor();
+            break;
+          }
+
+          // ---- Streaming file ops ----
+          // Bytes cross the bridge as base64 chunks. On the WebView side the
+          // input is an async-generator ReadableStream fed by a queue, and the
+          // output is a stream reader — so the WebView never buffers the whole
+          // file; backpressure is pull-based (the caller reads one chunk, then
+          // the next is only produced on demand).
+
+          // Pure in-WebView benchmark: generate deterministic bytes locally,
+          // encrypt them, and consume the output. No bridge traffic — measures
+          // WebView crypto speed in isolation from bridge round-trips.
+          case 'fileOpSelfTest': {
+            const n = data.bytes;
+            const input = new Uint8Array(n);
+            for (let i = 0; i < n; i++) input[i] = (i * 31 + 7) & 0xff;
+            const t0 = Date.now();
+            const stKeys = [await openpgp.readKey({ armoredKey: data.publicKey })];
+            const stMsg = await openpgp.createMessage({ binary: input, filename: 'selftest', date: new Date() });
+            const stOut = await openpgp.encrypt({ message: stMsg, encryptionKeys: stKeys, format: 'binary' });
+            const stReader = stOut.getReader();
+            let stTotal = 0;
+            for (;;) {
+              const { done, value } = await stReader.read();
+              if (done) break;
+              stTotal += value ? value.length : 0;
+            }
+            result = { elapsedMs: Date.now() - t0, inBytes: n, outBytes: stTotal };
+            break;
+          }
+
+          case 'fileOpBegin': {
+            if (!window.__fileSessions) window.__fileSessions = {};
+            const waiters = [];
+            const drainWaiters = [];
+            const queue = [];
+            const session = {
+              queue,
+              waiters,
+              drainWaiters,
+              done: false,
+              reader: null,
+              pending: null,
+              error: null,
+              // ReadableStream the literal-data packet reads from. pull() blocks
+              // until a chunk is pushed or the stream is closed — openpgp
+              // accepts a web ReadableStream, not a bare async generator.
+              feed: function () {
+                return new ReadableStream({
+                  async pull(controller) {
+                    for (;;) {
+                      if (queue.length) {
+                        controller.enqueue(queue.shift());
+                        // Wake any chunk-batch sender waiting for the queue to
+                        // drain (server-side backpressure).
+                        const dw = session.drainWaiters.splice(0);
+                        for (const r of dw) r();
+                        return;
+                      }
+                      if (session.done) { controller.close(); return; }
+                      if (session.error) { controller.error(session.error); return; }
+                      await new Promise(resolve => waiters.push(resolve));
+                    }
+                  },
+                });
+              },
+            };
+            window.__fileSessions[data.sessionId] = session;
+            result = { ok: true };
+            break;
+          }
+
+          // Pipelined chunk push. Enqueues the chunk(s) immediately, then
+          // resolves only once the queue has drained to 'drainBelow'. This is
+          // server-side backpressure: the host keeps a bounded number of
+          // chunks in flight instead of blocking on a full round-trip per
+          // chunk, which is what made large files crawl.
+          case 'fileOpChunkBatch': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpChunkBatch: unknown session');
+            // Hard queue cap: ack chunks immediately while there is room, and
+            // only apply backpressure once the queue is genuinely full. This
+            // keeps throughput high (no per-chunk blocking) while bounding
+            // memory during slow phases (e.g. a PBKDF2 key-unlock before the
+            // first stream pull), where the op's 120s timeout covers the wait.
+            const hardCap = typeof data.drainBelow === 'number' && data.drainBelow > 0 ? data.drainBelow : 6;
+            let received = 0;
+            for (const b64 of data.chunks) {
+              const bin = atob(b64);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              sess.queue.push(bytes);
+              received += bytes.length;
+              const w = sess.waiters.shift();
+              if (w) w();
+            }
+            while (sess.queue.length > hardCap && !sess.done && !sess.error) {
+              await new Promise(resolve => sess.drainWaiters.push(resolve));
+            }
+            if (sess.error) throw sess.error;
+            result = { received };
+            break;
+          }
+
+          case 'fileOpChunk': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpChunk: unknown session');
+            const bin = atob(data.base64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            if (sess.queue.length >= 4) throw new Error('fileOpChunk: input queue is full');
+            sess.queue.push(bytes);
+            // Wake the generator if it's waiting on a chunk.
+            const w = sess.waiters.shift();
+            if (w) w();
+            result = { received: bytes.length };
+            break;
+          }
+
+          // Report pending input depth so the feeder can apply backpressure
+          // (hold off pushing while the WebView still has queued chunks).
+          case 'fileOpStatus': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpStatus: unknown session');
+            result = { queueDepth: sess.queue.length, inputDone: sess.done === true };
+            break;
+          }
+
+          case 'fileOpEncrypt': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpEncrypt: unknown session');
+
+            const keys = await Promise.all(
+              (data.publicKeys || []).map(k => openpgp.readKey({ armoredKey: k }))
+            );
+            for (const k of keys) {
+              if (typeof k.isRevoked === 'function' && await k.isRevoked()) {
+                throw new Error('Cannot encrypt: a selected recipient key is revoked.');
+              }
+            }
+
+            let signingKey;
+            if (data.signOptions) {
+              signingKey = await getUnlockedPrivateKey(data.signOptions.privateKey, openpgp, data.signOptions.passphrase);
+            }
+
+            // Stream input → ciphertext stream. Output is a reader kept on the
+            // session; the caller drains it via fileOpResultChunk.
+            const msg = await openpgp.createMessage({
+              binary: sess.feed(),
+              filename: data.filename || 'file',
+              date: new Date(),
+            });
+            const params = { message: msg, encryptionKeys: keys, format: 'binary' };
+            if (signingKey) params.signingKeys = signingKey;
+            const out = await openpgp.encrypt(params);
+            sess.reader = out.getReader();
+            result = { ok: true };
+            break;
+          }
+
+          case 'fileOpDecrypt': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpDecrypt: unknown session');
+
+            const unlocked = await getUnlockedPrivateKey(data.privateKey, openpgp, data.passphrase);
+            const enc = await openpgp.readMessage({ binaryMessage: sess.feed() });
+            const verificationKeys = data.publicKeyForVerification
+              ? await openpgp.readKey({ armoredKey: data.publicKeyForVerification })
+              : undefined;
+
+            const { data: dec, filename, signatures } = await openpgp.decrypt({
+              message: enc,
+              decryptionKeys: unlocked,
+              verificationKeys,
+              format: 'binary',
+            });
+
+            // Verification is intentionally deferred until the output stream
+            // has been fully consumed; awaiting it here can deadlock streaming.
+            if (verificationKeys && signatures && signatures.length) {
+              sess.verificationPromise = signatures[0].verified
+                .then(() => true)
+                .catch(() => false);
+            }
+
+            sess.reader = dec.getReader();
+            result = { ok: true, filename: filename || '', verified: null };
+            break;
+          }
+
+          // Pull-based output: read the next chunk off the session's reader.
+          // done:true when the stream is exhausted. Never buffers the file;
+          // 'pending' carries only the sub-maxLength tail between pulls.
+          case 'fileOpResultChunk': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess || !sess.reader) throw new Error('fileOpResultChunk: no output');
+            const max = data.maxLength || 262144;
+            // Accumulate pending + freshly-read bytes until we have >= max or EOF.
+            let acc = sess.pending || new Uint8Array(0);
+            sess.pending = null;
+            let streamDone = false;
+            while (acc.length < max) {
+              const { done, value } = await sess.reader.read();
+              if (done || !value) { streamDone = true; break; }
+              const merged = new Uint8Array(acc.length + value.length);
+              merged.set(acc, 0); merged.set(value, acc.length);
+              acc = merged;
+            }
+            const slice = acc.length > max ? acc.subarray(0, max) : acc;
+            if (acc.length > max) sess.pending = acc.subarray(max);
+            const doneOut = streamDone && !sess.pending;
+            let bin = '';
+            for (let i = 0; i < slice.length; i++) bin += String.fromCharCode(slice[i]);
+            result = { base64: btoa(bin), done: doneOut };
+            // Set verified on the assigned result object (was set on undefined
+            // before assignment — crashed decrypt of signed files).
+            if (doneOut && sess.verificationPromise) {
+              result.verified = await sess.verificationPromise;
+            }
+            break;
+          }
+
+          // Signal end-of-input: closes the feeder stream but keeps the session
+          // (and its output reader) alive so the caller can drain the result.
+          case 'fileOpFinishInput': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (!sess) throw new Error('fileOpFinishInput: unknown session');
+            sess.done = true;
+            const w = sess.waiters.shift(); if (w) w();
+            result = { ok: true };
+            break;
+          }
+
+          case 'fileOpEnd': {
+            const sess = window.__fileSessions && window.__fileSessions[data.sessionId];
+            if (sess) {
+              try { if (sess.reader) await sess.reader.cancel(); } catch {}
+              sess.done = true;
+              const w = sess.waiters.shift(); if (w) w();
+              delete window.__fileSessions[data.sessionId];
+            }
+            result = { ok: true };
+            break;
+          }
+
           default:
             throw new Error('Unknown operation: ' + operation);
         }
 
         window.ReactNativeWebView.postMessage(JSON.stringify({ success: true, result, id }));
       } catch (err) {
+        // Fail fast for file sessions: mark the session errored and wake any
+        // pending feed/chunk-batch waits so the host aborts immediately instead
+        // of blocking until the operation timeout (and so the follow-up
+        // fileOpFinishInput does not hit an already-torn-down session).
+        try {
+          if (data && data.sessionId && window.__fileSessions && window.__fileSessions[data.sessionId]) {
+            const sess = window.__fileSessions[data.sessionId];
+            sess.error = sess.error || err;
+            sess.done = true;
+            const pendingWaiters = sess.waiters.splice(0);
+            for (const w of pendingWaiters) w();
+            const pendingDrain = sess.drainWaiters.splice(0);
+            for (const r of pendingDrain) r();
+          }
+        } catch (e) {}
         window.ReactNativeWebView.postMessage(JSON.stringify({ success: false, error: String((err && err.message) || err), id }));
       }
     };

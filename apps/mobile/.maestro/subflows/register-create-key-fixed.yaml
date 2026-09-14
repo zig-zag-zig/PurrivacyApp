@@ -34,9 +34,12 @@ env:
     commands:
       - tapOn:
           id: "purrivacy.signup.submit"
-- extendedWaitUntil:
-    visible:
+# seed.saved sits below the 24-word card; scroll to it rather than asserting
+# it is already on screen (viewport-dependent).
+- scrollUntilVisible:
+    element:
       id: "purrivacy.seed.saved"
+    direction: DOWN
     timeout: 30000
 - copyTextFrom:
     text: "^[a-z]+$"
@@ -360,11 +363,18 @@ env:
     id: "purrivacy.key.create.passphrase"
 - inputText: "maestroe2epassphrase123"
 - hideKeyboard
-- scrollUntilVisible:
-    element:
-      id: "purrivacy.key.create.confirmPassphrase"
-    direction: DOWN
-    timeout: 15000
+# confirmPassphrase may already be on screen on tall viewports; only scroll if
+# it isn't, then fill it either way (was a scroll flake on some emulators).
+- runFlow:
+    when:
+      notVisible:
+        id: "purrivacy.key.create.confirmPassphrase"
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "purrivacy.key.create.confirmPassphrase"
+          direction: DOWN
+          timeout: 15000
 - tapOn:
     id: "purrivacy.key.create.confirmPassphrase"
 - inputText: "maestroe2epassphrase123"

@@ -75,6 +75,79 @@ export interface ExtractPublicKeyRequest {
     privateKey: string;
 }
 
+/** Request payloads for `revokeKey`. */
+export interface RevokeKeyRequest {
+    privateKey: string;
+    passphrase: string;
+}
+
+/** Request payloads for `applyRevocation`. */
+export interface ApplyRevocationRequest {
+    publicKey: string;
+    revocationCertificate: string;
+}
+
+/** Result of `revokeKey`: the revoked pair plus the standalone cert. */
+export interface RevokedKeyResult {
+    privateKey: string;
+    publicKey: string;
+    revocationCertificate: string;
+}
+
+// ---- Chunked file ops ----
+// Binary payloads can't cross injectJavaScript in one shot; bytes move in
+// base64 chunks into a per-session WebView buffer, the op runs, and output is
+// read back in chunks. `sessionId` is caller-chosen.
+
+export interface FileOpBeginRequest { sessionId: string; }
+export interface FileOpChunkRequest { sessionId: string; base64: string; }
+/** Pipelined chunk-batch push: the WebView acks the batch after its queue
+ * drains to `drainBelow`, so the host can keep a bounded number of chunks in
+ * flight instead of blocking on a round-trip per chunk. */
+export interface FileOpChunkBatchRequest { sessionId: string; chunks: string[]; drainBelow?: number; }
+/**
+ * Pure in-WebView benchmark: generates `bytes` deterministic bytes inside the
+ * WebView, encrypts them locally, consumes the output stream, and reports
+ * elapsed time. No bridge traffic — used to separate WebView crypto speed
+ * from bridge round-trip cost when diagnosing file-op performance.
+ */
+export interface FileOpSelfTestRequest { bytes: number; publicKey: string; }
+export interface FileOpSelfTestResult { elapsedMs: number; inBytes: number; outBytes: number; }
+export interface FileOpEncryptRequest {
+    sessionId: string;
+    publicKeys: string[];
+    filename: string;
+    signOptions?: PrivateKeyAndPassphrase;
+}
+export interface FileOpDecryptRequest {
+    sessionId: string;
+    privateKey: string;
+    passphrase: string;
+    publicKeyForVerification?: string;
+}
+// Result streaming is pull-based: the caller asks for the next chunk and the
+// WebView reads one buffer off the output stream — it never buffers the whole
+// file. `maxLength` bounds each pull.
+export interface FileOpResultChunkRequest { sessionId: string; maxLength: number; }
+export interface FileOpFinishInputRequest { sessionId: string; }
+export interface FileOpEndRequest { sessionId: string; }
+export interface FileOpStatusRequest { sessionId: string; }
+
+export interface FileOpEncryptResult { ok: true; }
+export interface FileOpDecryptResult {
+    ok: true;
+    filename: string;
+    verified: boolean | null;
+}
+export interface FileOpChunkAck { received: number; }
+export interface FileOpOk { ok: true; }
+export interface FileOpResultChunk {
+    base64: string;
+    /** True when the output stream is exhausted — no more chunks follow. */
+    done: boolean;
+    verified?: boolean | null;
+}
+
 /**
  * Discriminated union of every PGP operation request sent to the WebView.
  * `operation` names the handler branch; `data` is the per-operation payload.
@@ -91,6 +164,18 @@ export interface PgpRequestMap {
     verifyDetachedSignature: { operation: 'verifyDetachedSignature'; data: VerifySignatureRequest };
     validatePrivateKeyPassphrase: { operation: 'validatePrivateKeyPassphrase'; data: ValidatePassphraseRequest };
     extractPublicKeyFromPrivate: { operation: 'extractPublicKeyFromPrivate'; data: ExtractPublicKeyRequest };
+    revokeKey: { operation: 'revokeKey'; data: RevokeKeyRequest };
+    applyRevocation: { operation: 'applyRevocation'; data: ApplyRevocationRequest };
+    fileOpBegin: { operation: 'fileOpBegin'; data: FileOpBeginRequest };
+    fileOpChunkBatch: { operation: 'fileOpChunkBatch'; data: FileOpChunkBatchRequest };
+    fileOpSelfTest: { operation: 'fileOpSelfTest'; data: FileOpSelfTestRequest };
+    fileOpChunk: { operation: 'fileOpChunk'; data: FileOpChunkRequest };
+    fileOpEncrypt: { operation: 'fileOpEncrypt'; data: FileOpEncryptRequest };
+    fileOpDecrypt: { operation: 'fileOpDecrypt'; data: FileOpDecryptRequest };
+    fileOpResultChunk: { operation: 'fileOpResultChunk'; data: FileOpResultChunkRequest };
+    fileOpFinishInput: { operation: 'fileOpFinishInput'; data: FileOpFinishInputRequest };
+    fileOpStatus: { operation: 'fileOpStatus'; data: FileOpStatusRequest };
+    fileOpEnd: { operation: 'fileOpEnd'; data: FileOpEndRequest };
 }
 
 export type PgpOperationName = keyof PgpRequestMap;
@@ -108,6 +193,18 @@ export interface PgpResponseMap {
     verifyDetachedSignature: boolean;
     validatePrivateKeyPassphrase: boolean;
     extractPublicKeyFromPrivate: string;
+    revokeKey: RevokedKeyResult;
+    applyRevocation: string;
+    fileOpBegin: FileOpOk;
+    fileOpChunkBatch: FileOpChunkAck;
+    fileOpSelfTest: FileOpSelfTestResult;
+    fileOpChunk: FileOpChunkAck;
+    fileOpEncrypt: FileOpEncryptResult;
+    fileOpDecrypt: FileOpDecryptResult;
+    fileOpResultChunk: FileOpResultChunk;
+    fileOpFinishInput: FileOpOk;
+    fileOpStatus: { queueDepth: number; inputDone: boolean };
+    fileOpEnd: FileOpOk;
 }
 
 export type PgpOperationResponse<T extends PgpOperationName> = PgpResponseMap[T];
@@ -190,6 +287,39 @@ export const isPgpOperationResultValid = (
                 typeof result.algorithm === 'string' &&
                 typeof result.expiry === 'string'
             );
+        case 'revokeKey':
+            return isArmoredKeyPair(result)
+                && typeof (result as { revocationCertificate?: unknown }).revocationCertificate === 'string';
+        case 'applyRevocation':
+            return typeof result === 'string';
+        case 'fileOpBegin':
+        case 'fileOpFinishInput':
+        case 'fileOpEnd':
+            return isRecord(result) && result.ok === true;
+        case 'fileOpSelfTest':
+            return isRecord(result)
+                && typeof result.elapsedMs === 'number'
+                && typeof result.inBytes === 'number'
+                && typeof result.outBytes === 'number';
+        case 'fileOpStatus':
+            return isRecord(result)
+                && typeof result.queueDepth === 'number'
+                && typeof result.inputDone === 'boolean';
+        case 'fileOpChunk':
+        case 'fileOpChunkBatch':
+            return isRecord(result) && typeof result.received === 'number';
+        case 'fileOpEncrypt':
+            return isRecord(result) && result.ok === true;
+        case 'fileOpDecrypt':
+            return isRecord(result)
+                && result.ok === true
+                && typeof result.filename === 'string'
+                && (result.verified == null || typeof result.verified === 'boolean');
+        case 'fileOpResultChunk':
+            return isRecord(result)
+                && typeof result.base64 === 'string'
+                && typeof result.done === 'boolean'
+                && (result.verified == null || typeof result.verified === 'boolean');
         case 'verifyDetachedSignature':
         case 'validatePrivateKeyPassphrase':
             return typeof result === 'boolean';

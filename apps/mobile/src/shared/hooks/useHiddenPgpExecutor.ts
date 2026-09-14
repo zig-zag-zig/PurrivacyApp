@@ -47,10 +47,20 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
                 'createDetachedSignature',
                 'verifyDetachedSignature',
                 'extractPublicKeyFromPrivate',
+                // File ops unlock a private key (PBKDF2) and stream large data;
+                // fileOpResultChunk can block while the output stream produces
+                // the next chunk, so it needs a generous cap too.
+                // fileOpChunkBatch may wait on the WebView queue while a slow
+                // key-unlock (PBKDF2) precedes the first stream pull, so it
+                // must survive that too (was a 30s timeout → decrypt failed).
+                'fileOpEncrypt',
+                'fileOpDecrypt',
+                'fileOpResultChunk',
+                'fileOpChunkBatch',
             ]);
             let timeoutMs = 30000; // default (light ops)
             if (CRYPTO_HEAVY_OPS.has(operation)) {
-                timeoutMs = 90000;
+                timeoutMs = 120000;
             } else if (operation === 'generateKeyPair') {
                 const bits = (data as PgpRequestMap['generateKeyPair']['data'] | undefined)?.bitStrength;
                 if (bits !== undefined && bits >= 4096) timeoutMs = 180000;
@@ -73,6 +83,10 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
             });
 
             const payload = { operation, data, id };
+            // No setTimeout wrapper: evaluateJavascript is already async on the
+            // native side, and deferring through a timer can add up to ~1s per
+            // call if the WebView throttles timers (hidden/offscreen webview).
+            // handlePGPOperation is async and yields on its own awaits.
             const js = `
         (function(){
           try {
@@ -80,13 +94,11 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ success:false, error:'handlePGPOperation not ready', id: ${id} }));
               return true;
             }
-            setTimeout(function(){
-              try {
-                window.handlePGPOperation(${JSON.stringify(payload)});
-              } catch(eInner) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ success:false, error: eInner.message, id: ${id} }));
-              }
-            }, 0);
+            try {
+              window.handlePGPOperation(${JSON.stringify(payload)});
+            } catch(eInner) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ success:false, error: eInner.message, id: ${id} }));
+            }
           } catch(e) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ success:false, error: e.message, id: ${id} }));
           }

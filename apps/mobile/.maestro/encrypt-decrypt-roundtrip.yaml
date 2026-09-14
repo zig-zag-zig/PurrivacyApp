@@ -41,12 +41,29 @@ env:
     id: "purrivacy.encrypt.recipients.item.0"
 - tapOn:
     id: "purrivacy.encrypt.submit"
+# The result now lives in the Activity modal (the composer clears on success).
 - extendedWaitUntil:
     visible:
-      id: "purrivacy.encrypt.result.text"
+      id: "purrivacy.ops.pill"
     timeout: 90000
+- tapOn:
+    id: "purrivacy.ops.pill"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.row.text-encrypt"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.ops.row.text-encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.result.encrypted.text"
+    timeout: 15000
 - copyTextFrom:
-    id: "purrivacy.encrypt.result.text"
+    id: "purrivacy.ops.result.encrypted.text"
+- tapOn:
+    id: "purrivacy.ops.back"
+- tapOn:
+    id: "purrivacy.ops.closeIcon"
 - evalScript: ${output.encryptedMessage = maestro.copiedText}
 - evalScript: ${output.encryptedLines = output.encryptedMessage.trim().split('\n')}
 - evalScript: ${output.encryptedHeader = output.encryptedLines[0]}
@@ -92,10 +109,26 @@ env:
     id: "purrivacy.decrypt.submit"
 - extendedWaitUntil:
     visible:
-      id: "purrivacy.decrypt.result.text"
+      id: "purrivacy.ops.pill"
     timeout: 90000
+- tapOn:
+    id: "purrivacy.ops.pill"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.row.text-decrypt"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.ops.row.text-decrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.result.decrypted.text"
+    timeout: 15000
 - copyTextFrom:
-    id: "purrivacy.decrypt.result.text"
+    id: "purrivacy.ops.result.decrypted.text"
+- tapOn:
+    id: "purrivacy.ops.back"
+- tapOn:
+    id: "purrivacy.ops.closeIcon"
 - evalScript: ${output.decryptedMessage = maestro.copiedText}
 - assertTrue:
     condition: ${output.decryptedMessage === ROUNDTRIP_MESSAGE}

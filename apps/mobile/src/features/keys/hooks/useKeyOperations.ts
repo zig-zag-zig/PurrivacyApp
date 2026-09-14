@@ -25,6 +25,7 @@ import {
 } from '../domain/tempKeyFixtures';
 import type { KeysUiState } from '../model/types';
 import { PgpKeyService } from '../services/pgpKeyService';
+import { useOperationCenter } from '../../../app/state/OperationCenterContext';
 import type { KeyScreenAction } from '../state/keyScreenReducer';
 
 type ShowToast = (message: string, type: ToastType) => void;
@@ -48,6 +49,7 @@ export function useKeyOperations({
 }: KeyOperationsParams) {
   const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'key');
   const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
+  const { beginOperation } = useOperationCenter();
   const refreshUserKeys = () => EventService.addEvent('user');
   const refreshDevTempKeys = () => EventService.addEvent('devTempKeys');
 
@@ -62,21 +64,39 @@ export function useKeyOperations({
       if (keyGenerationOptions.passphrase) {
         ensurePassphraseStorageConsent().catch(() => {});
       }
-      const key = await PgpKeyService.createKey(
-        user.uid,
-        keyGenerationOptions,
-        setAsDefault,
-        keyGenerationOptions.passphrase || null,
-      );
+      // Key generation is one of the longest operations in the app (up to
+      // minutes for large RSA strengths). Register it with the operation
+      // center so it stays visible and keeps running across navigation,
+      // inactivity lock, or backgrounding.
+      await beginOperation({
+        kind: 'key-generate',
+        title: 'Generating key',
+        detail: keyGenerationOptions.name || keyGenerationOptions.email || undefined,
+        run: async api => {
+          const bits = keyGenerationOptions.bitStrength;
+          api.setPhase(bits ? `Generating ${bits}-bit key` : 'Generating key');
+          const key = await PgpKeyService.createKey(
+            user.uid,
+            keyGenerationOptions,
+            setAsDefault,
+            keyGenerationOptions.passphrase || null,
+          );
 
-      if (key) {
-        dispatch({ type: 'optimisticKeyAdded', key });
-        dispatch({ type: 'keyActionChanged', keyAction: 'view' });
-        dispatch({ type: 'formResetIncremented' });
-        refreshUserKeys();
-        showToast(SUCCESS_MESSAGES.KEY_CREATED, 'success');
-        return;
-      }
+          if (!key) {
+            throw new Error('Key generation did not return a key');
+          }
+
+          api.succeed(
+            { fingerprint: key.fingerprint },
+            key.userId?.trim() || 'Key created',
+          );
+          dispatch({ type: 'optimisticKeyAdded', key });
+          dispatch({ type: 'keyActionChanged', keyAction: 'view' });
+          dispatch({ type: 'formResetIncremented' });
+          refreshUserKeys();
+          showToast(SUCCESS_MESSAGES.KEY_CREATED, 'success');
+        },
+      });
     } catch (error: any) {
       logger.warn('key creation failed', { error });
       showToast(getUserFacingErrorMessage(error, ERROR_MESSAGES.KEY_CREATE_FAILED), 'error');
@@ -307,6 +327,39 @@ export function useKeyOperations({
     }
   };
 
+  const onRevokeKey = async (fingerprint: string, passphrase: string) => {
+    if (!user) return;
+
+    if (isDevTempKeyFingerprint(fingerprint)) {
+      showToast('Temporary keys cannot be revoked', 'error');
+      return;
+    }
+
+    dispatch({ type: 'loadingChanged', isLoading: true });
+    try {
+      await PgpKeyService.revokeKey(user.uid, fingerprint, passphrase);
+      refreshUserKeys();
+    } catch (error: any) {
+      // Re-throw: the caller (useKeyMutationControls) owns the error toast.
+      throw error;
+    } finally {
+      dispatch({ type: 'loadingChanged', isLoading: false });
+    }
+  };
+
+  const onSetKeyVerified = async (fingerprint: string, verified: boolean) => {
+    if (!user) return;
+    dispatch({ type: 'loadingChanged', isLoading: true });
+    try {
+      await PgpKeyService.setKeyVerified(user.uid, fingerprint, verified);
+      refreshUserKeys();
+    } catch (error: any) {
+      throw error;
+    } finally {
+      dispatch({ type: 'loadingChanged', isLoading: false });
+    }
+  };
+
   const onPickImportFile = () => {
     void pickFile(
       content => dispatch({ type: 'importKeyChanged', importKey: content }),
@@ -321,6 +374,8 @@ export function useKeyOperations({
     onSetDefaultKey,
     onChangePassphrase,
     onChangeExpiration,
+    onRevokeKey,
+    onSetKeyVerified,
     onPickImportFile,
   };
 }

@@ -12,8 +12,17 @@ import type { KeyMetadata } from '../../../types/types';
 import { pgpCryptoService } from '../../../services/pgpCryptoService';
 import { AuthService } from '../../auth/services/authService';
 import { securityService } from '../../security/services/securityService';
+import { NOTE_RECORD_TYPE } from '../../notes/model/noteTypes';
+import type { SecureNote } from '../../notes/model/noteTypes';
 
-type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase;
+type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {
+  /** Discriminant: 'note' for secure-note records, absent for real keys. */
+  type?: string;
+  // Note payload fields (present only when type === 'note').
+  title?: string;
+  body?: string;
+  updatedAt?: number;
+};
 type StorageKeyPayload = KeyPair & {
   privateKeyPassphrase?: string | null;
 };
@@ -119,12 +128,25 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
   const keyRecords = await ApiClient.fetchAllKeyRecords();
   const dek = await getAvailableDek(userId);
   const decryptedKeys: KeyPairWithRecordId[] = [];
+  const decryptedNotes: SecureNote[] = [];
 
   for (const keyRecord of keyRecords) {
     const decryptedKey = JSON.parse(
       await AuthService.decrypt(userId, keyRecord.encryptedData, dek, keyRecord.iv, false, keyRecord.tag),
     ) as DecryptedKeyPayload;
 
+    // Note records share the key-records store; collect them here so the
+    // keyring and notes share a single fetch+decrypt pass instead of each
+    // decrypting the full set independently.
+    if (decryptedKey.type === NOTE_RECORD_TYPE) {
+      decryptedNotes.push({
+        id: keyRecord.recordId,
+        title: decryptedKey.title ?? '',
+        body: decryptedKey.body ?? '',
+        updatedAt: decryptedKey.updatedAt ?? 0,
+      });
+      continue;
+    }
     const privateKey = decryptedKey.privateKey ?? null;
     const publicKey = decryptedKey.publicKey;
     if (!publicKey) {
@@ -142,10 +164,20 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
       recordId: keyRecord.recordId,
       privateKeyPassphrase:
         privateKey !== null ? decryptedKey.privateKeyPassphrase ?? null : null,
+      // Standalone cert isn't derivable from the armored key; carry it through
+      // the encrypted payload. `revoked` comes from fresh metadata extraction.
+      revocationCertificate: decryptedKey.revocationCertificate ?? null,
+      // Verified is a device-side claim, not derivable from armor either.
+      verified: decryptedKey.verified === true,
     };
 
     decryptedKeys.push(key);
   }
 
-  return { ...userEncrypted, keys: decryptedKeys };
+  return {
+    ...userEncrypted,
+    keys: decryptedKeys,
+    // Newest first.
+    notes: decryptedNotes.sort((a, b) => b.updatedAt - a.updatedAt),
+  };
 }

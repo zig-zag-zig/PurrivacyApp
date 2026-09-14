@@ -65,6 +65,7 @@ const user = (keys: KeyPairWithRecordId[]): UserDecrypted => ({
   dekPassword: encrypted,
   dekSeed: encrypted,
   keys,
+  notes: [],
 });
 
 describe('PgpKeyService key record mutations', () => {

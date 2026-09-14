@@ -46,10 +46,23 @@ env:
     id: "purrivacy.encrypt.submit"
 - tapOn:
     id: "purrivacy.encrypt.submit"
-# Exactly one result, app alive and responsive
+# Exactly one operation: the modal lists a single text-encrypt row (the second
+# tap must not enqueue a duplicate) and the app is alive and responsive.
 - extendedWaitUntil:
     visible:
-      id: "purrivacy.encrypt.result.text"
+      id: "purrivacy.ops.pill"
     timeout: 90000
+- tapOn:
+    id: "purrivacy.ops.pill"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.row.text-encrypt"
+    timeout: 20000
 - assertVisible:
-    id: "purrivacy.encrypt.result.text"
+    id: "purrivacy.ops.row.text-encrypt"
+    index: 0
+- assertNotVisible:
+    id: "purrivacy.ops.row.text-encrypt"
+    index: 1
+- tapOn:
+    id: "purrivacy.ops.closeIcon"

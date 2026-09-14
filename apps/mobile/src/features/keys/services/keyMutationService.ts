@@ -271,6 +271,88 @@ export async function changeExpiration(
   }
 }
 
+export interface RevokeKeyOutcome {
+    /** The standalone armored revocation certificate, for sharing/export. */
+    revocationCertificate: string;
+}
+
+/**
+ * Revoke an own private key. Replaces the stored armored pair with the revoked
+ * pair (revocation signature embedded), marks the record revoked, and keeps the
+ * standalone certificate on the record so it can be exported even if the
+ * passphrase is later lost.
+ *
+ * Revoking is not deleting: the key stays so historical ciphertext still
+ * decrypts, but it stops being offered for new encryptions.
+ */
+export async function revokeKey(
+  userId: string,
+  fingerprint: string,
+  passphrase: string,
+): Promise<RevokeKeyOutcome> {
+  try {
+    const user = await getUserDecrypted(userId);
+    if (!user) throw new Error('User not found');
+
+    const key = user.keys.find(existingKey => existingKey.fingerprint === fingerprint && existingKey.privateKey);
+    if (!key) throw new Error('Private key not found');
+    if (key.revoked) throw new Error('Key is already revoked');
+
+    const result = await pgpCryptoService.revokeKey(key.privateKey!, passphrase);
+    const metadata = await pgpCryptoService.extractKeyMetadata(result.publicKey);
+
+    await updateEncryptedKeyRecord(userId, {
+      ...key,
+      ...metadata,
+      revoked: true,
+      revocationCertificate: result.revocationCertificate || undefined,
+      privateKey: result.privateKey,
+      publicKey: result.publicKey,
+      privateKeyPassphrase: await shouldSyncPassphrase(
+        userId,
+        key.privateKeyPassphrase ?? passphrase,
+      ),
+    });
+
+    return { revocationCertificate: result.revocationCertificate };
+  } catch (error: any) {
+    logger.warn('key revoke failed', { error });
+    throw new Error(error.message || 'Failed to revoke key');
+  }
+}
+
+/**
+ * Import/apply a revocation certificate to a stored public key. Marks the key
+ * revoked so it stops being offered for encryption.
+ */
+export async function applyRevocationToKey(
+  userId: string,
+  fingerprint: string,
+  revocationCertificate: string,
+): Promise<void> {
+  try {
+    const user = await getUserDecrypted(userId);
+    if (!user) throw new Error('User not found');
+
+    const key = findKeyByFingerprint(user, fingerprint);
+    if (!key) throw new Error('Key not found');
+
+    const revokedPublicKey = await pgpCryptoService.applyRevocation(key.publicKey, revocationCertificate);
+    const metadata = await pgpCryptoService.extractKeyMetadata(revokedPublicKey);
+
+    await updateEncryptedKeyRecord(userId, {
+      ...key,
+      ...metadata,
+      revoked: true,
+      revocationCertificate,
+      publicKey: revokedPublicKey,
+    });
+  } catch (error: any) {
+    logger.warn('apply revocation failed', { error });
+    throw new Error(error.message || 'Failed to apply revocation');
+  }
+}
+
 export async function setDefaultKey(userId: string, fingerprint: string): Promise<void> {
   try {
     const user = await getUserDecrypted(userId);
@@ -291,6 +373,33 @@ export async function setDefaultKey(userId: string, fingerprint: string): Promis
   } catch (error) {
     logger.warn('default key update failed', { error });
     throw new Error('Failed to set default key');
+  }
+}
+
+/**
+ * Set or clear the `verified` claim on a public-key record. `verified` is a
+ * device-side attestation that the user compared the fingerprint against a
+ * trusted channel; it isn't derivable from the armor, so it's re-encrypted
+ * back onto the record. Only meaningful for public keys (contacts).
+ */
+export async function setKeyVerified(
+  userId: string,
+  fingerprint: string,
+  verified: boolean,
+): Promise<void> {
+  try {
+    const user = await getUserDecrypted(userId);
+    if (!user) return;
+
+    const key = user.keys.find(existingKey => existingKey.fingerprint === fingerprint);
+    if (!key) {
+      throw new Error('Key not found');
+    }
+
+    await updateEncryptedKeyRecord(userId, { ...key, verified });
+  } catch (error) {
+    logger.warn('set key verified failed', { error });
+    throw new Error('Failed to update verified status');
   }
 }
 

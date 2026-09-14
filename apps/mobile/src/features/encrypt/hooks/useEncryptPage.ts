@@ -3,7 +3,19 @@ import { useCallback, useEffect, useReducer } from 'react';
 import type { SetStateAction } from 'react';
 
 import { useAuth } from '../../auth/state/AuthContext';
+import { useEncryptedComposeDraft } from '../../../services/drafts';
+import { useMemo } from 'react';
 import { useToast } from '../../../app/state/ToastContext';
+import { useOperationCenter } from '../../../app/state/OperationCenterContext';
+
+/** "Alice, Bob" or "Alice, Bob +2 more" — compact recipient/sender list for
+ * the operation card, with overflow collapsed instead of wrapping forever. */
+const formatKeyUserIds = (userIds: (string | undefined)[]): string => {
+    const clean = userIds.map(u => (u ?? '').trim()).filter(Boolean);
+    if (clean.length === 0) return '';
+    if (clean.length <= 2) return clean.join(', ');
+    return `${clean.slice(0, 2).join(', ')} +${clean.length - 2} more`;
+};
 import type { EncryptScreenRouteProp, RootNavigationProps } from '../../../app/navigation/types';
 import { useFilePicker } from '../../../shared/hooks/useFilePicker';
 import { useKeyPrerequisiteRedirect } from '../../../shared/hooks/useKeyPrerequisiteRedirect';
@@ -27,11 +39,17 @@ export function useEncryptPage() {
   const navigation = useNavigation<RootNavigationProps>();
   const { userDecrypted, visibleKeys, user, isAuthLoading } = useAuth();
   const { showToast } = useToast();
+  const { beginOperation } = useOperationCenter();
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
   const { secureCopy } = useSecureCopy();
 
   const pickFile = useFilePicker(['.txt']);
-  const keySelectionKeys = visibleKeys;
+  // Exclude revoked keys from the recipient picker: they cannot be encrypted
+  // to (the WebView also refuses), and offering them is a footgun.
+  const keySelectionKeys = useMemo(
+    () => visibleKeys.filter(key => !key.revoked),
+    [visibleKeys],
+  );
   const shouldRedirectToKeys = Boolean(userDecrypted && !isAuthLoading && keySelectionKeys.length === 0);
 
   const { isRedirecting: isRedirectingToKeys } = useKeyPrerequisiteRedirect(
@@ -45,6 +63,16 @@ export function useEncryptPage() {
     state.wasSuccessful,
     () => dispatch({ type: 'resetAfterSuccess' }),
   );
+
+  // Persist the compose field as an encrypted draft so a failed encrypt or an
+  // app background doesn't lose a long message. Cleared on success.
+  useEncryptedComposeDraft({
+    userId: user?.uid,
+    slot: 'encrypt',
+    value: state.content,
+    shouldClear: state.wasSuccessful,
+    onRestore: draft => dispatch({ type: 'contentChanged', content: draft }),
+  });
 
   useEffect(() => {
     const completeKeyPairs = getCompleteKeyPairs(keySelectionKeys);
@@ -127,39 +155,65 @@ export function useEncryptPage() {
         }
       }
 
-      const encryptedContent = await pgpCryptoService.encryptMessage(
-        Object.values(state.selectedPublicKeys),
-        contentToEncrypt,
-        needsPassphrase && privateKeyId
-          ? {
-            privateKey: state.selectedPrivateKey[privateKeyId],
-            passphrase: state.passphrase,
+      const recipientUserIds = Object.keys(state.selectedPublicKeys)
+        .map(fp => keySelectionKeys.find(key => key.fingerprint === fp)?.userId);
+      const senderUserId = state.signMessage && privateKeyId
+        ? state.completeKeyPairs.find(key => key.fingerprint === privateKeyId)?.userId
+        : undefined;
+      const operationDetail = [
+        recipientUserIds.length ? `To ${formatKeyUserIds(recipientUserIds)}` : null,
+        senderUserId ? `Signed by ${senderUserId.trim()}` : null,
+      ].filter(Boolean).join(' · ');
+
+      const { encryptedContent, signature } = await beginOperation({
+        kind: 'text-encrypt',
+        title: 'Encrypting message',
+        detail: operationDetail || undefined,
+        run: async api => {
+          const encrypted = await pgpCryptoService.encryptMessage(
+            Object.values(state.selectedPublicKeys),
+            contentToEncrypt,
+            needsPassphrase && privateKeyId
+              ? {
+                privateKey: state.selectedPrivateKey[privateKeyId],
+                passphrase: state.passphrase,
+              }
+              : undefined,
+          );
+          // Sign inside the operation so the detached signature lands in the
+          // same result the modal displays.
+          let detachedSignature = '';
+          if (state.signMessage && privateKeyId && state.selectedPrivateKey[privateKeyId]) {
+            try {
+              detachedSignature = await pgpCryptoService.createDetachedSignature(
+                contentToEncrypt,
+                state.selectedPrivateKey[privateKeyId],
+                state.passphrase,
+              );
+            } catch {
+              detachedSignature = '';
+            }
           }
-          : undefined,
-      );
+          api.succeed(
+            { encryptedContent: encrypted, signature: detachedSignature },
+            `${contentToEncrypt.length} characters encrypted`,
+          );
+          return { encryptedContent: encrypted, signature: detachedSignature };
+        },
+      });
 
       dispatch({ type: 'encryptedContentChanged', encryptedContent });
-
-      if (state.signMessage && privateKeyId && state.selectedPrivateKey[privateKeyId]) {
-        try {
-          const signature = await pgpCryptoService.createDetachedSignature(
-            contentToEncrypt,
-            state.selectedPrivateKey[privateKeyId],
-            state.passphrase,
-          );
-          dispatch({ type: 'signatureChanged', signature });
-        } catch {
-          dispatch({ type: 'signatureChanged', signature: '' });
-        }
-      } else {
-        dispatch({ type: 'signatureChanged', signature: '' });
-      }
-
-      dispatch({ type: 'markSuccessful' });
+      dispatch({ type: 'signatureChanged', signature });
+      // The outcome lives in the operation modal now, so the composer is reset
+      // rather than left holding the plaintext and passphrase.
+      dispatch({ type: 'resetAfterSuccess' });
       showToast('Encryption successful!', 'success');
 
-    } catch {
-      showToast('Failed to encrypt the message', 'error');
+    } catch (error: any) {
+      const message = typeof error?.message === 'string' && error.message.toLowerCase().includes('revoked')
+        ? error.message
+        : 'Failed to encrypt the message';
+      showToast(message, 'error');
     } finally {
       dispatch({ type: 'encryptFinished' });
     }
