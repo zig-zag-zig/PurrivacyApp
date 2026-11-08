@@ -8,6 +8,7 @@ import {
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
 import { KeyboardAwareScrollContext } from './KeyboardAwareScrollContext';
+import { measureScrollNodeInWindow } from './measureScrollNode';
 import {
     ScreenScrollHandle,
     useScreenScrollEngine,
@@ -46,11 +47,7 @@ export const ScreenContainer = React.forwardRef<ScrollView, ScreenContainerProps
             const handle: ScreenScrollHandle | null = node
                 ? {
                     scrollToY: (y, animated) => node.scrollTo({ y, animated }),
-                    // measureInWindow exists on the native ScrollView component
-                    // but is not declared on the public type.
-                    measureInWindow: (callback) =>
-                        (node as unknown as { measureInWindow: (cb: typeof callback) => void })
-                            .measureInWindow(callback),
+                    measureInWindow: (callback) => measureScrollNodeInWindow(node, callback),
                 }
                 : null;
             engine.attachRef(handle);

@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { Button } from '../../../components/Button';
 import { CustomText } from '../../../components/CustomText';
+import { useKeyboardAwareInputFocus } from '../../../components/useKeyboardAwareInputFocus';
 import { theme } from '../../../styles/theme';
 
 interface RecoveryCodeInputProps {
@@ -18,6 +19,7 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
     loading,
 }) => {
     const recoveryInputRef = useRef<TextInput | null>(null);
+    const { containerRef, scrollIntoView } = useKeyboardAwareInputFocus();
     const [isFocused, setIsFocused] = useState(false);
     const previousValueRef = useRef(value);
     // Bumped when the field is programmatically cleared (a rejected code):
@@ -81,7 +83,7 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
 
     return (
         <View style={styles.recoveryCodeContainer}>
-            <View style={styles.fieldContainer}>
+            <View ref={containerRef} collapsable={false} style={styles.fieldContainer}>
                 <CustomText
                     pointerEvents="none"
                     style={[
@@ -113,7 +115,10 @@ export const RecoveryCodeInput: React.FC<RecoveryCodeInputProps> = ({
                     editable={!loading}
                     onSubmitEditing={onSubmit}
                     returnKeyType="done"
-                    onFocus={() => setIsFocused(true)}
+                    onFocus={() => {
+                        scrollIntoView();
+                        setIsFocused(true);
+                    }}
                     onBlur={() => setIsFocused(false)}
                 />
             </View>

@@ -34,8 +34,11 @@ type KeyManagementFormProps = {
 };
 
 const SURFACE_LABEL_BACKPLATE_PROPS = {
-    labelTopBackgroundColor: theme.colors.surface,
-    labelBottomBackgroundColor: theme.colors.surface,
+    // These fields live in KeyItem's details panel (surfaceMuted) and the
+    // input wrapper itself is surfaceElevated. Matching both halves keeps the
+    // floating label's notch invisible instead of drawing a dark bar.
+    labelTopBackgroundColor: theme.colors.surfaceMuted,
+    labelBottomBackgroundColor: theme.colors.surfaceElevated,
 } as const;
 
 export const KeyManagementForm = ({

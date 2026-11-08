@@ -5,6 +5,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { CustomText } from '../../../components/CustomText';
+import { useKeyboardAwareInputFocus } from '../../../components/useKeyboardAwareInputFocus';
 
 interface SecureTextDisplayProps extends TextInputProps {
     text: string;
@@ -29,7 +30,8 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
 }) => {
     const [isRevealed, setIsRevealed] = useState(!secure);
     const [revealTimeout, setRevealTimeout] = useState<NodeJS.Timeout | null>(null);
-    const { testID, accessibilityLabel } = props;
+    const { containerRef, scrollIntoView } = useKeyboardAwareInputFocus();
+    const { testID, accessibilityLabel, onFocus, ...inputProps } = props;
 
     const InputComponent = Platform.OS === 'android' ? IsolatedTextInput : TextInput;
 
@@ -58,7 +60,7 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
     }, [revealTimeout]);
 
     return (
-        <View style={[commonStyles.row, commonStyles.spaceBetween, styles.container, style]}>
+        <View ref={containerRef} collapsable={false} style={[commonStyles.row, commonStyles.spaceBetween, styles.container, style]}>
             {onChangeText ? (
                 <>
                     {/* iOS HEURISTIC DECOY: Absorbs Apple's autofill grouping for secure editable fields */}
@@ -69,6 +71,7 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
                             autoComplete="username"
                             pointerEvents="none"
                             editable={false}
+                            underlineColorAndroid="transparent"
                         />
                     )}
                     <InputComponent
@@ -77,7 +80,11 @@ export const SecureTextDisplay: React.FC<SecureTextDisplayProps> = ({
                         onChangeText={onChangeText}
                         secureTextEntry={!isRevealed && secure}
                         placeholderTextColor={theme.colors.placeholder}
-                        {...props}
+                        {...inputProps}
+                        onFocus={(event) => {
+                            scrollIntoView();
+                            onFocus?.(event);
+                        }}
                         autoComplete="off"
                         autoCorrect={false}
                         autoCapitalize="none"

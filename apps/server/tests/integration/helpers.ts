@@ -11,7 +11,7 @@ jest.mock('../../src/infrastructure/firebase', () => require('../helpers/firebas
 
 export const app = require('../../src/app').default as typeof import('../../src/app').default;
 export const { db, rtdb } = require('../../src/infrastructure/firebase') as typeof import('../../src/infrastructure/firebase');
-export const AUTH_EMULATOR_ORIGIN = 'http://127.0.0.1:9099';
+export const AUTH_EMULATOR_ORIGIN = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099'}`;
 
 // ── Test data helpers ────────────────────────────────────────────────────
 

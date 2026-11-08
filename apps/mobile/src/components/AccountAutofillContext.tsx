@@ -29,6 +29,7 @@ export const AccountAutofillContext = ({ username }: AccountAutofillContextProps
                 showSoftInputOnFocus={false}
                 style={styles.input}
                 textContentType={undefined}
+                underlineColorAndroid="transparent"
                 value={username}
             />
         </View>

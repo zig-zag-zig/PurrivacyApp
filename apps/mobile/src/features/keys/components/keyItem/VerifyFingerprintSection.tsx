@@ -30,6 +30,10 @@ const normalize = (value: string): string => value.replace(/\s+/g, '').toLowerCa
  * out-of-band channel, compares them, and records a `verified` flag on the
  * key record. It's a device-side attestation — it travels with the encrypted
  * record but is never sent anywhere else.
+ *
+ * Own keys (records with a private key) skip the paste/compare controls:
+ * their fingerprint is derived from the key material itself, so there is no
+ * contact claim to verify. The fingerprint stays copyable for sharing.
  */
 export const VerifyFingerprintSection = ({ pgpKey }: VerifyFingerprintSectionProps) => {
     const { user } = useAuth();
@@ -39,6 +43,7 @@ export const VerifyFingerprintSection = ({ pgpKey }: VerifyFingerprintSectionPro
     const [claim, setClaim] = useState('');
     const [busy, setBusy] = useState(false);
 
+    const isOwnKey = Boolean(pgpKey.privateKey);
     const own = normalize(pgpKey.fingerprint);
     const claimed = normalize(claim);
     const compared = claimed.length > 0;
@@ -67,7 +72,7 @@ export const VerifyFingerprintSection = ({ pgpKey }: VerifyFingerprintSectionPro
     return (
         <View style={styles.section}>
             <View style={styles.header}>
-                <CustomText style={styles.title}>Verify fingerprint</CustomText>
+                <CustomText style={styles.title}>{isOwnKey ? 'Fingerprint' : 'Verify fingerprint'}</CustomText>
                 <TouchableOpacity onPress={copyFingerprint} hitSlop={8} accessibilityLabel="Copy fingerprint" testID="purrivacy.key.verify.copyFingerprint">
                     <Icon name="content-copy" size={18} color={theme.colors.primary} />
                 </TouchableOpacity>
@@ -78,49 +83,57 @@ export const VerifyFingerprintSection = ({ pgpKey }: VerifyFingerprintSectionPro
             </CustomText>
 
             <CustomText style={styles.hint}>
-                Compare this fingerprint with the contact's through a channel you both trust.
+                {isOwnKey
+                    ? 'This is your key. Share this fingerprint so contacts can verify it through a channel you both trust.'
+                    : "Compare this fingerprint with the contact's through a channel you both trust."}
             </CustomText>
 
-            <InputField
-                label="Paste contact's fingerprint"
-                value={claim}
-                onChangeText={setClaim}
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="purrivacy.key.verify.claim"
-            />
+            {!isOwnKey && (
+                <>
+                    <InputField
+                        label="Paste contact's fingerprint"
+                        value={claim}
+                        onChangeText={setClaim}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        labelTopBackgroundColor={theme.colors.surfaceMuted}
+                        labelBottomBackgroundColor={theme.colors.surfaceElevated}
+                        testID="purrivacy.key.verify.claim"
+                    />
 
-            {compared && (
-                <View style={[styles.result, match ? styles.resultMatch : styles.resultMismatch]}>
-                    <Icon name={match ? 'check-circle' : 'cancel'} size={18} color={match ? theme.colors.success : theme.colors.error} />
-                    <CustomText style={[styles.resultText, match ? { color: theme.colors.success } : { color: theme.colors.error }]}>
-                        {match ? 'Fingerprints match' : 'Fingerprints do not match'}
-                    </CustomText>
-                </View>
-            )}
+                    {compared && (
+                        <View style={[styles.result, match ? styles.resultMatch : styles.resultMismatch]}>
+                            <Icon name={match ? 'check-circle' : 'cancel'} size={18} color={match ? theme.colors.success : theme.colors.error} />
+                            <CustomText style={[styles.resultText, match ? { color: theme.colors.success } : { color: theme.colors.error }]}>
+                                {match ? 'Fingerprints match' : 'Fingerprints do not match'}
+                            </CustomText>
+                        </View>
+                    )}
 
-            {pgpKey.verified ? (
-                <View style={styles.verifiedRow}>
-                    <View style={styles.verifiedBadge}>
-                        <Icon name="verified-user" size={18} color={theme.colors.success} />
-                        <CustomText style={styles.verifiedText}>Verified</CustomText>
-                    </View>
-                    <TouchableOpacity onPress={() => void setVerified(false)} disabled={busy} testID="purrivacy.key.verify.unmark">
-                        <CustomText style={styles.unmark}>Remove</CustomText>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <TouchableOpacity
-                    style={[styles.markButton, !match && styles.markButtonDisabled]}
-                    onPress={() => void setVerified(true)}
-                    disabled={busy || !match}
-                    testID="purrivacy.key.verify.mark"
-                >
-                    <Icon name="verified-user" size={18} color={match ? theme.colors.onPrimary : theme.colors.textMuted} />
-                    <CustomText style={[styles.markButtonText, !match && styles.markButtonTextDisabled]}>
-                        Mark as verified
-                    </CustomText>
-                </TouchableOpacity>
+                    {pgpKey.verified ? (
+                        <View style={styles.verifiedRow}>
+                            <View style={styles.verifiedBadge}>
+                                <Icon name="verified-user" size={18} color={theme.colors.success} />
+                                <CustomText style={styles.verifiedText}>Verified</CustomText>
+                            </View>
+                            <TouchableOpacity onPress={() => void setVerified(false)} disabled={busy} testID="purrivacy.key.verify.unmark">
+                                <CustomText style={styles.unmark}>Remove</CustomText>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.markButton, !match && styles.markButtonDisabled]}
+                            onPress={() => void setVerified(true)}
+                            disabled={busy || !match}
+                            testID="purrivacy.key.verify.mark"
+                        >
+                            <Icon name="verified-user" size={18} color={match ? theme.colors.onPrimary : theme.colors.textMuted} />
+                            <CustomText style={[styles.markButtonText, !match && styles.markButtonTextDisabled]}>
+                                Mark as verified
+                            </CustomText>
+                        </TouchableOpacity>
+                    )}
+                </>
             )}
         </View>
     );

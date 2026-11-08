@@ -210,6 +210,7 @@ export const InputField = forwardRef<TextInput, InputFieldProps>(
                             autoComplete="username"
                             pointerEvents="none"
                             editable={false}
+                            underlineColorAndroid="transparent"
                         />
                     )}
                     <adapters.InputComponent

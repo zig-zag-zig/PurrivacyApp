@@ -9,6 +9,13 @@ const makeValidArmor = (type: string, minLength = 24) => {
 
 const makeArmorWithChecksum = (type: string) => `-----BEGIN PGP ${type}-----\n\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n=eWzB\n-----END PGP ${type}-----`;
 
+const makeArmorWithHeaders = (type: string) => `-----BEGIN PGP ${type}-----
+Comment: Vendor: xxx (1B0E0E2EED71...)
+Version: 2026-03-23 - Last update 2026-03-23
+
+${'A'.repeat(64)}
+-----END PGP ${type}-----`;
+
 describe('validateArmor', () => {
     it('returns true for valid public key', () => {
         expect(validateArmor(makeValidArmor('PUBLIC KEY BLOCK'), 'PUBLIC KEY BLOCK')).toBe(true);
@@ -43,6 +50,28 @@ describe('validateArmor', () => {
         expect(validateArmor(collapsed, 'MESSAGE')).toBe(true);
     });
 
+    it('ignores optional armor headers such as Comment and Version', () => {
+        expect(validateArmor(makeArmorWithHeaders('PUBLIC KEY BLOCK'), 'PUBLIC KEY BLOCK')).toBe(true);
+        expect(validateArmor(makeArmorWithHeaders('PRIVATE KEY BLOCK'), 'PRIVATE KEY BLOCK')).toBe(true);
+    });
+
+    it('accepts header lines followed directly by the body without a blank separator', () => {
+        const armor = makeArmorWithHeaders('PUBLIC KEY BLOCK').replace(
+            'Version: 2026-03-23 - Last update 2026-03-23\n\n',
+            'Version: 2026-03-23 - Last update 2026-03-23\n',
+        );
+        expect(validateArmor(armor, 'PUBLIC KEY BLOCK')).toBe(true);
+    });
+
+    it('accepts fully collapsed armor with headers and a checksum', () => {
+        const withChecksum = makeArmorWithHeaders('PUBLIC KEY BLOCK').replace(
+            '\n-----END',
+            '\n=eWzB\n-----END',
+        );
+        const collapsed = withChecksum.replace(/\n/g, '');
+        expect(validateArmor(collapsed, 'PUBLIC KEY BLOCK')).toBe(true);
+    });
+
     it('normalizeArmor rebuilds canonical multi-line armor from collapsed input', () => {
         const collapsed = makeArmorWithChecksum('MESSAGE').replace(/\n/g, '');
         const normalized = normalizeArmor(collapsed, 'MESSAGE');
@@ -56,6 +85,33 @@ describe('validateArmor', () => {
 
     it('normalizeArmor returns null for non-matching block types', () => {
         expect(normalizeArmor(makeValidArmor('MESSAGE'), 'PUBLIC KEY BLOCK')).toBeNull();
+    });
+
+    it('normalizeArmor drops optional headers and keeps the body parseable', () => {
+        const normalized = normalizeArmor(makeArmorWithHeaders('PUBLIC KEY BLOCK'), 'PUBLIC KEY BLOCK');
+        expect(normalized).not.toBeNull();
+        expect(normalized).not.toContain('Comment:');
+        expect(normalized).not.toContain('Version:');
+        expect(normalized!.startsWith('-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n')).toBe(true);
+        expect(normalized!.endsWith('\n-----END PGP PUBLIC KEY BLOCK-----')).toBe(true);
+        expect(validateArmor(normalized!, 'PUBLIC KEY BLOCK')).toBe(true);
+    });
+
+    it('normalizeArmor preserves the checksum when headers are present', () => {
+        const withChecksum = makeArmorWithHeaders('PUBLIC KEY BLOCK').replace(
+            '\n-----END',
+            '\n=eWzB\n-----END',
+        );
+        const normalized = normalizeArmor(withChecksum, 'PUBLIC KEY BLOCK');
+        expect(normalized).not.toBeNull();
+        expect(normalized!.endsWith('\n=eWzB\n-----END PGP PUBLIC KEY BLOCK-----')).toBe(true);
+    });
+
+    it('normalizeArmor handles fully collapsed armor with headers', () => {
+        const collapsed = makeArmorWithHeaders('PUBLIC KEY BLOCK').replace(/\n/g, '');
+        const normalized = normalizeArmor(collapsed, 'PUBLIC KEY BLOCK');
+        expect(normalized).not.toBeNull();
+        expect(validateArmor(normalized!, 'PUBLIC KEY BLOCK')).toBe(true);
     });
 
     it('normalizeArmor canonicalizes markers with irregular internal whitespace', () => {
@@ -96,6 +152,11 @@ describe('identifyKeyType', () => {
 
     it('identifies message', () => {
         expect(identifyKeyType(makeValidArmor('MESSAGE'))).toBe('message');
+    });
+
+    it('identifies keys that carry optional armor headers', () => {
+        expect(identifyKeyType(makeArmorWithHeaders('PUBLIC KEY BLOCK'))).toBe('public');
+        expect(identifyKeyType(makeArmorWithHeaders('PRIVATE KEY BLOCK'))).toBe('private');
     });
 
     it('returns unknown for unrecognized content', () => {

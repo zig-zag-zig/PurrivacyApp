@@ -31,14 +31,14 @@
         "@sentry/node": "^10.53.1",
         "dotenv": "^16.4.7",
         "expo-server-sdk": "^3.14.0",
-        "express": "^4.21.2",
+        "express": "^4.22.3",
         "firebase-admin": "^13.10.0",
         "ioredis": "^6.0.0",
         "otpauth": "^9.4.1",
         "@purrivacy/shared": "file:../../packages/shared"
     },
     "overrides": {
-        "@hono/node-server": "^2.0.5",
+        "@hono/node-server": "^2.1.6",
         "@opentelemetry/core": "^2.8.0",
         "gaxios": {
             "uuid": "11.1.1"
@@ -48,13 +48,33 @@
         },
         "teeny-request": {
             "uuid": "11.1.1"
+        },
+        "@grpc/grpc-js": "^1.14.7",
+        "@modelcontextprotocol/sdk": "^1.32.2",
+        "csv-parse": "^7.0.3",
+        "glob": "^14.0.4",
+        "js-yaml": "^4.3.2",
+        "minimatch": "^11.0.5",
+        "proxy-addr": "^2.0.8",
+        "qs": "^6.17.1",
+        "stream-json": "^3.8.0",
+        "@fastify/busboy": "^3.2.5",
+        "compression": "^1.8.2",
+        "deepmerge": "4.1.2",
+        "fast-uri": "^3.1.9",
+        "handlebars": "^4.7.10",
+        "hono": "^4.13.17",
+        "morgan": "^1.12.1",
+        "undici": "^6.29.1",
+        "node-gyp": {
+            "undici": "^8.12.4"
         }
     },
     "devDependencies": {
         "@types/express": "^4.17.25",
         "@types/jest": "^29.5.14",
         "@types/node": "^22.18.13",
-        "firebase-tools": "^15.24.0",
+        "firebase-tools": "^15.35.0",
         "jest": "^29.7.0",
         "nodemon": "^3.1.14",
         "ts-jest": "^29.4.11",
