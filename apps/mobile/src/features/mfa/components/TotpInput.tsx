@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, View, TouchableOpacity, Text, TextInput, StyleSheet } from 'react-native';
 import { theme } from '../../../styles/theme';
+import { useKeyboardAwareInputFocus } from '../../../components/useKeyboardAwareInputFocus';
 
 interface TotpInputProps {
     code: string[];
@@ -29,8 +30,10 @@ export const TotpInput: React.FC<TotpInputProps> = ({
     onTouchStart,
     testID,
 }) => {
+    const { containerRef, scrollIntoView } = useKeyboardAwareInputFocus();
+
     return (
-        <View style={styles.codeInputHost} onTouchStart={onTouchStart}>
+        <View ref={containerRef} collapsable={false} style={styles.codeInputHost} onTouchStart={onTouchStart}>
             <TextInput
                 ref={inputRef}
                 testID={testID}
@@ -45,7 +48,10 @@ export const TotpInput: React.FC<TotpInputProps> = ({
                 maxLength={6}
                 onBlur={onBlur}
                 onChangeText={onChangeText}
-                onFocus={onFocus}
+                onFocus={() => {
+                    scrollIntoView();
+                    onFocus();
+                }}
                 selectionColor="transparent"
                 selectionHandleColor="transparent"
                 showSoftInputOnFocus={true}

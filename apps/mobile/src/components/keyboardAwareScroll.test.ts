@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    reducePendingKeyboardSpacer,
     resolveAdditionalKeyboardSpacer,
     resolveKeyboardAwareScrollY,
+    resolvePendingKeyboardSpacer,
 } from './keyboardAwareScroll';
 
 const baseParams = {
@@ -64,5 +66,33 @@ describe('resolveAdditionalKeyboardSpacer', () => {
             targetScrollY: 180,
             viewportHeight: 700,
         })).toBe(100);
+    });
+});
+
+describe('resolvePendingKeyboardSpacer', () => {
+    it('returns the full request when no spacer is pending', () => {
+        expect(resolvePendingKeyboardSpacer(180, 0)).toBe(180);
+    });
+
+    it('does not request the same spacer twice before layout commits', () => {
+        expect(resolvePendingKeyboardSpacer(180, 180)).toBe(0);
+    });
+
+    it('requests only the additional amount for a new target', () => {
+        expect(resolvePendingKeyboardSpacer(240, 180)).toBe(60);
+    });
+});
+
+describe('reducePendingKeyboardSpacer', () => {
+    it('keeps the pending amount when content did not grow', () => {
+        expect(reducePendingKeyboardSpacer(180, 0)).toBe(180);
+    });
+
+    it('clears the pending amount when the spacer lands', () => {
+        expect(reducePendingKeyboardSpacer(180, 180)).toBe(0);
+    });
+
+    it('reduces the pending amount by partial growth', () => {
+        expect(reducePendingKeyboardSpacer(180, 60)).toBe(120);
     });
 });

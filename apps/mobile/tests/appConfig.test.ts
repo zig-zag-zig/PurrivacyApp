@@ -57,6 +57,10 @@ describe('Expo app config', () => {
         expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(LAUNCHER_BACKGROUND_COLOR);
     });
 
+    it('registers the plugin that removes the native Android EditText underline', () => {
+        expect(appConfig.expo.plugins).toContain('./scripts/android-edit-text-background');
+    });
+
     it('keeps local e2e builds emulator-friendly and skips Sentry plugin injection', () => {
         const config = loadDynamicExpoConfig('e2e-test');
 

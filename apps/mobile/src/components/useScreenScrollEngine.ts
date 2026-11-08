@@ -13,8 +13,10 @@ import {
     KeyboardAwareInputNode,
 } from './KeyboardAwareScrollContext';
 import {
+    reducePendingKeyboardSpacer,
     resolveAdditionalKeyboardSpacer,
     resolveKeyboardAwareScrollY,
+    resolvePendingKeyboardSpacer,
 } from './keyboardAwareScroll';
 import { usePassphraseBannerScrollEvents } from './usePassphraseBannerScrollEvents';
 
@@ -22,6 +24,7 @@ const EXTRA_KEYBOARD_GAP = 24;
 const KEYBOARD_INPUT_CLEARANCE = 104;
 const FOCUS_SCROLL_DELAY_MS = 520;
 const KEYBOARD_FRAME_SCROLL_DELAY_MS = 90;
+const KEYBOARD_LAYOUT_SETTLE_DELAY_MS = 120;
 
 const getFallbackKeyboardHeight = (windowHeight: number): number => (
     Math.max(320, Math.round(windowHeight * 0.42))
@@ -95,9 +98,12 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
     const focusedInputRef = React.useRef<KeyboardAwareInputNode | null>(null);
     const currentScrollYRef = React.useRef(0);
     const lastKeyboardHeightRef = React.useRef(0);
-    const scrollFrameRef = React.useRef<number | null>(null);
     const scrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewportHeightRef = React.useRef(0);
+    // Spacer increments that have been requested but are not reflected in
+    // contentHeightRef yet. Subtracting them prevents piling on more padding
+    // when we retry before the native layout has committed the last change.
+    const pendingSpacerRef = React.useRef(0);
     const [keyboardBottomSpacer, setKeyboardBottomSpacer] = React.useState(0);
     const bannerScrollEvents = usePassphraseBannerScrollEvents({
         onScroll,
@@ -114,10 +120,6 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
         if (scrollTimeoutRef.current) {
             clearTimeout(scrollTimeoutRef.current);
             scrollTimeoutRef.current = null;
-        }
-        if (scrollFrameRef.current !== null) {
-            cancelAnimationFrame(scrollFrameRef.current);
-            scrollFrameRef.current = null;
         }
     }, []);
 
@@ -160,21 +162,8 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
         return frame;
     }, [getKeyboardFrame]);
 
-    const scrollToY = React.useCallback((y: number, afterLayout = false) => {
-        const scroll = () => {
-            scrollFrameRef.current = null;
-            scrollRef.current?.scrollToY(y, true);
-        };
-
-        if (!afterLayout) {
-            scroll();
-            return;
-        }
-
-        if (scrollFrameRef.current !== null) {
-            cancelAnimationFrame(scrollFrameRef.current);
-        }
-        scrollFrameRef.current = requestAnimationFrame(scroll);
+    const scrollToY = React.useCallback((y: number) => {
+        scrollRef.current?.scrollToY(y, true);
     }, []);
 
     const scrollFocusedInputIntoView = React.useCallback(() => {
@@ -206,15 +195,18 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
 
                 if (Math.abs(nextScrollY - currentScrollYRef.current) <= 1) return;
 
-                const additionalSpacer = resolveAdditionalKeyboardSpacer({
+                const requiredSpacer = resolveAdditionalKeyboardSpacer({
                     contentHeight: contentHeightRef.current,
                     targetScrollY: nextScrollY,
                     viewportHeight: viewportHeightRef.current,
                 });
+                const additionalSpacer = resolvePendingKeyboardSpacer(requiredSpacer, pendingSpacerRef.current);
 
                 if (additionalSpacer > 0) {
+                    pendingSpacerRef.current += additionalSpacer;
                     setKeyboardBottomSpacer(current => current + additionalSpacer);
-                    scrollToY(nextScrollY, true);
+                    // Scrolling now would clamp at the old content height. The
+                    // keyboardBottomSpacer effect retries once padding lays out.
                     return;
                 }
 
@@ -253,6 +245,14 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
         scrollInputIntoView,
     }), [scrollInputIntoView]);
 
+    // A focused field near the end of the content needs the extra bottom
+    // padding before it can scroll above the keyboard. Retry after that state
+    // lands so the target offset is actually reachable.
+    React.useEffect(() => {
+        if (keyboardBottomSpacer <= 0 || !focusedInputRef.current) return;
+        scheduleFocusedInputScroll(KEYBOARD_LAYOUT_SETTLE_DELAY_MS);
+    }, [keyboardBottomSpacer, scheduleFocusedInputScroll]);
+
     React.useEffect(() => {
         const handleKeyboardFrame = (event: KeyboardEvent) => {
             const windowHeight = Dimensions.get('window').height;
@@ -266,6 +266,7 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
         };
         const handleKeyboardHide = () => {
             lastKeyboardHeightRef.current = 0;
+            pendingSpacerRef.current = 0;
             setKeyboardBottomSpacer(0);
             clearScrollTimeouts();
         };
@@ -291,7 +292,16 @@ export function useScreenScrollEngine(props: ScreenScrollEngineProps): ScreenScr
     };
 
     const handleContentSizeChange = (width: number, height: number) => {
+        const growth = Math.max(0, height - contentHeightRef.current);
+        pendingSpacerRef.current = reducePendingKeyboardSpacer(pendingSpacerRef.current, growth);
         contentHeightRef.current = height;
+
+        // If padding from a keyboard spacer just landed (or the content grew),
+        // re-run the focused-input scroll now that the target offset exists.
+        if (growth > 0 && focusedInputRef.current && lastKeyboardHeightRef.current > 0) {
+            scheduleFocusedInputScroll(0);
+        }
+
         onContentSizeChange?.(width, height);
     };
 

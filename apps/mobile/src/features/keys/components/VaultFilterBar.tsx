@@ -3,6 +3,7 @@ import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
 import { CustomText } from '../../../components/CustomText';
+import { useKeyboardAwareInputFocus } from '../../../components/useKeyboardAwareInputFocus';
 import { theme } from '../../../styles/theme';
 import { VAULT_KEY_FILTERS } from '../domain/keyFilters';
 import type { VaultKeyFilter } from '../domain/keyFilters';
@@ -26,9 +27,12 @@ export const VaultFilterBar: React.FC<VaultFilterBarProps> = ({
     activeFilter,
     onFilterChange,
     testIDPrefix,
-}) => (
+}) => {
+    const { containerRef, scrollIntoView } = useKeyboardAwareInputFocus();
+
+    return (
     <View style={styles.container}>
-        <View style={styles.searchContainer}>
+        <View ref={containerRef} collapsable={false} style={styles.searchContainer}>
             <Icon name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
             <TextInput
                 autoComplete="off"
@@ -41,6 +45,7 @@ export const VaultFilterBar: React.FC<VaultFilterBarProps> = ({
                 placeholder="Search keys"
                 value={searchQuery}
                 onChangeText={onSearchChange}
+                onFocus={scrollIntoView}
                 onBlur={() => onSearchChange(searchQuery.trim())}
                 placeholderTextColor={theme.colors.textSecondary}
                 autoCapitalize="none"
@@ -81,7 +86,8 @@ export const VaultFilterBar: React.FC<VaultFilterBarProps> = ({
             })}
         </View>
     </View>
-);
+    );
+};
 
 const styles = StyleSheet.create({
     container: {

@@ -38,3 +38,11 @@ export const resolveAdditionalKeyboardSpacer = ({
     const maxScrollY = Math.max(0, contentHeight - viewportHeight);
     return Math.max(0, Math.ceil(targetScrollY - maxScrollY));
 };
+
+export const resolvePendingKeyboardSpacer = (requiredSpacer: number, pendingSpacer: number): number => (
+    Math.max(0, requiredSpacer - pendingSpacer)
+);
+
+export const reducePendingKeyboardSpacer = (pendingSpacer: number, contentGrowth: number): number => (
+    Math.max(0, pendingSpacer - Math.max(0, contentGrowth))
+);

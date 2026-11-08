@@ -9,6 +9,7 @@ import {
 import { commonStyles } from '../styles/commonStyles';
 import { theme } from '../styles/theme';
 import { KeyboardAwareScrollContext } from './KeyboardAwareScrollContext';
+import { measureScrollNodeInWindow } from './measureScrollNode';
 import {
     ScreenScrollHandle,
     useScreenScrollEngine,
@@ -68,16 +69,7 @@ function ScreenListInner<T>(
         const handle: ScreenScrollHandle | null = node
             ? {
                 scrollToY: (y, animated) => node.scrollToOffset({ offset: y, animated }),
-                measureInWindow: (callback) => {
-                    // getScrollRef() exists on VirtualizedList but is not in the
-                    // generated public types.
-                    const scrollable = (node as unknown as {
-                        getScrollRef?: () => { measureInWindow?: (cb: typeof callback) => void } | null;
-                    }).getScrollRef?.();
-                    if (scrollable && typeof scrollable.measureInWindow === 'function') {
-                        scrollable.measureInWindow(callback);
-                    }
-                },
+                measureInWindow: (callback) => measureScrollNodeInWindow(node, callback),
             }
             : null;
         engine.attachRef(handle);
