@@ -67,6 +67,12 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const [errorText, setErrorText] = useState('');
     const [result, setResult] = useState<{ fileUri: string; fileName: string; totalBytes: number; verified?: boolean | null; sha256?: string; sourceSha256?: string; savedUri?: string | null } | null>(null);
     const [selfTestResult, setSelfTestResult] = useState('');
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     // e2e/dev perf probe: measures pure WebView crypto throughput (no bridge).
     const handleSelfTest = async () => {
@@ -191,15 +197,12 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                             signOptions,
                             (done, total) => api.setProgress(done, total),
                         );
-                        setResult({ ...out, sourceSha256: picked.sourceSha256 });
                         api.succeed(
                             { fileUri: out.fileUri, fileName: out.fileName, totalBytes: out.totalBytes, sha256: out.sha256, sourceSha256: picked.sourceSha256, savedUri: out.savedUri ?? null },
                             out.savedUri
                                 ? `${out.fileName} · saved to Downloads/Purrivacy`
                                 : `${out.fileName} · ${formatBytes(out.totalBytes)}`,
                         );
-                        clearForm();
-                        showToast(out.savedUri ? 'File encrypted — saved to Downloads/Purrivacy' : 'File encrypted', 'success');
                     } else {
                         if (!selectedPrivateKeyObj?.privateKey) {
                             throw new Error('Select a private key to decrypt with');
@@ -218,7 +221,6 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                         );
                         // Attach the plaintext hash recorded at encrypt time so the e2e
                         // verdict can compare it against the decrypted bytes.
-                        setResult({ ...out, sourceSha256: picked.sourceSha256 });
                         const signature = out.verified === true
                             ? 'signature verified'
                             : out.verified === false
@@ -232,19 +234,21 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                                 out.savedUri ? 'saved to Downloads/Purrivacy' : formatBytes(out.totalBytes),
                             ].filter(Boolean).join(' · '),
                         );
-                        clearForm();
-                        showToast(out.savedUri ? 'File decrypted — saved to Downloads/Purrivacy' : 'File decrypted', 'success');
                     }
                 },
             });
+            if (!mountedRef.current) return;
+            clearForm();
+            showToast(mode === 'encrypt' ? 'File encrypted' : 'File decrypted', 'success');
         } catch (error) {
+            if (!mountedRef.current) return;
             const message = getUserFacingErrorMessage(error, mode === 'encrypt' ? 'Failed to encrypt file' : 'Failed to decrypt file');
             const raw = error instanceof Error ? error.message : String(error);
             if (isE2E) console.error('[fileCrypto] operation failed', raw);
             setErrorText(`${message} :: ${raw}`);
             showToast(message, 'error');
         } finally {
-            setBusy(false);
+            if (mountedRef.current) setBusy(false);
         }
     };
 

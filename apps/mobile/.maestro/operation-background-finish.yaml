@@ -1,0 +1,28 @@
+appId: vip.chi_chi.purrivacy
+---
+# Phase 2 of the long-background-dwell test. Runs after >120s in the background
+# (longer than the per-call WebView bridge timeout). Relaunches without
+# stopping the app, verifies the vault stayed unlocked and the operation did
+# not time out while backgrounded, and waits for the resumed operation to
+# finish and render its SHA-256 result card.
+- launchApp:
+    stopApp: false
+
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- assertNotVisible:
+    id: "purrivacy.signin.username"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.ops.pill"
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.encrypt.file.sha256"
+    direction: DOWN
+    timeout: 240000
+- assertVisible:
+    id: "purrivacy.encrypt.file.sha256"

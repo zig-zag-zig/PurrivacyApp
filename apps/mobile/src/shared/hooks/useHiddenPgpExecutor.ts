@@ -1,4 +1,5 @@
 import { RefObject, useCallback, useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import type { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 import type { PGPExecutor } from '../../services/pgpCryptoService';
@@ -12,23 +13,81 @@ import {
 } from '../../services/pgpProtocol';
 
 type PendingOperation = {
+    id: number;
     resolve: (value: unknown) => void;
     reject: (error: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
+    timer: ReturnType<typeof setTimeout> | null;
+    remainingMs: number;
+    timerStartedAt: number | null;
     operation: PgpOperationName;
 };
 
 export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
     const pending = useRef<Map<number, PendingOperation>>(new Map());
     const opId = useRef(0);
+    const appStateRef = useRef<AppStateStatus | string>(AppState.currentState ?? 'active');
+
+    const clearOperationTimer = useCallback((operation: PendingOperation) => {
+        if (operation.timer !== null) {
+            clearTimeout(operation.timer);
+            operation.timer = null;
+        }
+    }, []);
+
+    const startOperationTimer = useCallback((operation: PendingOperation) => {
+        clearOperationTimer(operation);
+        const delayMs = Math.max(1, operation.remainingMs);
+        operation.timerStartedAt = Date.now();
+        operation.timer = setTimeout(() => {
+            if (pending.current.get(operation.id) === operation) {
+                pending.current.delete(operation.id);
+                operation.reject(new Error(`Timeout ${operation.operation} #${operation.id}`));
+            }
+        }, delayMs);
+    }, [clearOperationTimer]);
+
+    const pauseOperationTimers = useCallback(() => {
+        const now = Date.now();
+        pending.current.forEach(operation => {
+            if (operation.timer === null) return;
+            const elapsed = operation.timerStartedAt === null ? 0 : Math.max(0, now - operation.timerStartedAt);
+            clearOperationTimer(operation);
+            operation.remainingMs = Math.max(1000, operation.remainingMs - elapsed);
+            operation.timerStartedAt = null;
+        });
+    }, [clearOperationTimer]);
+
+    const resumeOperationTimers = useCallback(() => {
+        pending.current.forEach(operation => {
+            if (operation.timer === null) {
+                startOperationTimer(operation);
+            }
+        });
+    }, [startOperationTimer]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener?.('change', nextState => {
+            appStateRef.current = nextState;
+            // Android/iOS can suspend or throttle the offscreen WebView while
+            // backgrounded even if the host JS timer keeps ticking. Only count
+            // foreground time against the per-call bridge timeout so a paused
+            // operation can finish once the app returns active.
+            if (nextState === 'active') {
+                resumeOperationTimers();
+            } else {
+                pauseOperationTimers();
+            }
+        });
+        return () => subscription?.remove();
+    }, [pauseOperationTimers, resumeOperationTimers]);
 
     useEffect(() => () => {
         pending.current.forEach(operation => {
-            clearTimeout(operation.timer);
+            clearOperationTimer(operation);
             operation.reject(new Error('PGP WebView disposed'));
         });
         pending.current.clear();
-    }, []);
+    }, [clearOperationTimer]);
 
     const executePGPOperation: PGPExecutor['executePGPOperation'] = useCallback(<T extends PgpOperationName>(operation: T, data: PgpRequestMap[T]['data']) => {
         return new Promise<PgpOperationResponse<T>>((resolve, reject) => {
@@ -68,19 +127,25 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
                 else if (bits !== undefined && bits >= 2048) timeoutMs = 45000;
             }
 
-            const timer = setTimeout(() => {
-                if (pending.current.has(id)) {
-                    pending.current.delete(id);
-                    reject(new Error(`Timeout ${operation} #${id}`));
-                }
-            }, timeoutMs);
-
-            pending.current.set(id, {
+            const pendingOperation: PendingOperation = {
+                id,
                 resolve: value => resolve(value as PgpOperationResponse<T>),
                 reject,
-                timer,
+                timer: null,
+                remainingMs: timeoutMs,
+                timerStartedAt: null,
                 operation,
-            });
+            };
+
+            if (!webViewRef.current) {
+                reject(new Error('PGP WebView not available'));
+                return;
+            }
+
+            pending.current.set(id, pendingOperation);
+            if (appStateRef.current === 'active') {
+                startOperationTimer(pendingOperation);
+            }
 
             const payload = { operation, data, id };
             // No setTimeout wrapper: evaluateJavascript is already async on the
@@ -106,16 +171,9 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
         })();
       `;
 
-            if (!webViewRef.current) {
-                clearTimeout(timer);
-                pending.current.delete(id);
-                reject(new Error('PGP WebView not available'));
-                return;
-            }
-
             webViewRef.current.injectJavaScript(js);
         });
-    }, [webViewRef]);
+    }, [startOperationTimer, webViewRef]);
 
     const reload = useCallback(() => {
         webViewRef.current?.reload();
@@ -139,7 +197,7 @@ export function useHiddenPgpExecutor(webViewRef: RefObject<WebView | null>) {
         if (!operation) return;
 
         pending.current.delete(parsed.id);
-        clearTimeout(operation.timer);
+        clearOperationTimer(operation);
 
         if (!parsed.success) {
             operation.reject(new Error(parsed.error));

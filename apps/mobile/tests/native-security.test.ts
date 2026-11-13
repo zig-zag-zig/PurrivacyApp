@@ -14,6 +14,7 @@ interface MainActivityPatchResult {
 const nativeSecurity = require('../scripts/native-security.js') as {
     patchMainActivitySource: (source: string) => MainActivityPatchResult;
     patchAndroidMainActivity: (projectRoot: string, packageName: string) => boolean;
+    patchIosAppDelegate: (projectRoot: string) => void;
     shouldApplyAndroidFlagSecure: (appEnv?: string) => boolean;
 };
 
@@ -56,6 +57,136 @@ class MainActivity : ReactActivity() {
   }
 }
 `;
+
+const UNPATCHED_IOS_APP_DELEGATE = `import React
+import ReactAppDependencyProvider
+
+@UIApplicationMain
+public class AppDelegate: ExpoAppDelegate {
+  var window: UIWindow?
+
+  var reactNativeDelegate: ExpoReactNativeFactoryDelegate?
+  var reactNativeFactory: RCTReactNativeFactory?
+
+  public override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    let delegate = ReactNativeDelegate()
+    let factory = ExpoReactNativeFactory(delegate: delegate)
+    delegate.dependencyProvider = RCTAppDependencyProvider()
+
+    reactNativeDelegate = delegate
+    reactNativeFactory = factory
+    bindReactNativeFactory(factory)
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // Linking API
+  public override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    return super.application(app, open: url, options: options)
+  }
+}
+`;
+
+function withIosAppDelegate(contents: string, fn: (projectRoot: string) => void) {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-security-test-'));
+    const appDir = path.join(projectRoot, 'ios', 'Purrivacy');
+    fs.mkdirSync(appDir, { recursive: true });
+    const appDelegatePath = path.join(appDir, 'AppDelegate.swift');
+    fs.writeFileSync(appDelegatePath, contents, 'utf8');
+
+    try {
+        fn(projectRoot);
+        return fs.readFileSync(appDelegatePath, 'utf8');
+    } finally {
+        fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+}
+
+describe('scripts/native-security.js iOS background grace task patching', () => {
+    it('adds the bounded background task alongside the privacy cover', () => {
+        const patched = withIosAppDelegate(UNPATCHED_IOS_APP_DELEGATE, projectRoot => {
+            nativeSecurity.patchIosAppDelegate(projectRoot);
+        });
+
+        expect(patched).toContain('import UIKit');
+        expect(patched).toContain('private var privacyCoverView: UIView?');
+        expect(patched).toContain('private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid');
+        expect(patched).toContain('UIApplication.shared.beginBackgroundTask(withName: "PurrivacyActiveOperationGrace")');
+        expect(patched).toContain('UIApplication.shared.endBackgroundTask(backgroundTaskId)');
+        expect(patched.match(/beginOperationGraceTask\(\)/g)).toHaveLength(2); // call + declaration guard
+        expect(patched.match(/UIApplication\.shared\.beginBackgroundTask/g)).toHaveLength(1);
+    });
+
+    it('is idempotent across repeated prebuilds', () => {
+        const once = withIosAppDelegate(UNPATCHED_IOS_APP_DELEGATE, projectRoot => {
+            nativeSecurity.patchIosAppDelegate(projectRoot);
+        });
+        const twice = withIosAppDelegate(UNPATCHED_IOS_APP_DELEGATE, projectRoot => {
+            nativeSecurity.patchIosAppDelegate(projectRoot);
+            nativeSecurity.patchIosAppDelegate(projectRoot);
+        });
+
+        expect(twice).toBe(once);
+        expect(twice.match(/private var backgroundTaskId/g)).toHaveLength(1);
+        expect(twice.match(/UIApplication\.shared\.endBackgroundTask/g)).toHaveLength(1);
+    });
+
+    it('upgrades an AppDelegate that already had only the privacy cover', () => {
+        const legacy = UNPATCHED_IOS_APP_DELEGATE
+            .replace(
+                '  var window: UIWindow?\n',
+                '  var window: UIWindow?\n  private var privacyCoverView: UIView?\n'
+            )
+            .replace(
+                '    bindReactNativeFactory(factory)\n',
+                [
+                    '    bindReactNativeFactory(factory)',
+                    '    NotificationCenter.default.addObserver(self, selector: #selector(showPrivacyCover), name: UIApplication.willResignActiveNotification, object: nil)',
+                    '    NotificationCenter.default.addObserver(self, selector: #selector(hidePrivacyCover), name: UIApplication.didBecomeActiveNotification, object: nil)',
+                    '',
+                ].join('\n')
+            )
+            .replace(
+                '  // Linking API\n',
+                [
+                    '  @objc private func showPrivacyCover() {',
+                    '    guard let window = window, privacyCoverView == nil else {',
+                    '      return',
+                    '    }',
+                    '    let coverView = UIView(frame: window.bounds)',
+                    '    coverView.backgroundColor = .black',
+                    '    window.addSubview(coverView)',
+                    '    privacyCoverView = coverView',
+                    '  }',
+                    '',
+                    '  @objc private func hidePrivacyCover() {',
+                    '    privacyCoverView?.removeFromSuperview()',
+                    '    privacyCoverView = nil',
+                    '  }',
+                    '',
+                    '  // Linking API',
+                    '',
+                ].join('\n')
+            );
+
+        const patched = withIosAppDelegate(legacy, projectRoot => {
+            nativeSecurity.patchIosAppDelegate(projectRoot);
+        });
+
+        expect(patched).toContain('  @objc private func showPrivacyCover() {\n    beginOperationGraceTask()');
+        expect(patched).toContain('  @objc private func hidePrivacyCover() {\n    endOperationGraceTask()');
+        expect(patched).toContain('private func beginOperationGraceTask() {');
+        expect(patched.match(/private var backgroundTaskId/g)).toHaveLength(1);
+        expect(patched.match(/UIApplication\.shared\.beginBackgroundTask/g)).toHaveLength(1);
+    });
+});
 
 describe('scripts/native-security.js Android FLAG_SECURE patching', () => {
     it('keeps FLAG_SECURE enabled except for the isolated local E2E build', () => {

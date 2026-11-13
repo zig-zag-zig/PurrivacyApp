@@ -239,6 +239,7 @@ export const fileCryptoService = {
         onProgress?: (doneBytes: number, totalBytes?: number) => void,
     ): Promise<FileEncryptResult> {
         const sessionId = newSessionId();
+        let outFile: File | undefined;
         try {
             // Open the session + start the op (sets up the output stream reader).
             await pgpCryptoService.execute('fileOpBegin', { sessionId });
@@ -251,7 +252,7 @@ export const fileCryptoService = {
 
             const safeName = sanitizeFileName(sourceFileName, 'file');
             const outName = `${safeName.replace(/\.[^.]*$/, '') || 'encrypted'}.pgp`;
-            const outFile = new File(Paths.cache, `purrivacy-${Date.now()}-${outName}`);
+            outFile = new File(Paths.cache, `purrivacy-${sessionId}-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 
             // Feed plaintext in while pulling ciphertext out. The WebView
@@ -273,6 +274,9 @@ export const fileCryptoService = {
             return { fileUri: outFile.uri, fileName: outName, totalBytes, sha256, sourceSha256, savedUri };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
+            // A failed pull may have left a truncated ciphertext file in cache.
+            // It is never published as a result and should not linger as if valid.
+            try { if (outFile?.exists) outFile.delete(); } catch { /* best-effort cleanup */ }
             throw error;
         }
     },
@@ -289,6 +293,7 @@ export const fileCryptoService = {
         onProgress?: (doneBytes: number, totalBytes?: number) => void,
     ): Promise<FileDecryptResult> {
         const sessionId = newSessionId();
+        let outFile: File | undefined;
         try {
             await pgpCryptoService.execute('fileOpBegin', { sessionId });
             // Start feeding before parsing the streaming message.
@@ -302,7 +307,7 @@ export const fileCryptoService = {
             });
 
             const outName = sanitizeFileName(filename, `decrypted-${Date.now()}.bin`);
-            const outFile = new File(Paths.cache, `purrivacy-${outName}`);
+            outFile = new File(Paths.cache, `purrivacy-${sessionId}-${outName}`);
             outFile.create({ intermediates: true, overwrite: true });
 
             const pull = pullSessionToFile(sessionId, outFile);
@@ -314,6 +319,8 @@ export const fileCryptoService = {
             return { fileUri: outFile.uri, fileName: outName, totalBytes: pulled.totalBytes, verified: pulled.verified ?? verified, sha256: pulled.sha256, savedUri };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
+            // Plaintext output must not survive a failed or interrupted decrypt.
+            try { if (outFile?.exists) outFile.delete(); } catch { /* best-effort cleanup */ }
             throw error;
         }
     },

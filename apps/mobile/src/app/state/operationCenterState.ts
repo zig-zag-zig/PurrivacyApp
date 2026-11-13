@@ -64,7 +64,8 @@ export type OperationCenterAction =
     | { type: 'updated'; id: string; patch: Partial<OperationRecord> }
     | { type: 'seen'; id: string }
     | { type: 'dismiss'; id: string }
-    | { type: 'clearFinished' };
+    | { type: 'clearFinished' }
+    | { type: 'failRunning'; error: string; finishedAt?: number };
 
 /** Keep the newest N finished records; running records are never pruned. */
 export const MAX_FINISHED_OPERATIONS = 10;
@@ -114,6 +115,23 @@ export function operationCenterReducer(
 
         case 'clearFinished':
             return { operations: state.operations.filter(op => !isFinished(op)) };
+
+        case 'failRunning': {
+            const finishedAt = action.finishedAt ?? Date.now();
+            return {
+                operations: state.operations.map(op =>
+                    op.status === 'running'
+                        ? {
+                            ...op,
+                            status: 'failed',
+                            finishedAt,
+                            phase: undefined,
+                            error: action.error,
+                        }
+                        : op,
+                ),
+            };
+        }
 
         default:
             return state;

@@ -67,6 +67,23 @@ describe('operationCenterState', () => {
         expect(state.operations.map(op => op.id)).toEqual(['running']);
     });
 
+    it('failRunning marks only running records failed and clears their phase', () => {
+        const running = makeRecord({ id: 'running', status: 'running', phase: 'Streaming ciphertext' });
+        const succeeded = makeRecord({ id: 'succeeded', status: 'succeeded', resultSummary: 'done' });
+        const state = operationCenterReducer(
+            { operations: [running, succeeded] },
+            { type: 'failRunning', error: 'Interrupted because the vault locked or signed out', finishedAt: 42 },
+        );
+        expect(state.operations[0]).toMatchObject({
+            id: 'running',
+            status: 'failed',
+            finishedAt: 42,
+            phase: undefined,
+            error: 'Interrupted because the vault locked or signed out',
+        });
+        expect(state.operations[1]).toEqual(succeeded);
+    });
+
     it('pruneOperations caps finished records and keeps running ones', () => {
         const running = makeRecord({ id: 'running', status: 'running' });
         const finished = Array.from({ length: MAX_FINISHED_OPERATIONS + 3 }, (_, i) =>

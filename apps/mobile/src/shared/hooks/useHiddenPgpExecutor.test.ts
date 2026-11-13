@@ -3,9 +3,21 @@ import type { RefObject } from 'react';
 import type { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 const mockLogger = vi.hoisted(() => ({ warn: vi.fn() }));
+const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
+const mockAppState = vi.hoisted(() => ({
+    currentState: 'active',
+    addEventListener: vi.fn((_event: string, listener: (state: string) => void) => {
+        appStateListeners.add(listener);
+        return { remove: () => appStateListeners.delete(listener) };
+    }),
+}));
 
 vi.mock('../../utils/logger', () => ({
     logger: mockLogger,
+}));
+
+vi.mock('react-native', () => ({
+    AppState: mockAppState,
 }));
 
 // The hook is exercised without a React renderer (no react-dom/test-utils in
@@ -14,7 +26,9 @@ vi.mock('react', () => {
     return {
         useRef: (initial: unknown) => ({ current: initial }),
         useCallback: (fn: unknown) => fn,
-        useEffect: () => undefined,
+        useEffect: (effect: () => unknown) => {
+            effect();
+        },
     };
 });
 
@@ -28,6 +42,8 @@ const messageWithRaw = (data: string): WebViewMessageEvent =>
 
 beforeEach(() => {
     vi.clearAllMocks();
+    appStateListeners.clear();
+    mockAppState.currentState = 'active';
 });
 
 afterEach(() => {
@@ -133,5 +149,50 @@ describe('useHiddenPgpExecutor', () => {
         const { executePGPOperation } = useHiddenPgpExecutor(ref);
 
         await expect(executePGPOperation('ping', undefined)).rejects.toThrow('PGP WebView not available');
+    });
+
+    it('pauses the bridge timeout while backgrounded and resumes remaining foreground time on return', async () => {
+        vi.useFakeTimers();
+        const { executePGPOperation, onMessage } = createHost();
+        const promise = executePGPOperation('fileOpResultChunk', { sessionId: 's1', maxLength: 1024 });
+
+        // Spend 30s of the 120s budget in the foreground.
+        vi.advanceTimersByTime(30_000);
+
+        // Background for 4 minutes — must NOT consume the remaining 90s budget.
+        mockAppState.currentState = 'background';
+        appStateListeners.forEach(listener => listener('background'));
+        vi.advanceTimersByTime(240_000);
+
+        // Return to foreground; 80s later (total foreground time 110s < 120s)
+        // the WebView produces its chunk and the operation resolves.
+        mockAppState.currentState = 'active';
+        appStateListeners.forEach(listener => listener('active'));
+        vi.advanceTimersByTime(80_000);
+
+        onMessage(message({
+            success: true,
+            result: { base64: 'YWJj', done: true },
+            id: 0,
+        }));
+
+        await expect(promise).resolves.toEqual({ base64: 'YWJj', done: true });
+    });
+
+    it('still times out if the remaining foreground budget expires after resuming', async () => {
+        vi.useFakeTimers();
+        const { executePGPOperation } = createHost();
+        const promise = executePGPOperation('ping', undefined);
+
+        vi.advanceTimersByTime(10_000);
+        mockAppState.currentState = 'background';
+        appStateListeners.forEach(listener => listener('background'));
+        vi.advanceTimersByTime(180_000);
+
+        mockAppState.currentState = 'active';
+        appStateListeners.forEach(listener => listener('active'));
+        vi.advanceTimersByTime(20_001);
+
+        await expect(promise).rejects.toThrow('Timeout ping #0');
     });
 });
