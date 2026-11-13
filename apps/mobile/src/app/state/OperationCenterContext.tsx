@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import {
     countRunning,
     countUnseenFinished,
+    formatBytes,
     latestByKind,
     newOperationId,
     prunedOperationCenterReducer,
@@ -20,6 +21,16 @@ import {
     type OperationKind,
     type OperationRecord,
 } from './operationCenterState';
+import {
+    startOperationKeepAlive,
+    stopOperationKeepAlive,
+    updateOperationKeepAlive,
+} from '../../services/operationKeepAlive';
+import {
+    armOperationLockGrace,
+    clearOperationLockGrace,
+    setActiveOperationCount,
+} from '../../services/operationRuntimeState';
 import { logger } from '../../utils/logger';
 
 /**
@@ -37,11 +48,14 @@ import { logger } from '../../utils/logger';
  *  - A compact status surface (rendered by `OperationCenterUI`) keeps
  *    pending/finished operations visible from anywhere — no blocking
  *    full-screen spinner for these ops.
- *  - AppState changes never cancel work: JS keeps running while the process
- *    is alive; finishing in the background posts a best-effort local
- *    notification. If the OS kills the process, the registry dies with it —
- *    surfaced honestly as "nothing running" on next launch rather than a
- *    fake resume.
+ *  - AppState changes do not cancel operations, but Android may suspend the
+ *    WebView renderer while the app is backgrounded: crypto work can stall and
+ *    resume only when the app is foregrounded again. The native keep-alive
+ *    service keeps the process (and the operation record) alive and the bounded
+ *    lock grace delays the inactivity lock, but neither guarantees that WebView
+ *    work progresses in the background. If the OS kills the process, the
+ *    registry dies with it — surfaced honestly as "nothing running" on next
+ *    launch rather than a fake resume.
  */
 
 export interface OperationRunApi {
@@ -71,6 +85,7 @@ interface OperationCenterContextValue {
     runningCount: number;
     unseenFinishedCount: number;
     beginOperation: <T>(input: BeginOperationInput<T>) => Promise<T>;
+    failRunningOperations: (reason: string) => void;
     markSeen: (id: string) => void;
     dismiss: (id: string) => void;
     clearFinished: () => void;
@@ -79,6 +94,10 @@ interface OperationCenterContextValue {
 const OperationCenterContext = createContext<OperationCenterContextValue | null>(null);
 
 const OP_NOTIFICATION_ID_PREFIX = 'purrivacy-op-';
+
+/** Upper bound on foreground-service notification refreshes. Progress updates
+ * arrive once per streamed chunk; the notification only needs a coarse rate. */
+const KEEP_ALIVE_UPDATE_INTERVAL_MS = 2000;
 
 /** Best-effort local notification when an operation finishes in background. */
 const notifyFinishedInBackground = async (record: OperationRecord): Promise<void> => {
@@ -104,15 +123,87 @@ const notifyFinishedInBackground = async (record: OperationRecord): Promise<void
     }
 };
 
+const describeKeepAliveStatus = (running: OperationRecord[]): { title: string; detail: string } => {
+    const primary = running[0];
+    const title = running.length === 1
+        ? primary.title
+        : `${running.length} operations running`;
+    const progressText = primary?.progress
+        ? primary.progress.total && primary.progress.total > 0
+            ? `${formatBytes(primary.progress.done)} / ${formatBytes(primary.progress.total)}`
+            : formatBytes(primary.progress.done)
+        : undefined;
+    // Deliberately excludes `record.detail` (file names, recipient/user ids):
+    // this text is rendered on the lock screen by the foreground-service
+    // notification. Only generic phase/progress information belongs here.
+    const detail = [primary?.phase, progressText]
+        .filter(Boolean)
+        .join(' · ') || 'Keep Purrivacy open to continue';
+    return { title, detail };
+};
+
 export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [state, dispatch] = useReducer(prunedOperationCenterReducer, initialOperationCenterState);
     const appStateRef = useRef(AppState.currentState);
+    const keepAliveActiveRef = useRef(false);
+    const lastKeepAlivePayloadRef = useRef<string | null>(null);
+    const lastKeepAliveUpdateAtRef = useRef(0);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
             appStateRef.current = nextAppState;
+            // The bounded lock-deferral window is measured from the moment the
+            // app leaves the foreground with work still running, so a long
+            // foreground run never eats into (or shortens) it.
+            if (nextAppState === 'active') {
+                clearOperationLockGrace();
+            } else {
+                armOperationLockGrace();
+            }
         });
         return () => subscription.remove();
+    }, []);
+
+    useEffect(() => {
+        const running = state.operations.filter(op => op.status === 'running');
+        setActiveOperationCount(running.length);
+
+        if (running.length === 0) {
+            lastKeepAlivePayloadRef.current = null;
+            lastKeepAliveUpdateAtRef.current = 0;
+            clearOperationLockGrace();
+            if (keepAliveActiveRef.current) {
+                keepAliveActiveRef.current = false;
+                void stopOperationKeepAlive();
+            }
+            return;
+        }
+
+        const { title, detail } = describeKeepAliveStatus(running);
+        const payload = `${title}\u0000${detail}`;
+        const now = Date.now();
+        if (keepAliveActiveRef.current) {
+            if (payload === lastKeepAlivePayloadRef.current) return;
+            if (now - lastKeepAliveUpdateAtRef.current < KEEP_ALIVE_UPDATE_INTERVAL_MS) return;
+        }
+
+        lastKeepAlivePayloadRef.current = payload;
+        lastKeepAliveUpdateAtRef.current = now;
+        if (!keepAliveActiveRef.current) {
+            keepAliveActiveRef.current = true;
+            void startOperationKeepAlive(title, detail);
+        } else {
+            void updateOperationKeepAlive(title, detail);
+        }
+    }, [state.operations]);
+
+    useEffect(() => () => {
+        setActiveOperationCount(0);
+        clearOperationLockGrace();
+        if (keepAliveActiveRef.current) {
+            keepAliveActiveRef.current = false;
+            void stopOperationKeepAlive();
+        }
     }, []);
 
     const beginOperation = useCallback(async <T,>(input: BeginOperationInput<T>): Promise<T> => {
@@ -175,6 +266,9 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
     }, []);
 
+    const failRunningOperations = useCallback((reason: string) => {
+        dispatch({ type: 'failRunning', error: reason });
+    }, []);
     const markSeen = useCallback((id: string) => dispatch({ type: 'seen', id }), []);
     const dismiss = useCallback((id: string) => dispatch({ type: 'dismiss', id }), []);
     const clearFinished = useCallback(() => dispatch({ type: 'clearFinished' }), []);
@@ -184,10 +278,11 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
         runningCount: countRunning(state.operations),
         unseenFinishedCount: countUnseenFinished(state.operations),
         beginOperation,
+        failRunningOperations,
         markSeen,
         dismiss,
         clearFinished,
-    }), [state.operations, beginOperation, markSeen, dismiss, clearFinished]);
+    }), [state.operations, beginOperation, failRunningOperations, markSeen, dismiss, clearFinished]);
 
     return (
         <OperationCenterContext.Provider value={value}>

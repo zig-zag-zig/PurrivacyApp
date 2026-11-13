@@ -6,7 +6,7 @@ global.Buffer = Buffer;
 // Configure API runtime ports before any module accesses them
 import { configureAppApiRuntime } from './src/app/configureApiRuntime';
 configureAppApiRuntime();
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -28,7 +28,7 @@ import { UpdateProvider } from './src/features/updates/state/UpdateContext';
 import { initErrorMonitoring, wrapWithErrorMonitoring } from './src/services/monitoring/sentry';
 import { PassphraseBannerOverlayProvider } from './src/features/keys/components/PassphraseBannerOverlay';
 import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
-import { OperationCenterProvider } from './src/app/state/OperationCenterContext';
+import { OperationCenterProvider, useOperationCenter } from './src/app/state/OperationCenterContext';
 import { OperationCenterUI } from './src/app/components/OperationCenterUI';
 import { usePassphraseStorageAutoSync } from './src/features/security/hooks/usePassphraseStorageAutoSync';
 import { useStartupUpdateCheck } from './src/app/hooks/useStartupUpdateCheck';
@@ -51,6 +51,10 @@ const navigationTheme = {
 
 const AppContent = () => {
     const { lock, authCompleted, user, isCheckingInactivity, userDecrypted, appStateIsBackground } = useAuth();
+    const { failRunningOperations } = useOperationCenter();
+    const handlePgpRuntimeCleared = useCallback(() => {
+        failRunningOperations('Interrupted because the vault locked or signed out');
+    }, [failRunningOperations]);
     const { webViewRef, onReload, reloadWebView } = useWebViewPGP();
     const showStartupLoading = !authCompleted;
 
@@ -72,7 +76,7 @@ const AppContent = () => {
     usePassphraseStorageAutoSync(userDecrypted);
     useStartupUpdateCheck(authCompleted);
     useShareIntentRouting();
-    usePgpRuntimeOnUserChange(user, reloadWebView);
+    usePgpRuntimeOnUserChange(user, reloadWebView, handlePgpRuntimeCleared);
 
     return (
         <View style={commonStyles.flex}>

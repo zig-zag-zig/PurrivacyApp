@@ -50,6 +50,7 @@ function getMaestroTargets() {
 }
 
 const maestroTargets = getMaestroTargets();
+const dwellMs = Number(process.env.PURRIVACY_E2E_DWELL_MS || 0);
 
 const backendEnv = {
   ...process.env,
@@ -192,7 +193,17 @@ async function runInsideEmulators() {
         runSync('adb', ['-s', deviceId, 'push', src, dest], { cwd: appRoot, env: backendEnv });
       }
     }
-    runSync('node', ['scripts/run-maestro.cjs', ...maestroTargets], { cwd: appRoot, env: backendEnv });
+    if (dwellMs > 0 && maestroTargets.length > 1) {
+      for (let i = 0; i < maestroTargets.length; i += 1) {
+        runSync('node', ['scripts/run-maestro.cjs', maestroTargets[i]], { cwd: appRoot, env: backendEnv });
+        if (i < maestroTargets.length - 1) {
+          console.log(`[e2e] dwelling ${dwellMs}ms before ${maestroTargets[i + 1]}`);
+          await new Promise(resolve => setTimeout(resolve, dwellMs));
+        }
+      }
+    } else {
+      runSync('node', ['scripts/run-maestro.cjs', ...maestroTargets], { cwd: appRoot, env: backendEnv });
+    }
   } finally {
     process.off('SIGINT', onSigint);
     process.off('SIGTERM', onSigterm);

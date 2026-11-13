@@ -98,7 +98,13 @@ function patchIosAppDelegate(projectRoot) {
     if (!appDelegate.includes('private var privacyCoverView: UIView?')) {
         appDelegate = appDelegate.replace(
             '  var window: UIWindow?\n',
-            '  var window: UIWindow?\n  private var privacyCoverView: UIView?\n'
+            '  var window: UIWindow?\n  private var privacyCoverView: UIView?\n  private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid\n'
+        );
+        requiresWrite = true;
+    } else if (!appDelegate.includes('private var backgroundTaskId: UIBackgroundTaskIdentifier')) {
+        appDelegate = appDelegate.replace(
+            '  private var privacyCoverView: UIView?\n',
+            '  private var privacyCoverView: UIView?\n  private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid\n'
         );
         requiresWrite = true;
     }
@@ -122,6 +128,7 @@ function patchIosAppDelegate(projectRoot) {
             '  // Linking API\n',
             [
                 '  @objc private func showPrivacyCover() {',
+                '    beginOperationGraceTask()',
                 '    guard let window = window, privacyCoverView == nil else {',
                 '      return',
                 '    }',
@@ -134,8 +141,26 @@ function patchIosAppDelegate(projectRoot) {
                 '  }',
                 '',
                 '  @objc private func hidePrivacyCover() {',
+                '    endOperationGraceTask()',
                 '    privacyCoverView?.removeFromSuperview()',
                 '    privacyCoverView = nil',
+                '  }',
+                '',
+                '  private func beginOperationGraceTask() {',
+                '    guard backgroundTaskId == .invalid else {',
+                '      return',
+                '    }',
+                '    backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "PurrivacyActiveOperationGrace") { [weak self] in',
+                '      self?.endOperationGraceTask()',
+                '    }',
+                '  }',
+                '',
+                '  private func endOperationGraceTask() {',
+                '    guard backgroundTaskId != .invalid else {',
+                '      return',
+                '    }',
+                '    UIApplication.shared.endBackgroundTask(backgroundTaskId)',
+                '    backgroundTaskId = .invalid',
                 '  }',
                 '',
                 '  // Linking API',
@@ -143,6 +168,53 @@ function patchIosAppDelegate(projectRoot) {
             ].join('\n')
         );
         requiresWrite = true;
+    } else {
+        // Upgrade path: an earlier prebuild already inserted the privacy
+        // cover. Add the background-task calls/functions without duplicating
+        // existing declarations.
+        if (!appDelegate.includes('beginOperationGraceTask()')) {
+            appDelegate = appDelegate.replace(
+                '  @objc private func showPrivacyCover() {\n',
+                '  @objc private func showPrivacyCover() {\n    beginOperationGraceTask()\n'
+            );
+            requiresWrite = true;
+        }
+
+        if (!appDelegate.includes('endOperationGraceTask()')) {
+            appDelegate = appDelegate.replace(
+                '  @objc private func hidePrivacyCover() {\n',
+                '  @objc private func hidePrivacyCover() {\n    endOperationGraceTask()\n'
+            );
+            requiresWrite = true;
+        }
+
+        if (!appDelegate.includes('private func beginOperationGraceTask() {')) {
+            appDelegate = appDelegate.replace(
+                '  // Linking API\n',
+                [
+                    '  private func beginOperationGraceTask() {',
+                    '    guard backgroundTaskId == .invalid else {',
+                    '      return',
+                    '    }',
+                    '    backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "PurrivacyActiveOperationGrace") { [weak self] in',
+                    '      self?.endOperationGraceTask()',
+                    '    }',
+                    '  }',
+                    '',
+                    '  private func endOperationGraceTask() {',
+                    '    guard backgroundTaskId != .invalid else {',
+                    '      return',
+                    '    }',
+                    '    UIApplication.shared.endBackgroundTask(backgroundTaskId)',
+                    '    backgroundTaskId = .invalid',
+                    '  }',
+                    '',
+                    '  // Linking API',
+                    '',
+                ].join('\n')
+            );
+            requiresWrite = true;
+        }
     }
 
     if (requiresWrite) {
@@ -195,4 +267,5 @@ module.exports.plugin = withNativeSecurity;
 module.exports.addKotlinImport = addKotlinImport;
 module.exports.patchMainActivitySource = patchMainActivitySource;
 module.exports.patchAndroidMainActivity = patchAndroidMainActivity;
+module.exports.patchIosAppDelegate = patchIosAppDelegate;
 module.exports.shouldApplyAndroidFlagSecure = shouldApplyAndroidFlagSecure;

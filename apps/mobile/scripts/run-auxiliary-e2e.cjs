@@ -51,6 +51,7 @@ const ALL_FLOWS = [
   'signout-clears-sensitive-state',
   'rapid-double-submit',
   'revoke-sessions-other-device',
+  'operation-survives-background',
 ];
 
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
@@ -216,6 +217,8 @@ async function main() {
       ...process.env,
       E2E_USERNAME: freshUsername(),
       MFA_RECOVERY_CODE: recoveryCode,
+      FIXTURE_USERNAME: SHARED_USERNAME,
+      FIXTURE_PASSWORD: SHARED_PASSWORD,
     };
 
     if (flow === 'recovery-wrong-seed-phrase') {

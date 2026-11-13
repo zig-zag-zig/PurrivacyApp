@@ -12,6 +12,7 @@
         "scripts/android-e2e-cleartext.js",
         "scripts/android-isolated-input.cjs",
         "scripts/android-local-build.cjs",
+        "scripts/android-operation-keepalive.js",
         "scripts/android-system-bars.js",
         "scripts/android-update-installer.js",
         "scripts/configure-android-gradle.cjs",
