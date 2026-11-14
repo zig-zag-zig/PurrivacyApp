@@ -11,30 +11,44 @@ export interface PickedBinaryFile {
     mimeType?: string;
 }
 
+interface PickFilesOptions {
+    /** Let the system picker select more than one file at a time. */
+    multiple?: boolean;
+}
+
+const toPickedFile = (asset: DocumentPicker.DocumentPickerAsset): PickedBinaryFile => {
+    // Copy to cache gives a stable file:// path the stream API can read.
+    const file = new File(asset.uri);
+    return {
+        uri: file.uri,
+        name: asset.name ?? 'file',
+        size: asset.size,
+        mimeType: asset.mimeType,
+    };
+};
+
 /**
- * Pick a file of any type and return its URI + metadata — for binary
- * encrypt/decrypt, which streams the file rather than reading it as text.
- * Does not read contents; the caller streams from `uri`.
+ * Pick files of any type and return their URIs + metadata — for binary
+ * encrypt/decrypt, which streams the files rather than reading them as text.
+ * Does not read contents; the caller streams from each `uri`.
  */
 export function useBinaryFilePicker() {
-    const pickFile = useCallback(async (): Promise<PickedBinaryFile | null> => {
+    const pickFiles = useCallback(async ({ multiple = false }: PickFilesOptions = {}): Promise<PickedBinaryFile[]> => {
         const result = await DocumentPicker.getDocumentAsync({
             type: '*/*',
             copyToCacheDirectory: true,
+            multiple,
         });
 
-        if (result.canceled || !result.assets?.length) return null;
+        if (result.canceled || !result.assets?.length) return [];
 
-        const asset = result.assets[0];
-        // Copy to cache gives a stable file:// path the stream API can read.
-        const file = new File(asset.uri);
-        return {
-            uri: file.uri,
-            name: asset.name ?? 'file',
-            size: asset.size,
-            mimeType: asset.mimeType,
-        };
+        return result.assets.map(toPickedFile);
     }, []);
 
-    return { pickFile };
+    const pickFile = useCallback(async (): Promise<PickedBinaryFile | null> => {
+        const files = await pickFiles();
+        return files[0] ?? null;
+    }, [pickFiles]);
+
+    return { pickFile, pickFiles };
 }
