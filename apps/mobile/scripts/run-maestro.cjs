@@ -310,7 +310,12 @@ function removeAdbReversePorts(deviceId) {
 }
 
 const maestroArgs = ['test', '--device', deviceId];
-if (process.env.MAESTRO_REINSTALL_DRIVER !== 'false') {
+// Do NOT reinstall the driver for every flow. Each `maestro test` invocation
+// would tear down and recreate the driver/server pair, which resets the gRPC
+// channel mid-settle and surfaces as `StatusRuntimeException: CANCELLED`
+// between otherwise unrelated flows. Reuse the installed driver; set
+// MAESTRO_REINSTALL_DRIVER=true only for an explicit clean-driver run.
+if (process.env.MAESTRO_REINSTALL_DRIVER === 'true') {
   maestroArgs.push('--reinstall-driver');
 }
 for (const name of ['E2E_USERNAME', 'MFA_RECOVERY_CODE', 'WRONG_SEED_PHRASE', 'E2E_FILE_PATH', 'E2E_FILE_SHA256', 'TEST_USERNAME', 'ACCOUNT_PASSWORD', 'FIXTURE_USERNAME', 'FIXTURE_PASSWORD']) {

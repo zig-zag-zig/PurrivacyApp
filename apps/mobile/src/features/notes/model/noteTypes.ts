@@ -9,4 +9,19 @@ export interface SecureNote {
   body: string;
   /** epoch ms */
   updatedAt: number;
+  /**
+   * When true, opening the note (and therefore copying it — the list preview
+   * is never selectable) requires fresh proof of identity: the account
+   * password via Firebase re-authentication, or biometrics. Same policy as
+   * revealing a private key; the unlocked vault alone is not sufficient.
+   *
+   * Optional rather than defaulted so legacy notes — written before this
+   * flag existed — stay exactly as accessible as they were, instead of being
+   * silently upgraded to protected.
+   */
+  requireReauth?: boolean;
 }
+
+/** True when a note must pass the re-authentication gate before it can open. */
+export const isNoteProtected = (note: Pick<SecureNote, 'requireReauth'>): boolean =>
+  note.requireReauth === true;

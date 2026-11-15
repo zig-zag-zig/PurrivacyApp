@@ -30,6 +30,8 @@ import { PassphraseBannerOverlayProvider } from './src/features/keys/components/
 import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
 import { OperationCenterProvider, useOperationCenter } from './src/app/state/OperationCenterContext';
 import { OperationCenterUI } from './src/app/components/OperationCenterUI';
+import { purgeFileCryptoCaches } from './src/services/fileCacheCleanup';
+import { clearLastEncryptedFile } from './src/services/fileCryptoService';
 import { usePassphraseStorageAutoSync } from './src/features/security/hooks/usePassphraseStorageAutoSync';
 import { useStartupUpdateCheck } from './src/app/hooks/useStartupUpdateCheck';
 import { useShareIntentRouting } from './src/app/hooks/useShareIntentRouting';
@@ -50,13 +52,40 @@ const navigationTheme = {
 };
 
 const AppContent = () => {
-    const { lock, authCompleted, user, isCheckingInactivity, userDecrypted, appStateIsBackground } = useAuth();
-    const { failRunningOperations } = useOperationCenter();
-    const handlePgpRuntimeCleared = useCallback(() => {
+    const { lock, authCompleted, user, isCheckingInactivity, userDecrypted, appStateIsBackground, isLocalSessionLocked } = useAuth();
+    const { failRunningOperations, clearFinished, resumeOperations } = useOperationCenter();
+    const clearSensitiveOperationState = useCallback(() => {
         failRunningOperations('Interrupted because the vault locked or signed out');
-    }, [failRunningOperations]);
+        // Finished records can contain decrypted text, file names, and cache
+        // URIs. Never carry them across a lock, sign-out, or account switch.
+        clearFinished();
+        purgeFileCryptoCaches();
+        clearLastEncryptedFile();
+    }, [failRunningOperations, clearFinished]);
+
+    const handlePgpRuntimeCleared = clearSensitiveOperationState;
     const { webViewRef, onReload, reloadWebView } = useWebViewPGP();
     const showStartupLoading = !authCompleted;
+
+    // Suspend and wipe only across a real security boundary: no user (signed
+    // out) or a locally-locked session. `userDecrypted` must NOT be part of this
+    // test — during signup a user exists with no decrypted records yet, and
+    // treating that as locked aborted the signup key generation.
+    useEffect(() => {
+        if (!user || isLocalSessionLocked) {
+            clearSensitiveOperationState();
+            return;
+        }
+        resumeOperations();
+    }, [user, isLocalSessionLocked, resumeOperations, clearSensitiveOperationState]);
+
+    // A previous process may have died before lock/sign-out cleanup ran. Its
+    // OperationCenter state is gone, so any surviving file-crypto cache copy is
+    // unreferenced and safe to remove on launch.
+    useEffect(() => {
+        purgeFileCryptoCaches();
+        clearLastEncryptedFile();
+    }, []);
 
     // APP-SEC-007: signup secrets live only in the in-process session; discard
     // them when the app backgrounds so they never outlive the signup flow.
@@ -88,7 +117,7 @@ const AppContent = () => {
                     onTouchStart={() => user?.uid ? resetSessionTimer(user.uid, lock) : {}}
                 >
                     <StackNavigator />
-                    <OperationCenterUI />
+                    {user && userDecrypted && !isLocalSessionLocked ? <OperationCenterUI /> : null}
                 </SafeAreaView>
             ) : null}
             {!showStartupLoading && user ? (

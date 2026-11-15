@@ -47,7 +47,7 @@ export function useKeyOperations({
   setLoading,
   showToast,
 }: KeyOperationsParams) {
-  const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'key');
+  const pickFile = useFilePicker({ validatePGP: 'key' });
   const ensurePassphraseStorageConsent = usePassphraseStorageConsent(user?.uid);
   const { beginOperation } = useOperationCenter();
   const refreshUserKeys = () => EventService.addEvent('user');

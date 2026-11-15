@@ -43,7 +43,7 @@ export function useEncryptPage() {
   const [state, dispatch] = useReducer(encryptReducer, initialEncryptState);
   const { secureCopy } = useSecureCopy();
 
-  const pickFile = useFilePicker(['.txt']);
+  const pickFile = useFilePicker();
   // Exclude revoked keys from the recipient picker: they cannot be encrypted
   // to (the WebView also refuses), and offering them is a footgun.
   const keySelectionKeys = useMemo(

@@ -7,6 +7,7 @@ import {
     newOperationId,
     operationCenterReducer,
     pruneOperations,
+    removedOperationFileUris,
     MAX_FINISHED_OPERATIONS,
     type OperationRecord,
 } from './operationCenterState';
@@ -108,6 +109,30 @@ describe('operationCenterState', () => {
         expect(latestByKind(ops, 'key-generate')).toBeUndefined();
         expect(countRunning(ops)).toBe(1);
         expect(countUnseenFinished(ops)).toBe(1);
+    });
+
+    it('removedOperationFileUris only collects files for records that left the registry', () => {
+        const kept = makeRecord({
+            id: 'kept',
+            status: 'succeeded',
+            result: { fileUri: 'file:///cache/purrivacy-kept.pgp' },
+        });
+        const dismissed = makeRecord({
+            id: 'dismissed',
+            status: 'succeeded',
+            result: { fileUri: 'file:///cache/purrivacy-dismissed.pgp' },
+        });
+        const textOnly = makeRecord({
+            id: 'text',
+            kind: 'text-decrypt',
+            status: 'succeeded',
+            result: { decryptedContent: 'secret' },
+        });
+
+        expect(removedOperationFileUris([kept, dismissed, textOnly], [kept])).toEqual([
+            'file:///cache/purrivacy-dismissed.pgp',
+        ]);
+        expect(removedOperationFileUris([], [kept])).toEqual([]);
     });
 
     it('newOperationId is unique', () => {

@@ -18,6 +18,7 @@ import {
     newOperationId,
     prunedOperationCenterReducer,
     initialOperationCenterState,
+    removedOperationFileUris,
     type OperationKind,
     type OperationRecord,
 } from './operationCenterState';
@@ -32,6 +33,7 @@ import {
     setActiveOperationCount,
 } from '../../services/operationRuntimeState';
 import { logger } from '../../utils/logger';
+import { deleteCachedFile } from '../../services/fileCacheCleanup';
 
 /**
  * App-wide registry for long-running operations (file encrypt/decrypt, key
@@ -84,8 +86,11 @@ interface OperationCenterContextValue {
     operations: OperationRecord[];
     runningCount: number;
     unseenFinishedCount: number;
-    beginOperation: <T>(input: BeginOperationInput<T>) => Promise<T>;
+    beginOperation: <T>(input: BeginOperationInput<T>, expectedEpoch?: number) => Promise<T>;
+    getOperationEpoch: () => number;
     failRunningOperations: (reason: string) => void;
+    /** Unblock new operations after the vault is unlocked again. */
+    resumeOperations: () => void;
     markSeen: (id: string) => void;
     dismiss: (id: string) => void;
     clearFinished: () => void;
@@ -111,9 +116,10 @@ const notifyFinishedInBackground = async (record: OperationRecord): Promise<void
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: record.title,
-                body: record.status === 'succeeded'
-                    ? `Finished — ${record.resultSummary ?? 'done'}`
-                    : `Failed — ${record.error ?? 'error'}`,
+                // Never include file names, result summaries, or raw error
+                // strings: this notification is displayed on the lock screen
+                // and can be read by notification-listener services.
+                body: record.status === 'succeeded' ? 'Operation finished' : 'Operation failed',
             },
             trigger: null, // fire immediately
             identifier: `${OP_NOTIFICATION_ID_PREFIX}${record.id}`,
@@ -148,6 +154,21 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
     const keepAliveActiveRef = useRef(false);
     const lastKeepAlivePayloadRef = useRef<string | null>(null);
     const lastKeepAliveUpdateAtRef = useRef(0);
+    const previousOperationsRef = useRef<OperationRecord[]>([]);
+    const operationsRef = useRef<OperationRecord[]>(state.operations);
+    operationsRef.current = state.operations;
+    const operationsSuspendedRef = useRef(false);
+    const operationEpochRef = useRef(0);
+
+    // When a record leaves the registry (dismissed, cleared, or pruned by the
+    // finished-record cap), delete its cached output file. Downloads copies are
+    // content:// URIs and are intentionally untouched.
+    useEffect(() => {
+        for (const fileUri of removedOperationFileUris(previousOperationsRef.current, state.operations)) {
+            deleteCachedFile(fileUri);
+        }
+        previousOperationsRef.current = state.operations;
+    }, [state.operations]);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
@@ -206,7 +227,15 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
     }, []);
 
-    const beginOperation = useCallback(async <T,>(input: BeginOperationInput<T>): Promise<T> => {
+    const beginOperation = useCallback(async <T,>(input: BeginOperationInput<T>, expectedEpoch?: number): Promise<T> => {
+        if (operationsSuspendedRef.current || (expectedEpoch !== undefined && expectedEpoch !== operationEpochRef.current)) {
+            // A batch loop can outlive the screen that started it. Without this
+            // guard, files queued before a lock/sign-out would keep running and
+            // could repopulate the operation registry with decrypted results
+            // after it was cleared.
+            throw new Error('Operations are paused while the vault is locked or signed out');
+        }
+        const operationEpoch = operationEpochRef.current;
         const id = newOperationId(input.kind);
         const record: OperationRecord = {
             id,
@@ -219,14 +248,23 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
         dispatch({ type: 'started', record });
 
         let settled = false;
-        let successSummary: string | undefined;
-        const patch = (p: Partial<OperationRecord>) => dispatch({ type: 'updated', id, patch: p });
+        const isCurrentOperation = () => (
+            !operationsSuspendedRef.current && operationEpoch === operationEpochRef.current
+        );
+        const patch = (p: Partial<OperationRecord>) => {
+            if (!isCurrentOperation()) return;
+            dispatch({ type: 'updated', id, patch: p });
+        };
         const api: OperationRunApi = {
             setPhase: phase => patch({ phase }),
             setProgress: (done, total) => patch({ progress: { done, total } }),
             succeed: (result, resultSummary) => {
+                if (!isCurrentOperation()) {
+                    const fileUri = typeof result?.fileUri === 'string' ? result.fileUri : null;
+                    deleteCachedFile(fileUri);
+                    return;
+                }
                 settled = true;
-                successSummary = resultSummary;
                 patch({
                     status: 'succeeded',
                     finishedAt: Date.now(),
@@ -239,23 +277,28 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
 
         try {
             const value = await input.run(api);
+            if (!isCurrentOperation()) {
+                // Do not let a late decrypt/encrypt result escape to a screen
+                // after lock/sign-out/account-switch. The caller will receive
+                // an interruption error instead of dispatching sensitive data.
+                throw new Error('Operation interrupted because the vault locked or signed out');
+            }
             if (!settled) {
                 // Run resolved without an explicit succeed — record success
                 // anyway so the registry never shows a phantom running op.
                 patch({ status: 'succeeded', finishedAt: Date.now(), phase: undefined });
             }
-            if (appStateRef.current.match(/inactive|background/)) {
+            if (isCurrentOperation() && appStateRef.current.match(/inactive|background/)) {
                 void notifyFinishedInBackground({
                     ...record,
                     status: 'succeeded',
-                    resultSummary: successSummary,
                 });
             }
             return value;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             patch({ status: 'failed', finishedAt: Date.now(), phase: undefined, error: message });
-            if (appStateRef.current.match(/inactive|background/)) {
+            if (isCurrentOperation() && appStateRef.current.match(/inactive|background/)) {
                 void notifyFinishedInBackground({
                     ...record,
                     status: 'failed',
@@ -266,23 +309,46 @@ export const OperationCenterProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
     }, []);
 
+    const getOperationEpoch = useCallback(() => operationEpochRef.current, []);
     const failRunningOperations = useCallback((reason: string) => {
+        operationEpochRef.current += 1;
+        operationsSuspendedRef.current = true;
         dispatch({ type: 'failRunning', error: reason });
     }, []);
+    const resumeOperations = useCallback(() => {
+        operationsSuspendedRef.current = false;
+    }, []);
     const markSeen = useCallback((id: string) => dispatch({ type: 'seen', id }), []);
-    const dismiss = useCallback((id: string) => dispatch({ type: 'dismiss', id }), []);
-    const clearFinished = useCallback(() => dispatch({ type: 'clearFinished' }), []);
+    const dismiss = useCallback((id: string) => {
+        const operation = operationsRef.current.find(candidate => candidate.id === id);
+        if (operation?.status !== 'running') {
+            const fileUri = typeof operation?.result?.fileUri === 'string' ? operation.result.fileUri : null;
+            deleteCachedFile(fileUri);
+        }
+        dispatch({ type: 'dismiss', id });
+    }, []);
+    const clearFinished = useCallback(() => {
+        for (const operation of operationsRef.current) {
+            if (operation.status !== 'running') {
+                const fileUri = typeof operation.result?.fileUri === 'string' ? operation.result.fileUri : null;
+                deleteCachedFile(fileUri);
+            }
+        }
+        dispatch({ type: 'clearFinished' });
+    }, []);
 
     const value = useMemo<OperationCenterContextValue>(() => ({
         operations: state.operations,
         runningCount: countRunning(state.operations),
         unseenFinishedCount: countUnseenFinished(state.operations),
         beginOperation,
+        getOperationEpoch,
         failRunningOperations,
+        resumeOperations,
         markSeen,
         dismiss,
         clearFinished,
-    }), [state.operations, beginOperation, failRunningOperations, markSeen, dismiss, clearFinished]);
+    }), [state.operations, beginOperation, getOperationEpoch, failRunningOperations, resumeOperations, markSeen, dismiss, clearFinished]);
 
     return (
         <OperationCenterContext.Provider value={value}>

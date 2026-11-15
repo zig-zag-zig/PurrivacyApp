@@ -42,7 +42,7 @@ export function useDecryptPage() {
   const { beginOperation } = useOperationCenter();
   const [state, dispatch] = useReducer(decryptReducer, initialDecryptState);
 
-  const pickFile = useFilePicker(['.txt', '.asc', '.pgp', '.gpg'], 'message');
+  const pickFile = useFilePicker({ validatePGP: 'message' });
   const keySelectionKeys = visibleKeys;
   const privateKeys = keySelectionKeys.filter(key => key.privateKey);
   const shouldRedirectToKeys = Boolean(userDecrypted && !isAuthLoading && privateKeys.length === 0);

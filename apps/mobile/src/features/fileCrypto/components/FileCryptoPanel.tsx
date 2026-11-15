@@ -8,10 +8,12 @@ import { KeySelection } from '../../keys/components/KeySelection';
 import { useToast } from '../../../app/state/ToastContext';
 import { useAuth } from '../../auth/state/AuthContext';
 import { fileCryptoService, getLastEncryptedFile, writeDeterministicTestFile } from '../../../services/fileCryptoService';
+import { deleteCachedFile } from '../../../services/fileCacheCleanup';
 import { useOperationCenter, useLatestOperation } from '../../../app/state/OperationCenterContext';
 import { formatBytes } from '../../../app/state/operationCenterState';
 import { getCompleteKeyPairs } from '../../keys/domain/keyUtils';
-import { useBinaryFilePicker } from '../../../shared/hooks/useBinaryFilePicker';
+import { useBinaryFilePicker, type PickedBinaryFile } from '../../../shared/hooks/useBinaryFilePicker';
+import { runFileBatch } from '../domain/fileBatch';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
 import { ENV } from '../../../config/env';
 import { theme } from '../../../styles/theme';
@@ -19,6 +21,7 @@ import type { KeyPair } from '../../../types/types';
 import type { KeySelectionMap } from '../../encrypt/model/types';
 
 type Mode = 'encrypt' | 'decrypt';
+type PickedFile = PickedBinaryFile & { sourceSha256?: string };
 
 interface FileCryptoPanelProps {
     mode: Mode;
@@ -26,10 +29,13 @@ interface FileCryptoPanelProps {
 }
 
 /**
- * File-mode encrypt/decrypt panel. Streams a picked file through the chunked
- * WebView bridge (fileCryptoService) and hands the result to the OS share sheet
- * so it lands in a user-chosen destination — matching the "share over
+ * File-mode encrypt/decrypt panel. Streams picked files through the chunked
+ * WebView bridge (fileCryptoService) and hands each result to the OS share
+ * sheet so it lands in a user-chosen destination — matching the "share over
  * clipboard" posture for sensitive output.
+ *
+ * A multi-file selection runs sequentially, one OperationCenter record per
+ * file, so each result keeps its own progress/share/open/failure state.
  *
  * Long operations register with the app-wide OperationCenter, so they keep
  * running (and stay visible/restorable) if the user navigates away, the
@@ -52,12 +58,12 @@ const E2E_SIZES = [
 export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPrefix }) => {
     const { visibleKeys } = useAuth();
     const { showToast } = useToast();
-    const { pickFile } = useBinaryFilePicker();
-    const { beginOperation } = useOperationCenter();
+    const { pickFile, pickFiles } = useBinaryFilePicker();
+    const { beginOperation, getOperationEpoch } = useOperationCenter();
     const opKind = mode === 'encrypt' ? 'file-encrypt' as const : 'file-decrypt' as const;
     const latestOp = useLatestOperation(opKind);
 
-    const [picked, setPicked] = useState<{ uri: string; name: string; size?: number; sourceSha256?: string } | null>(null);
+    const [pickedFiles, setPickedFiles] = useState<PickedFile[]>([]);
     const [e2eSize, setE2eSize] = useState(1024 * 1024);
     const [selectedPublicKeys, setSelectedPublicKeys] = useState<KeySelectionMap>({});
     const [selectedPrivateKey, setSelectedPrivateKey] = useState<KeySelectionMap>({});
@@ -68,10 +74,23 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const [result, setResult] = useState<{ fileUri: string; fileName: string; totalBytes: number; verified?: boolean | null; sha256?: string; sourceSha256?: string; savedUri?: string | null } | null>(null);
     const [selfTestResult, setSelfTestResult] = useState('');
     const mountedRef = useRef(true);
+    const pickedFilesRef = useRef<PickedFile[]>([]);
+    const operationActiveRef = useRef(false);
+    pickedFilesRef.current = pickedFiles;
 
     useEffect(() => {
         mountedRef.current = true;
-        return () => { mountedRef.current = false; };
+        return () => {
+            mountedRef.current = false;
+            // If the panel is abandoned before a run starts, remove picker
+            // copies that no longer have any owner. Active crypto sessions own
+            // their source/output cleanup in fileCryptoService.
+            if (!operationActiveRef.current) {
+                for (const file of pickedFilesRef.current) {
+                    deleteCachedFile(file.uri);
+                }
+            }
+        };
     }, []);
 
     // e2e/dev perf probe: measures pure WebView crypto throughput (no bridge).
@@ -122,6 +141,29 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
         selectedPrivateKeyObj && selectedPrivateKeyObj.privateKeyIsUnlocked === false,
     );
 
+    const nextE2ePickedFile = (): PickedFile | null => {
+        if (mode === 'decrypt') {
+            const latest = getLastEncryptedFile();
+            if (!latest) {
+                showToast('No encrypted file available yet', 'error');
+                return null;
+            }
+            return { uri: latest.uri, name: latest.name, sourceSha256: latest.sourceSha256 };
+        }
+        const generated = writeDeterministicTestFile(e2eSize);
+        return { uri: generated.uri, name: generated.name, size: generated.size, sourceSha256: generated.sha256 };
+    };
+
+    const addPickedFiles = (files: PickedFile[]) => {
+        setPickedFiles(current => {
+            const existing = new Set(current.map(file => file.uri));
+            const additions = files.filter(file => !existing.has(file.uri));
+            return additions.length > 0 ? [...current, ...additions] : current;
+        });
+        setResult(null);
+        setErrorText('');
+    };
+
     const handlePick = async () => {
         if (bypassPicker) {
             // E2E: bypass the system document picker (SAF UI isn't driveable by
@@ -129,29 +171,47 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
             // decrypt reuses the file the previous encrypt step produced. The
             // rest of the pipeline (streaming bridge, crypto, backend) is the
             // real code path.
-            if (mode === 'decrypt') {
-                const latest = getLastEncryptedFile();
-                if (!latest) {
-                    showToast('No encrypted file available yet', 'error');
-                    return;
-                }
-                setPicked({ uri: latest.uri, name: latest.name, sourceSha256: latest.sourceSha256 });
-            } else {
-                const generated = writeDeterministicTestFile(e2eSize);
-                setPicked({ uri: generated.uri, name: generated.name, size: generated.size, sourceSha256: generated.sha256 });
-            }
-            setResult(null);
-            setErrorText('');
+            const file = nextE2ePickedFile();
+            if (file) addPickedFiles([file]);
             return;
         }
         // A picker failure used to reject silently (no handler), which looked
         // like "nothing happens" for files the provider could not hand over
         // (some cloud/media providers reject the cache copy).
         try {
+            const files = await pickFiles({ multiple: true });
+            if (files.length) addPickedFiles(files);
+        } catch (error) {
+            const raw = error instanceof Error ? error.message : String(error);
+            setErrorText(raw);
+            showToast(getUserFacingErrorMessage(error, 'Could not open the selected file'), 'error');
+        }
+    };
+
+    const handleReplaceFile = async (index: number) => {
+        if (busy || opRunning) return;
+        if (bypassPicker) {
+            const file = nextE2ePickedFile();
+            if (!file) return;
+            const replaced = pickedFiles[index];
+            if (replaced && replaced.uri !== file.uri) {
+                deleteCachedFile(replaced.uri);
+            }
+            setPickedFiles(current => current.map((existing, i) => (i === index ? file : existing)));
+            setResult(null);
+            setErrorText('');
+            return;
+        }
+        try {
             const file = await pickFile();
             if (file) {
-                setPicked({ uri: file.uri, name: file.name, size: file.size });
+                const replaced = pickedFiles[index];
+                if (replaced && replaced.uri !== file.uri) {
+                    deleteCachedFile(replaced.uri);
+                }
+                setPickedFiles(current => current.map((existing, i) => (i === index ? file : existing)));
                 setResult(null);
+                setErrorText('');
             }
         } catch (error) {
             const raw = error instanceof Error ? error.message : String(error);
@@ -160,12 +220,22 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
         }
     };
 
-    // After a successful run the panel clears itself: the outcome (saved
-    // location, hashes, signature status, share/open actions) lives in the
-    // operation modal, so leaving the picked file and keys on screen is just
-    // clutter — and keeping the plaintext passphrase around is worse.
+    const removePickedFile = (index: number) => {
+        deleteCachedFile(pickedFiles[index]?.uri);
+        setPickedFiles(current => current.filter((_, i) => i !== index));
+        setResult(null);
+        setErrorText('');
+    };
+
+    // After a fully successful run the panel clears itself: the outcome
+    // (saved location, hashes, signature status, share/open actions) lives in
+    // the operation modal, so leaving the picked files and keys on screen is
+    // just clutter — and keeping the plaintext passphrase around is worse.
     const clearForm = () => {
-        setPicked(null);
+        for (const file of pickedFiles) {
+            deleteCachedFile(file.uri);
+        }
+        setPickedFiles([]);
         setSelectedPublicKeys({});
         setSelectedPrivateKey({});
         setSelectedSenderKey({});
@@ -173,121 +243,204 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     };
 
     const handleRun = async () => {
-        if (!picked) return;
+        const files = pickedFiles;
+        if (files.length === 0) return;
+        const operationEpoch = getOperationEpoch();
         setBusy(true);
+        operationActiveRef.current = true;
         setResult(null);
         setErrorText('');
         try {
-            await beginOperation({
-                kind: opKind,
-                title: mode === 'encrypt' ? 'Encrypting file' : 'Decrypting file',
-                detail: picked.name,
-                run: async api => {
-                    if (mode === 'encrypt') {
-                        const publicKeys = Object.keys(selectedPublicKeys)
-                            .map(fp => recipientKeys.find(k => k.fingerprint === fp)?.publicKey)
-                            .filter((k): k is string => Boolean(k));
-                        const signOptions = selectedPrivateKeyObj
-                            ? { privateKey: selectedPrivateKeyObj.privateKey!, passphrase }
-                            : undefined;
-                        const out = await fileCryptoService.encryptFile(
-                            picked.uri,
-                            picked.name,
-                            publicKeys,
-                            signOptions,
-                            (done, total) => api.setProgress(done, total),
-                        );
-                        api.succeed(
-                            { fileUri: out.fileUri, fileName: out.fileName, totalBytes: out.totalBytes, sha256: out.sha256, sourceSha256: picked.sourceSha256, savedUri: out.savedUri ?? null },
-                            out.savedUri
-                                ? `${out.fileName} · saved to Downloads/Purrivacy`
-                                : `${out.fileName} · ${formatBytes(out.totalBytes)}`,
-                        );
-                    } else {
-                        if (!selectedPrivateKeyObj?.privateKey) {
-                            throw new Error('Select a private key to decrypt with');
+            // Each file is its own OperationCenter record: it gets its own
+            // progress, result, share/open actions, and failure state. Files
+            // run sequentially so peak memory and WebView load stay bounded to
+            // one streaming session regardless of selection size.
+            const { failures } = await runFileBatch(files, async (picked, index) => {
+                const batchPosition = files.length > 1 ? ` ${index + 1} of ${files.length}` : '';
+                await beginOperation({
+                    kind: opKind,
+                    title: `${mode === 'encrypt' ? 'Encrypting file' : 'Decrypting file'}${batchPosition}`,
+                    detail: picked.name,
+                    run: async api => {
+                        if (mode === 'encrypt') {
+                            const publicKeys = Object.keys(selectedPublicKeys)
+                                .map(fp => recipientKeys.find(k => k.fingerprint === fp)?.publicKey)
+                                .filter((k): k is string => Boolean(k));
+                            const signOptions = selectedPrivateKeyObj
+                                ? { privateKey: selectedPrivateKeyObj.privateKey!, passphrase }
+                                : undefined;
+                            const out = await fileCryptoService.encryptFile(
+                                picked.uri,
+                                picked.name,
+                                publicKeys,
+                                signOptions,
+                                (done, total) => api.setProgress(done, total),
+                            );
+                            api.succeed(
+                                { fileUri: out.fileUri, fileName: out.fileName, totalBytes: out.totalBytes, sha256: out.sha256, sourceSha256: picked.sourceSha256, savedUri: out.savedUri ?? null },
+                                out.savedUri
+                                    ? `${out.fileName} · saved to Downloads/Purrivacy`
+                                    : `${out.fileName} · ${formatBytes(out.totalBytes)}`,
+                            );
+                        } else {
+                            if (!selectedPrivateKeyObj?.privateKey) {
+                                throw new Error('Select a private key to decrypt with');
+                            }
+                            // Optional sender key: when chosen, the embedded
+                            // signature is verified against it and the outcome is
+                            // surfaced on the operation (modal badge).
+                            const senderPublicKey = recipientKeys
+                                .find(k => k.fingerprint === Object.keys(selectedSenderKey)[0])?.publicKey;
+                            const out = await fileCryptoService.decryptFile(
+                                picked.uri,
+                                selectedPrivateKeyObj.privateKey,
+                                passphrase,
+                                senderPublicKey,
+                                (done, total) => api.setProgress(done, total),
+                            );
+                            // Attach the plaintext hash recorded at encrypt time so the e2e
+                            // verdict can compare it against the decrypted bytes.
+                            const signature = out.verified === true
+                                ? 'signature verified'
+                                : out.verified === false
+                                    ? 'SIGNATURE INVALID'
+                                    : null;
+                            api.succeed(
+                                { fileUri: out.fileUri, fileName: out.fileName, totalBytes: out.totalBytes, sha256: out.sha256, sourceSha256: picked.sourceSha256, verdict: out.verified ?? null, verified: out.verified ?? null, savedUri: out.savedUri ?? null },
+                                [
+                                    out.fileName,
+                                    signature,
+                                    out.savedUri ? 'saved to Downloads/Purrivacy' : formatBytes(out.totalBytes),
+                                ].filter(Boolean).join(' · '),
+                            );
                         }
-                        // Optional sender key: when chosen, the embedded
-                        // signature is verified against it and the outcome is
-                        // surfaced on the operation (modal badge).
-                        const senderPublicKey = recipientKeys
-                            .find(k => k.fingerprint === Object.keys(selectedSenderKey)[0])?.publicKey;
-                        const out = await fileCryptoService.decryptFile(
-                            picked.uri,
-                            selectedPrivateKeyObj.privateKey,
-                            passphrase,
-                            senderPublicKey,
-                            (done, total) => api.setProgress(done, total),
-                        );
-                        // Attach the plaintext hash recorded at encrypt time so the e2e
-                        // verdict can compare it against the decrypted bytes.
-                        const signature = out.verified === true
-                            ? 'signature verified'
-                            : out.verified === false
-                                ? 'SIGNATURE INVALID'
-                                : null;
-                        api.succeed(
-                            { fileUri: out.fileUri, fileName: out.fileName, totalBytes: out.totalBytes, sha256: out.sha256, sourceSha256: picked.sourceSha256, verdict: out.verified ?? null, verified: out.verified ?? null, savedUri: out.savedUri ?? null },
-                            [
-                                out.fileName,
-                                signature,
-                                out.savedUri ? 'saved to Downloads/Purrivacy' : formatBytes(out.totalBytes),
-                            ].filter(Boolean).join(' · '),
-                        );
-                    }
-                },
+                    },
+                }, operationEpoch);
             });
+
             if (!mountedRef.current) return;
-            clearForm();
-            showToast(mode === 'encrypt' ? 'File encrypted' : 'File decrypted', 'success');
-        } catch (error) {
-            if (!mountedRef.current) return;
-            const message = getUserFacingErrorMessage(error, mode === 'encrypt' ? 'Failed to encrypt file' : 'Failed to decrypt file');
-            const raw = error instanceof Error ? error.message : String(error);
-            if (isE2E) console.error('[fileCrypto] operation failed', raw);
-            setErrorText(`${message} :: ${raw}`);
-            showToast(message, 'error');
+            if (failures.length > 0) {
+                // The streaming service deletes picked cache sources on any
+                // failed run. Also clean sources for a run rejected before a
+                // service session was created (e.g. a lock race), then force a
+                // fresh selection rather than retaining stale paths.
+                for (const file of files) {
+                    deleteCachedFile(file.uri);
+                }
+                setPickedFiles([]);
+                const failureDetails = failures.map(({ file, error }) => (
+                    `${file.name}: ${error instanceof Error ? error.message : String(error)}`
+                ));
+                if (isE2E) {
+                    failures.forEach(({ error }) => {
+                        console.error('[fileCrypto] operation failed', error instanceof Error ? error.message : String(error));
+                    });
+                }
+                const action = mode === 'encrypt' ? 'encrypt' : 'decrypt';
+                const message = failures.length === files.length
+                    ? `Failed to ${action} the selected ${files.length === 1 ? 'file' : 'files'}`
+                    : `${failures.length} of ${files.length} files could not be ${action === 'encrypt' ? 'encrypted' : 'decrypted'}`;
+                setErrorText(`${message} :: ${failureDetails.join(' | ')}`);
+                showToast(message, 'error');
+            } else {
+                clearForm();
+                showToast(
+                    mode === 'encrypt'
+                        ? (files.length > 1 ? `${files.length} files encrypted` : 'File encrypted')
+                        : (files.length > 1 ? `${files.length} files decrypted` : 'File decrypted'),
+                    'success',
+                );
+            }
         } finally {
+            // Any file not yet processed when the panel is abandoned, locked,
+            // or a batch stops is still only a picker cache copy. Cleanup is
+            // idempotent and does not affect public Downloads copies.
+            for (const file of files) {
+                deleteCachedFile(file.uri);
+            }
+            operationActiveRef.current = false;
             if (mountedRef.current) setBusy(false);
         }
     };
 
     const canRun = Boolean(
-        picked && !busy && !opRunning
+        pickedFiles.length > 0 && !busy && !opRunning
         && (mode === 'encrypt'
             ? Object.keys(selectedPublicKeys).length > 0
             : Boolean(selectedPrivateKeyObj) && (!needsPassphrase || passphrase))
     );
+
+    const totalBytes = pickedFiles.every(file => file.size != null)
+        ? pickedFiles.reduce((sum, file) => sum + (file.size ?? 0), 0)
+        : null;
 
     return (
         <View style={styles.container}>
             <TouchableOpacity
                 onPress={handlePick}
                 activeOpacity={0.78}
+                disabled={busy || opRunning}
                 testID={testIDPrefix ? `${testIDPrefix}.pick` : undefined}
                 style={styles.pickButton}
             >
                 <View style={styles.pickIconWrap}>
                     <Icon name="attach-file" size={20} color={theme.colors.primary} />
                 </View>
-                {picked ? (
-                    // One card, icon + file info: the name is middle-truncated
-                    // so the extension stays visible and nothing overflows the
-                    // right edge; size sits right under it.
-                    <View style={styles.pickText}>
-                        <CustomText style={styles.pickName} numberOfLines={1} ellipsizeMode="middle">
-                            {picked.name}
-                        </CustomText>
-                        <CustomText style={styles.pickMeta} numberOfLines={1}>
-                            {picked.size != null ? `${(picked.size / 1024).toFixed(1)} KB` : 'Selected'}
-                        </CustomText>
-                    </View>
-                ) : (
+                <View style={styles.pickText}>
                     <CustomText style={styles.pickLabel} numberOfLines={1}>
-                        Choose a file
+                        {pickedFiles.length === 0 ? 'Choose files' : 'Add files'}
                     </CustomText>
-                )}
+                    {pickedFiles.length > 0 ? (
+                        <CustomText style={styles.pickMeta} numberOfLines={1}>
+                            {totalBytes != null
+                                ? `${formatBytes(totalBytes)} total · tap a file to replace`
+                                : 'Tap a file to replace'}
+                        </CustomText>
+                    ) : null}
+                </View>
             </TouchableOpacity>
+
+            {pickedFiles.length > 0 ? (
+                <View style={styles.fileList}>
+                    {pickedFiles.map((file, index) => (
+                        <View
+                            key={`${file.uri}-${index}`}
+                            style={styles.fileRow}
+                            testID={testIDPrefix ? `${testIDPrefix}.file.${index}` : undefined}
+                        >
+                            <TouchableOpacity
+                                onPress={() => handleReplaceFile(index)}
+                                disabled={busy || opRunning}
+                                activeOpacity={0.7}
+                                style={styles.fileRowButton}
+                                accessibilityLabel={`Replace ${file.name}`}
+                                accessibilityRole="button"
+                                testID={testIDPrefix ? `${testIDPrefix}.replace.${index}` : undefined}
+                            >
+                                <Icon name="description" size={18} color={theme.colors.textSecondary} />
+                                <View style={styles.fileRowText}>
+                                    <CustomText style={styles.fileRowName} numberOfLines={1} ellipsizeMode="middle">
+                                        {file.name}
+                                    </CustomText>
+                                    <CustomText style={styles.fileRowMeta} numberOfLines={1}>
+                                        {file.size != null ? formatBytes(file.size) : 'Size unavailable'}
+                                    </CustomText>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => removePickedFile(index)}
+                                disabled={busy || opRunning}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                accessibilityLabel={`Remove ${file.name}`}
+                                accessibilityRole="button"
+                                testID={testIDPrefix ? `${testIDPrefix}.remove.${index}` : undefined}
+                            >
+                                <Icon name="close" size={18} color={theme.colors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            ) : null}
 
             {isE2E && mode === 'encrypt' ? (
                 <View style={styles.e2eRow}>
@@ -488,20 +641,46 @@ const styles = StyleSheet.create({
         gap: 2,
     },
     pickLabel: {
-        flex: 1,
-        textAlign: 'center',
         color: theme.colors.text,
         fontWeight: '700',
         fontSize: theme.typography.body.fontSize,
     },
-    pickName: {
-        color: theme.colors.text,
-        fontWeight: '600',
-        fontSize: 14,
-    },
     pickMeta: {
         color: theme.colors.textSecondary,
         fontSize: 12,
+    },
+    fileList: {
+        gap: theme.spacing.xs,
+    },
+    fileRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        paddingVertical: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.sm,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surfaceMuted,
+    },
+    fileRowButton: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+    },
+    fileRowText: {
+        flex: 1,
+        minWidth: 0,
+        gap: 1,
+    },
+    fileRowName: {
+        color: theme.colors.text,
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    fileRowMeta: {
+        color: theme.colors.textSecondary,
+        fontSize: 11,
     },
     resultMeta: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
 });
