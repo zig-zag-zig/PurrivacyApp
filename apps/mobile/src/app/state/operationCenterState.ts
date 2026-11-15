@@ -158,6 +158,24 @@ export const countRunning = (operations: OperationRecord[]): number =>
 export const countUnseenFinished = (operations: OperationRecord[]): number =>
     operations.filter(op => isFinished(op) && !op.seen).length;
 
+/**
+ * Cache-file URIs belonging to records that are no longer in the registry
+ * (dismissed, cleared, or pruned by the finished-record cap). The provider uses
+ * this to delete those cache copies without touching the still-visible ones.
+ */
+export const removedOperationFileUris = (
+    previous: readonly OperationRecord[],
+    current: readonly OperationRecord[],
+): string[] => {
+    const currentIds = new Set(current.map(operation => operation.id));
+    return previous
+        .filter(operation => !currentIds.has(operation.id))
+        .map(operation => (
+            typeof operation.result?.fileUri === 'string' ? operation.result.fileUri : null
+        ))
+        .filter((uri): uri is string => Boolean(uri));
+};
+
 /** Format bytes for status surfaces. */
 export const formatBytes = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;

@@ -1,0 +1,115 @@
+appId: vip.chi_chi.purrivacy
+env:
+  TEST_USERNAME: e2e-shared
+  ACCOUNT_PASSWORD: Purrivacy-e2e-password-123
+  DRAFT_MESSAGE: e2e unsaved draft that must not survive sign out
+---
+# Compose-draft lifecycle: a draft is persisted (debounced) into the encrypted
+# per-user store so it survives leaving the screen, but it must never survive
+# sign-out. Tab switches are used instead of artificial sleeps — remounting the
+# encrypt screen forces a real load from the draft store.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.item"
+    timeout: 60000
+
+# Type an unsaved draft.
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.encrypt.content"
+- inputText: ${DRAFT_MESSAGE}
+- hideKeyboard
+
+# Switching tabs and back exceeds the 600ms save debounce and remounts the
+# composer, so the draft must come back from the encrypted store.
+- tapOn:
+    id: "purrivacy.tab.key"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      text: ${DRAFT_MESSAGE}
+    timeout: 20000
+
+# Sign out: the draft is deleted, not merely hidden.
+- tapOn:
+    id: "purrivacy.tab.settings"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.settings.screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "purrivacy.settings.logout"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.settings.logout"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.signin.username"
+    timeout: 30000
+
+# Sign back in as the same account and look for the draft again.
+- tapOn:
+    id: "purrivacy.signin.username"
+- inputText: ${TEST_USERNAME}
+- tapOn:
+    id: "purrivacy.signin.password"
+- inputText: ${ACCOUNT_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.signin.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 60000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+# One more remount gives any stale restore a chance to surface.
+- tapOn:
+    id: "purrivacy.tab.key"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.key.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.tab.encrypt"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.encrypt.screen"
+    timeout: 15000
+- assertNotVisible:
+    text: ${DRAFT_MESSAGE}

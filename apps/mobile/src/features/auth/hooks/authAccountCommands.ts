@@ -13,6 +13,7 @@ import { ApiClient } from '../../../api/client';
 import { auth } from '../../../config/firebase';
 import type { LastSignedInUser } from '../../../types/types';
 import { logger } from '../../../utils/logger';
+import { clearDraftsForUser } from '../../../services/drafts';
 import {
   clearLastActiveTime,
   clearSessionTimer,
@@ -104,6 +105,7 @@ export const useAccountCommands = (deps: AuthCommandDeps): AccountCommands => {
     try {
       await securityService.setLocalSessionLocked(currentUser.uid, false);
       await clearLastActiveTime(currentUser.uid);
+      await clearDraftsForUser(currentUser.uid);
       await clearSecureStorageForUser(
         currentUser.uid,
         getUsernameFromUser(currentUser) || '',
@@ -160,6 +162,7 @@ export const useAccountCommands = (deps: AuthCommandDeps): AccountCommands => {
     await runCleanup('clear local session lock', () => securityService.setLocalSessionLocked(userId, false));
     await runCleanup('clear last active time', () => clearLastActiveTime(userId));
     await runCleanup('clear stored session', () => securityService.clearStoredSession(userId));
+    await runCleanup('clear compose drafts', () => clearDraftsForUser(userId));
     await runCleanup('clear secure storage', () => securityService.clearSecureStorage(userId, username));
     await runCleanup('clear last signed-in user', () => securityService.clearLastSignedInUser());
     await runCleanup('sign out from Firebase', () => firebaseSignOut(auth));

@@ -56,7 +56,17 @@ function configureGradleProperties() {
     'kotlin.daemon.jvmargs',
     'org.gradle.parallel',
     'org.gradle.workers.max',
+    'expo.sqlite.enableFTS',
   ]);
+
+  if (process.env.APP_ENV === 'e2e-test') {
+    // expo-sqlite@57.0.5's published AAR only contains arm64-v8a, but the local
+    // E2E emulator is x86_64. Any expo.sqlite.* gradle property makes
+    // shouldUsePublication.groovy return false, switching the module to a
+    // source build that honours reactNativeArchitectures. E2E-only so the
+    // production release keeps using the prebuilt arm64 AAR.
+    source = `${source.trimEnd()}\n\nexpo.sqlite.enableFTS=true\n`;
+  }
 
   return writeIfChanged(gradlePropertiesPath, before, source);
 }

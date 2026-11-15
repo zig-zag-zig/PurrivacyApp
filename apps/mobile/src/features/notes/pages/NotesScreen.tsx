@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 
 import { AppScreenHeader } from '../../../components/AppScreenHeader';
@@ -9,12 +9,16 @@ import { InputField } from '../../../components/InputField';
 import { ScreenContainer } from '../../../components/ScreenContainer';
 import { ConfirmationDialog } from '../../settings/components/ConfirmationDialog';
 import { SecureTextDisplay } from '../../keys/components/SecureTextDisplay';
+import { SettingsOption } from '../../../shared/ui/SettingsOption';
 import { useToast } from '../../../app/state/ToastContext';
 import { useAuth } from '../../auth/state/AuthContext';
+import { useSecretReauthorization } from '../../security/hooks/useSecretReauthorization';
+import { commonStyles } from '../../../styles/commonStyles';
 import { theme } from '../../../styles/theme';
 import { createNote, deleteNote, sortNotes, updateNote } from '../services/notesService';
-import type { SecureNote } from '../model/noteTypes';
+import { isNoteProtected, type SecureNote } from '../model/noteTypes';
 import { getUserFacingErrorMessage } from '../../../utils/errorHandling';
+import { NoteReauthDialog } from '../components/NoteReauthDialog';
 
 /**
  * Secure notes — flat list + editor + delete only. Notes are encrypted
@@ -29,16 +33,55 @@ export const NotesScreen = () => {
   const userId = user?.uid ?? '';
 
   const notes = sortNotes(userDecrypted?.notes ?? []);
-  const [editing, setEditing] = useState<{ id: string | null; title: string; body: string } | null>(null);
+  const [editing, setEditing] = useState<{
+    id: string | null;
+    title: string;
+    body: string;
+    requireReauth: boolean;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SecureNote | null>(null);
+  const [reauthTarget, setReauthTarget] = useState<SecureNote | null>(null);
   const [saving, setSaving] = useState(false);
+  const reauth = useSecretReauthorization('Open protected note');
 
   const load = useCallback(async () => {
     await loadUser();
   }, [loadUser]);
 
-  const startNew = () => setEditing({ id: null, title: '', body: '' });
-  const startEdit = (note: SecureNote) => setEditing({ id: note.id, title: note.title, body: note.body });
+  const startNew = () => setEditing({ id: null, title: '', body: '', requireReauth: false });
+  const startEdit = (note: SecureNote) => setEditing({
+    id: note.id,
+    title: note.title,
+    body: note.body,
+    requireReauth: isNoteProtected(note),
+  });
+
+  // Protected notes never reveal/preview their body in the list: the only way
+  // in is this gate, and the editor is where copying becomes possible.
+  const requestOpenNote = (note: SecureNote) => {
+    if (!isNoteProtected(note)) {
+      startEdit(note);
+      return;
+    }
+    reauth.reset();
+    setReauthTarget(note);
+  };
+
+  const closeReauth = () => {
+    Keyboard.dismiss();
+    setReauthTarget(null);
+    reauth.reset();
+  };
+
+  const handleReauthenticated = () => {
+    const target = reauthTarget;
+    Keyboard.dismiss();
+    setReauthTarget(null);
+    reauth.reset();
+    if (target) {
+      startEdit(target);
+    }
+  };
 
   const handleSave = async () => {
     if (!editing || !editing.title.trim()) {
@@ -53,9 +96,14 @@ export const NotesScreen = () => {
           title: editing.title.trim(),
           body: editing.body,
           updatedAt: Date.now(),
+          requireReauth: editing.requireReauth,
         });
       } else {
-        await createNote(userId, { title: editing.title.trim(), body: editing.body });
+        await createNote(userId, {
+          title: editing.title.trim(),
+          body: editing.body,
+          requireReauth: editing.requireReauth,
+        });
       }
       setEditing(null);
       await load();
@@ -101,6 +149,17 @@ export const NotesScreen = () => {
         />
         {/* Editing must stay visible while typing, so the editor shows the
             body in the clear; the list view is where masking matters. */}
+        <SettingsOption
+          iconName="lock-outline"
+          text="Require authentication"
+          extraText="Ask for your account password or biometrics before this note opens."
+          transparentSwitch
+          switchProps={{
+            value: editing.requireReauth,
+            onValueChange: requireReauth => setEditing(e => e && { ...e, requireReauth }),
+          }}
+          testID="purrivacy.notes.requireReauth"
+        />
         <Button label="Save" onPress={handleSave} loading={saving} testID="purrivacy.notes.save" />
         <Button label="Cancel" onPress={() => setEditing(null)} variant="secondary" testID="purrivacy.notes.cancel" />
       </ScreenContainer>
@@ -118,22 +177,25 @@ export const NotesScreen = () => {
           <CustomText style={styles.emptyText}>No notes yet. Notes are end-to-end encrypted like your keys.</CustomText>
         </View>
       ) : (
-        notes.map((note, index) => (
-          <TouchableOpacity key={note.id} style={styles.noteCard} onPress={() => startEdit(note)} testID={`purrivacy.notes.item.${index}`}>
-            <View style={styles.noteText}>
-              <CustomText style={styles.noteTitle} numberOfLines={1}>{note.title}</CustomText>
-              {note.body ? (
-                // Bodies are decrypted in memory while the vault is unlocked, so
-                // they are masked by default and revealed on demand (same
-                // pattern as private keys) — a shoulder-surfer or a screenshot
-                // of the list no longer exposes note contents. Delete rides in
-                // the same row as the reveal button so the two icons align.
-                <SecureTextDisplay
-                  text={note.body}
-                  secure
-                  revealDuration={20000}
-                  testID={`purrivacy.notes.preview.${index}`}
-                  extraActions={(
+        notes.map((note, index) => {
+          const protectedNote = isNoteProtected(note);
+          return (
+            <TouchableOpacity
+              key={note.id}
+              style={styles.noteCard}
+              onPress={() => requestOpenNote(note)}
+              testID={`purrivacy.notes.item.${index}`}
+            >
+              <View style={styles.noteText}>
+                <CustomText style={styles.noteTitle} numberOfLines={1}>{note.title}</CustomText>
+                {protectedNote ? (
+                  // A protected note has no inline preview or reveal control:
+                  // the body is only available through the re-auth gate above.
+                  <View style={styles.protectedRow}>
+                    <Icon name="lock" size={16} color={theme.colors.textSecondary} />
+                    <CustomText style={styles.protectedText} testID={`purrivacy.notes.protected.${index}`}>
+                      Protected — authentication required
+                    </CustomText>
                     <TouchableOpacity
                       onPress={() => setDeleteTarget(note)}
                       hitSlop={8}
@@ -142,24 +204,64 @@ export const NotesScreen = () => {
                     >
                       <Icon name="delete-outline" size={24} color={theme.colors.error} />
                     </TouchableOpacity>
-                  )}
-                />
-              ) : (
-                <View style={styles.noteActionsRow}>
-                  <TouchableOpacity
-                    onPress={() => setDeleteTarget(note)}
-                    hitSlop={8}
-                    accessibilityLabel="Delete note"
-                    testID={`purrivacy.notes.delete.${index}`}
-                  >
-                    <Icon name="delete-outline" size={24} color={theme.colors.error} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))
+                  </View>
+                ) : note.body ? (
+                  // Unprotected bodies stay masked by default and revealed on
+                  // demand; protected bodies never render here.
+                  <SecureTextDisplay
+                    text={note.body}
+                    secure
+                    revealDuration={20000}
+                    testID={`purrivacy.notes.preview.${index}`}
+                    extraActions={(
+                      <TouchableOpacity
+                        onPress={() => setDeleteTarget(note)}
+                        hitSlop={8}
+                        accessibilityLabel="Delete note"
+                        testID={`purrivacy.notes.delete.${index}`}
+                      >
+                        <Icon name="delete-outline" size={24} color={theme.colors.error} />
+                      </TouchableOpacity>
+                    )}
+                  />
+                ) : (
+                  <View style={styles.noteActionsRow}>
+                    <TouchableOpacity
+                      onPress={() => setDeleteTarget(note)}
+                      hitSlop={8}
+                      accessibilityLabel="Delete note"
+                      testID={`purrivacy.notes.delete.${index}`}
+                    >
+                      <Icon name="delete-outline" size={24} color={theme.colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })
       )}
+
+      <NoteReauthDialog
+        visible={Boolean(reauthTarget)}
+        noteTitle={reauthTarget?.title ?? ''}
+        accountPassword={reauth.accountPassword}
+        canUseBiometrics={reauth.canUseBiometrics}
+        error={reauth.error}
+        loading={reauth.loading}
+        onChangeAccountPassword={reauth.setAccountPassword}
+        onCancel={closeReauth}
+        onRevealWithAccountPassword={() => {
+          void reauth.authenticateWithPassword().then(ok => {
+            if (ok) handleReauthenticated();
+          });
+        }}
+        onRevealWithBiometric={() => {
+          void reauth.authenticateWithBiometric().then(ok => {
+            if (ok) handleReauthenticated();
+          });
+        }}
+      />
 
       <ConfirmationDialog
         visible={Boolean(deleteTarget)}
@@ -196,6 +298,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
+  },
+  protectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  protectedText: {
+    ...commonStyles.textCaption,
+    color: theme.colors.textSecondary,
+    flex: 1,
   },
   notePreview: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
 });

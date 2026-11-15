@@ -59,6 +59,50 @@ describe('createDraftService', () => {
         expect(await service.load('alice', 'encrypt')).toBeNull();
     });
 
+    it('clearForUser removes both drafts, blocks later saves for that session, and preserves other users', async () => {
+        await service.save('alice', 'encrypt', 'encrypt draft');
+        await service.save('alice', 'decrypt', 'decrypt draft');
+        await service.save('bob', 'encrypt', 'bob draft');
+
+        await service.clearForUser('alice');
+        await service.save('alice', 'encrypt', 'late save after sign-out');
+
+        expect(await service.load('alice', 'encrypt')).toBeNull();
+        expect(await service.load('alice', 'decrypt')).toBeNull();
+        expect(await service.load('bob', 'encrypt')).toBe('bob draft');
+
+        service.allowUser('alice');
+        await service.save('alice', 'encrypt', 'new signed-in session');
+        expect(await service.load('alice', 'encrypt')).toBe('new signed-in session');
+    });
+
+    it('clearForUser waits for an in-flight write and removes it before resolving', async () => {
+        const { map } = makeFakeStore();
+        let signalWriteStarted!: () => void;
+        let releaseWrite!: () => void;
+        const writeStarted = new Promise<void>(resolve => { signalWriteStarted = resolve; });
+        const writeGate = new Promise<void>(resolve => { releaseWrite = resolve; });
+        const delayedStore: DraftStore = {
+            getItem: async key => map.get(key) ?? null,
+            setItem: async (key, value) => {
+                map.set(key, value);
+                signalWriteStarted();
+                await writeGate;
+            },
+            removeItem: async key => { map.delete(key); },
+        };
+        const delayedService = createDraftService(delayedStore);
+
+        const saving = delayedService.save('alice', 'encrypt', 'in-flight draft');
+        await writeStarted;
+        const clearing = delayedService.clearForUser('alice');
+        releaseWrite();
+        await Promise.all([saving, clearing]);
+
+        expect(map.has('draft:encrypt:alice')).toBe(false);
+        expect(map.has('draft:decrypt:alice')).toBe(false);
+    });
+
     it('load failures resolve to null rather than throwing', async () => {
         const broken: DraftStore = {
             getItem: async () => { throw new Error('io'); },

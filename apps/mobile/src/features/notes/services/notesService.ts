@@ -57,7 +57,7 @@ const validateNote = (note: { title: string; body: string }): void => {
 
 export async function createNote(
   userId: string,
-  note: { title: string; body: string },
+  note: { title: string; body: string; requireReauth?: boolean },
 ): Promise<SecureNote> {
   if (userId.trim() === '') throw new Error('userId cannot be empty');
   validateNote(note);
@@ -68,6 +68,7 @@ export async function createNote(
     title: note.title,
     body: note.body,
     updatedAt: Date.now(),
+    requireReauth: note.requireReauth === true,
   };
   const encrypted = await encryptNote(userId, payload);
   const saved = await ApiClient.addKeyRecord(encrypted);
@@ -87,6 +88,7 @@ export async function updateNote(
     title: note.title,
     body: note.body,
     updatedAt: Date.now(),
+    requireReauth: note.requireReauth === true,
   };
   const encrypted = await encryptNote(userId, payload);
   await ApiClient.updateKeyRecord(note.id, encrypted);

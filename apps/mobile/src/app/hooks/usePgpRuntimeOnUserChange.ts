@@ -9,7 +9,9 @@ export function usePgpRuntimeOnUserChange(
   const previousUserRef = useRef(user);
 
   useEffect(() => {
-    if (previousUserRef.current && !user) {
+    const previousUser = previousUserRef.current;
+    const userChanged = Boolean(previousUser && user && previousUser.uid !== user.uid);
+    if (previousUser && (!user || userChanged)) {
       onRuntimeCleared?.();
       reloadWebView();
     }

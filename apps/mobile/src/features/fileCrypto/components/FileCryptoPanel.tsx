@@ -8,6 +8,7 @@ import { KeySelection } from '../../keys/components/KeySelection';
 import { useToast } from '../../../app/state/ToastContext';
 import { useAuth } from '../../auth/state/AuthContext';
 import { fileCryptoService, getLastEncryptedFile, writeDeterministicTestFile } from '../../../services/fileCryptoService';
+import { deleteCachedFile } from '../../../services/fileCacheCleanup';
 import { useOperationCenter, useLatestOperation } from '../../../app/state/OperationCenterContext';
 import { formatBytes } from '../../../app/state/operationCenterState';
 import { getCompleteKeyPairs } from '../../keys/domain/keyUtils';
@@ -58,7 +59,7 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const { visibleKeys } = useAuth();
     const { showToast } = useToast();
     const { pickFile, pickFiles } = useBinaryFilePicker();
-    const { beginOperation } = useOperationCenter();
+    const { beginOperation, getOperationEpoch } = useOperationCenter();
     const opKind = mode === 'encrypt' ? 'file-encrypt' as const : 'file-decrypt' as const;
     const latestOp = useLatestOperation(opKind);
 
@@ -73,10 +74,23 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const [result, setResult] = useState<{ fileUri: string; fileName: string; totalBytes: number; verified?: boolean | null; sha256?: string; sourceSha256?: string; savedUri?: string | null } | null>(null);
     const [selfTestResult, setSelfTestResult] = useState('');
     const mountedRef = useRef(true);
+    const pickedFilesRef = useRef<PickedFile[]>([]);
+    const operationActiveRef = useRef(false);
+    pickedFilesRef.current = pickedFiles;
 
     useEffect(() => {
         mountedRef.current = true;
-        return () => { mountedRef.current = false; };
+        return () => {
+            mountedRef.current = false;
+            // If the panel is abandoned before a run starts, remove picker
+            // copies that no longer have any owner. Active crypto sessions own
+            // their source/output cleanup in fileCryptoService.
+            if (!operationActiveRef.current) {
+                for (const file of pickedFilesRef.current) {
+                    deleteCachedFile(file.uri);
+                }
+            }
+        };
     }, []);
 
     // e2e/dev perf probe: measures pure WebView crypto throughput (no bridge).
@@ -143,7 +157,8 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const addPickedFiles = (files: PickedFile[]) => {
         setPickedFiles(current => {
             const existing = new Set(current.map(file => file.uri));
-            return [...current, ...files.filter(file => !existing.has(file.uri))];
+            const additions = files.filter(file => !existing.has(file.uri));
+            return additions.length > 0 ? [...current, ...additions] : current;
         });
         setResult(null);
         setErrorText('');
@@ -178,6 +193,10 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
         if (bypassPicker) {
             const file = nextE2ePickedFile();
             if (!file) return;
+            const replaced = pickedFiles[index];
+            if (replaced && replaced.uri !== file.uri) {
+                deleteCachedFile(replaced.uri);
+            }
             setPickedFiles(current => current.map((existing, i) => (i === index ? file : existing)));
             setResult(null);
             setErrorText('');
@@ -186,6 +205,10 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
         try {
             const file = await pickFile();
             if (file) {
+                const replaced = pickedFiles[index];
+                if (replaced && replaced.uri !== file.uri) {
+                    deleteCachedFile(replaced.uri);
+                }
                 setPickedFiles(current => current.map((existing, i) => (i === index ? file : existing)));
                 setResult(null);
                 setErrorText('');
@@ -198,6 +221,7 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     };
 
     const removePickedFile = (index: number) => {
+        deleteCachedFile(pickedFiles[index]?.uri);
         setPickedFiles(current => current.filter((_, i) => i !== index));
         setResult(null);
         setErrorText('');
@@ -208,6 +232,9 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     // the operation modal, so leaving the picked files and keys on screen is
     // just clutter — and keeping the plaintext passphrase around is worse.
     const clearForm = () => {
+        for (const file of pickedFiles) {
+            deleteCachedFile(file.uri);
+        }
         setPickedFiles([]);
         setSelectedPublicKeys({});
         setSelectedPrivateKey({});
@@ -218,7 +245,9 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
     const handleRun = async () => {
         const files = pickedFiles;
         if (files.length === 0) return;
+        const operationEpoch = getOperationEpoch();
         setBusy(true);
+        operationActiveRef.current = true;
         setResult(null);
         setErrorText('');
         try {
@@ -286,14 +315,19 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                             );
                         }
                     },
-                });
+                }, operationEpoch);
             });
 
             if (!mountedRef.current) return;
             if (failures.length > 0) {
-                // Leave only the files that failed selected, with the chosen
-                // key/passphrase intact, so a retry is one tap away.
-                const failedIndexes = new Set(failures.map(failure => failure.index));
+                // The streaming service deletes picked cache sources on any
+                // failed run. Also clean sources for a run rejected before a
+                // service session was created (e.g. a lock race), then force a
+                // fresh selection rather than retaining stale paths.
+                for (const file of files) {
+                    deleteCachedFile(file.uri);
+                }
+                setPickedFiles([]);
                 const failureDetails = failures.map(({ file, error }) => (
                     `${file.name}: ${error instanceof Error ? error.message : String(error)}`
                 ));
@@ -302,7 +336,6 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                         console.error('[fileCrypto] operation failed', error instanceof Error ? error.message : String(error));
                     });
                 }
-                setPickedFiles(files.filter((_, index) => failedIndexes.has(index)));
                 const action = mode === 'encrypt' ? 'encrypt' : 'decrypt';
                 const message = failures.length === files.length
                     ? `Failed to ${action} the selected ${files.length === 1 ? 'file' : 'files'}`
@@ -319,6 +352,13 @@ export const FileCryptoPanel: React.FC<FileCryptoPanelProps> = ({ mode, testIDPr
                 );
             }
         } finally {
+            // Any file not yet processed when the panel is abandoned, locked,
+            // or a batch stops is still only a picker cache copy. Cleanup is
+            // idempotent and does not affect public Downloads copies.
+            for (const file of files) {
+                deleteCachedFile(file.uri);
+            }
+            operationActiveRef.current = false;
             if (mountedRef.current) setBusy(false);
         }
     };

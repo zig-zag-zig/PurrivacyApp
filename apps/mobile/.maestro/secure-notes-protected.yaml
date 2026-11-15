@@ -1,0 +1,122 @@
+appId: vip.chi_chi.purrivacy
+---
+# Protected secure notes: the per-note "Require authentication" switch must
+# gate opening the note behind fresh account-password / biometric proof, the
+# same policy as revealing a private key. The unlocked vault alone is not
+# enough, and a protected body must never render in the list.
+
+- runFlow:
+    file: subflows/login-shared.yaml
+    env:
+      FIXTURE_USERNAME: "e2e-shared"
+      FIXTURE_PASSWORD: "Purrivacy-e2e-password-123"
+
+- tapOn:
+    id: "purrivacy.tab.notes"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.screen"
+    timeout: 15000
+
+# Create a note with the protection switch on.
+- tapOn:
+    id: "purrivacy.notes.new"
+- tapOn:
+    id: "purrivacy.notes.title"
+- inputText: "E2E Protected Note"
+- tapOn:
+    id: "purrivacy.notes.body"
+- inputText: "E2E protected body content"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.notes.requireReauth"
+- tapOn:
+    id: "purrivacy.notes.save"
+- extendedWaitUntil:
+    visible:
+      text: "E2E Protected Note"
+    timeout: 20000
+
+# The list shows the protected marker and never the body, even via the reveal
+# control that unprotected notes have. Notes sort newest-first, so the note
+# just saved is index 0 even if earlier runs left rows behind.
+- assertVisible:
+    text: "Protected — authentication required"
+- assertNotVisible:
+    text: "E2E protected body content"
+
+# Tapping the note opens the re-auth gate instead of the editor.
+- tapOn:
+    id: "purrivacy.notes.item.0"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.reauth.password"
+    timeout: 15000
+- assertNotVisible:
+    id: "purrivacy.notes.body"
+
+# A wrong password is rejected and the note stays closed.
+- tapOn:
+    id: "purrivacy.notes.reauth.password"
+- inputText: "wrong-password-123"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.notes.reauth.password.submit"
+- extendedWaitUntil:
+    visible:
+      text: "Incorrect account password"
+    timeout: 30000
+
+# Cancelling returns to the list without exposing the body.
+- tapOn:
+    id: "purrivacy.notes.reauth.cancel"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.screen"
+    timeout: 15000
+- assertNotVisible:
+    text: "E2E protected body content"
+
+# The correct account password opens the editor, where the body is visible.
+- tapOn:
+    id: "purrivacy.notes.item.0"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.reauth.password"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.notes.reauth.password"
+- inputText: "Purrivacy-e2e-password-123"
+- hideKeyboard
+- tapOn:
+    id: "purrivacy.notes.reauth.password.submit"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.body"
+    timeout: 30000
+- assertVisible:
+    text: "E2E protected body content"
+
+# The switch state survives the round trip: the note is still protected.
+- assertVisible:
+    id: "purrivacy.notes.requireReauth"
+
+# Close the editor and delete the note.
+- tapOn:
+    id: "purrivacy.notes.cancel"
+- extendedWaitUntil:
+    visible:
+      id: "purrivacy.notes.screen"
+    timeout: 15000
+- tapOn:
+    id: "purrivacy.notes.delete.0"
+- extendedWaitUntil:
+    visible:
+      text: "Delete note?"
+    timeout: 15000
+- tapOn:
+    text: "Delete"
+- extendedWaitUntil:
+    notVisible:
+      text: "E2E Protected Note"
+    timeout: 20000

@@ -3,6 +3,7 @@ import { File, FileMode, Paths } from 'expo-file-system';
 
 import { pgpCryptoService } from './pgpCryptoService';
 import { saveToDownloads } from './downloadsSaver';
+import { deleteCachedFile } from './fileCacheCleanup';
 import type { FileOpSelfTestResult } from './pgpProtocol';
 import { createSha256Hasher } from '../features/updates/services/updateSigning';
 import type { PrivateKeyAndPassphrase } from '../types/types';
@@ -54,6 +55,9 @@ async function feedFileToSession(
     onProgress?: (doneBytes: number, totalBytes?: number) => void,
 ): Promise<string> {
     const source = new File(fileUri);
+    if (!source.exists) {
+        throw new Error('The selected file is no longer available. Please select it again');
+    }
     const info = source.info();
     if (info.size !== undefined && info.size > MAX_FILE_BYTES) {
         throw new Error('File is larger than the 100 MB limit');
@@ -211,8 +215,28 @@ export function writeDeterministicTestFile(sizeBytes: number): { uri: string; na
 let lastEncryptedFile: { uri: string; name: string; sourceSha256: string } | null = null;
 
 export function getLastEncryptedFile(): { uri: string; name: string; sourceSha256: string } | null {
+    if (!lastEncryptedFile) return null;
+    try {
+        if (!new File(lastEncryptedFile.uri).exists) {
+            lastEncryptedFile = null;
+            return null;
+        }
+    } catch {
+        lastEncryptedFile = null;
+        return null;
+    }
     return lastEncryptedFile;
 }
+
+export function clearLastEncryptedFile(): void {
+    lastEncryptedFile = null;
+}
+
+const forgetLastEncryptedFile = (uri: string): void => {
+    if (lastEncryptedFile?.uri === uri) {
+        lastEncryptedFile = null;
+    }
+};
 
 export const fileCryptoService = {
     /**
@@ -268,12 +292,16 @@ export const fileCryptoService = {
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
             lastEncryptedFile = { uri: outFile.uri, name: outName, sourceSha256 };
+            // The picked source was a cache copy; it is not needed after a
+            // successful encryption and must not linger as plaintext.
+            deleteCachedFile(sourceFileUri);
             // Publish a findable copy into Downloads/Purrivacy (best effort:
             // the cache file remains shareable if this is unsupported).
             const savedUri = await saveToDownloads(outName, outFile.uri);
             return { fileUri: outFile.uri, fileName: outName, totalBytes, sha256, sourceSha256, savedUri };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
+            deleteCachedFile(sourceFileUri);
             // A failed pull may have left a truncated ciphertext file in cache.
             // It is never published as a result and should not linger as if valid.
             try { if (outFile?.exists) outFile.delete(); } catch { /* best-effort cleanup */ }
@@ -316,9 +344,15 @@ export const fileCryptoService = {
             await pgpCryptoService.execute('fileOpEnd', { sessionId });
 
             const savedUri = await saveToDownloads(outName, outFile.uri);
+            // The encrypted source was a cache copy; it is no longer needed
+            // after a successful decrypt (and may be the e2e handoff file).
+            deleteCachedFile(sourceFileUri);
+            forgetLastEncryptedFile(sourceFileUri);
             return { fileUri: outFile.uri, fileName: outName, totalBytes: pulled.totalBytes, verified: pulled.verified ?? verified, sha256: pulled.sha256, savedUri };
         } catch (error) {
             await pgpCryptoService.execute('fileOpEnd', { sessionId }).catch(() => {});
+            deleteCachedFile(sourceFileUri);
+            forgetLastEncryptedFile(sourceFileUri);
             // Plaintext output must not survive a failed or interrupted decrypt.
             try { if (outFile?.exists) outFile.delete(); } catch { /* best-effort cleanup */ }
             throw error;

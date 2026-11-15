@@ -22,6 +22,7 @@ type DecryptedKeyPayload = Partial<KeyMetadata> & KeyPairBase & {
   title?: string;
   body?: string;
   updatedAt?: number;
+  requireReauth?: boolean;
 };
 type StorageKeyPayload = KeyPair & {
   privateKeyPassphrase?: string | null;
@@ -144,6 +145,8 @@ export async function getUserDecrypted(userId: string): Promise<UserDecrypted | 
         title: decryptedKey.title ?? '',
         body: decryptedKey.body ?? '',
         updatedAt: decryptedKey.updatedAt ?? 0,
+        // Only an explicit true is protected; legacy notes stay unprotected.
+        requireReauth: decryptedKey.requireReauth === true,
       });
       continue;
     }

@@ -56,6 +56,7 @@ const FIXTURE_PASSWORD = 'Purrivacy-e2e-password-123';
 const flows = process.env.E2E_ONLY_FLOWS || [
   '.maestro/file-encrypt-decrypt-roundtrip.yaml',
   '.maestro/secure-notes-crud.yaml',
+  '.maestro/secure-notes-protected.yaml',
   '.maestro/create-and-delete-account.yaml',
 ].join(',');
 

@@ -2,6 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Buffer } from 'buffer';
 import { File } from 'expo-file-system';
 import { validateArmor } from '../../features/keys/domain/pgpValidation';
+import { deleteCachedFile } from '../../services/fileCacheCleanup';
 
 /** Text is rendered in the composer and sent through the WebView bridge; keep
  * it well below the Binder transaction budget. Larger inputs belong in File
@@ -114,26 +115,32 @@ export const useFilePicker = ({
 
             const asset = result.assets[0];
             const file = new File(asset.uri);
-            const fileSize = asset.size ?? file.info().size;
+            try {
+                const fileSize = asset.size ?? file.info().size;
 
-            if (requireText) {
-                if (fileSize != null && fileSize > maxBytes) {
-                    throw new Error(`Text file is larger than ${Math.floor(maxBytes / (1024 * 1024))} MB. Use File mode for large files`);
+                if (requireText) {
+                    if (fileSize != null && fileSize > maxBytes) {
+                        throw new Error(`Text file is larger than ${Math.floor(maxBytes / (1024 * 1024))} MB. Use File mode for large files`);
+                    }
+
+                    const bytes = new Uint8Array(await file.arrayBuffer());
+                    if (!looksLikeText(bytes)) {
+                        throw new Error('Only text files can be read here. Use File mode for binary files like PDFs');
+                    }
+                    const fileContent = decodeText(bytes);
+                    validatePickedContent(fileContent, validatePGP);
+                    onFilePicked(fileContent);
+                    return;
                 }
 
-                const bytes = new Uint8Array(await file.arrayBuffer());
-                if (!looksLikeText(bytes)) {
-                    throw new Error('Only text files can be read here. Use File mode for binary files like PDFs');
-                }
-                const fileContent = decodeText(bytes);
+                const fileContent = await file.text();
                 validatePickedContent(fileContent, validatePGP);
                 onFilePicked(fileContent);
-                return;
+            } finally {
+                // The picker copied this into the app cache. Its text is now in
+                // memory/state; the cache copy must not linger as plaintext.
+                deleteCachedFile(file.uri);
             }
-
-            const fileContent = await file.text();
-            validatePickedContent(fileContent, validatePGP);
-            onFilePicked(fileContent);
         } catch (error: any) {
             const message = typeof error?.message === 'string' && isUserFacingFilePickerError(error.message)
                 ? error.message

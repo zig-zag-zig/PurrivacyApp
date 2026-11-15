@@ -49,6 +49,7 @@ const ALL_FLOWS = [
   'mfa-login-recovery-code',
   'passphrase-autofill-after-relaunch',
   'signout-clears-sensitive-state',
+  'signout-clears-drafts',
   'rapid-double-submit',
   'revoke-sessions-other-device',
   'operation-survives-background',

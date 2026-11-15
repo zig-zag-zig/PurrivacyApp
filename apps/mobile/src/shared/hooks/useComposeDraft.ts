@@ -25,34 +25,66 @@ const draftKey = (userId: string, slot: string): string =>
  * encrypted sqlite value store (see useComposeDraft.ts binding), never a
  * plaintext backend.
  */
-export const createDraftService = (store: DraftStore) => ({
-    load: async (userId: string, slot: string): Promise<string | null> => {
-        try {
-            return await store.getItem(draftKey(userId, slot));
-        } catch (error) {
-            logger.warn('draft load failed', { slot, error });
-            return null;
-        }
-    },
-    save: async (userId: string, slot: string, value: string): Promise<void> => {
-        try {
-            if (!value.trim()) {
-                await store.removeItem(draftKey(userId, slot));
-                return;
-            }
-            await store.setItem(draftKey(userId, slot), value);
-        } catch (error) {
-            logger.warn('draft save failed', { slot, error });
-        }
-    },
-    clear: async (userId: string, slot: string): Promise<void> => {
+export const createDraftService = (store: DraftStore) => {
+    const clearedUsers = new Set<string>();
+    const pendingWrites = new Map<string, Set<Promise<void>>>();
+
+    const clear = async (userId: string, slot: string): Promise<void> => {
         try {
             await store.removeItem(draftKey(userId, slot));
         } catch (error) {
             logger.warn('draft clear failed', { slot, error });
         }
-    },
-});
+    };
+
+    return {
+        load: async (userId: string, slot: string): Promise<string | null> => {
+            try {
+                return await store.getItem(draftKey(userId, slot));
+            } catch (error) {
+                logger.warn('draft load failed', { slot, error });
+                return null;
+            }
+        },
+        save: async (userId: string, slot: string, value: string): Promise<void> => {
+            if (clearedUsers.has(userId)) return;
+            const key = draftKey(userId, slot);
+            const write = (async () => {
+                try {
+                    if (!value.trim()) {
+                        await store.removeItem(key);
+                        return;
+                    }
+                    await store.setItem(key, value);
+                    // If sign-out began while the write was in flight, remove
+                    // the just-written value before that cleanup can complete.
+                    if (clearedUsers.has(userId)) await store.removeItem(key);
+                } catch (error) {
+                    logger.warn('draft save failed', { slot, error });
+                }
+            })();
+            const writes = pendingWrites.get(userId) ?? new Set<Promise<void>>();
+            writes.add(write);
+            pendingWrites.set(userId, writes);
+            try {
+                await write;
+            } finally {
+                writes.delete(write);
+                if (writes.size === 0) pendingWrites.delete(userId);
+            }
+        },
+        clear,
+        allowUser: (userId: string): void => {
+            if (userId.trim()) clearedUsers.delete(userId);
+        },
+        clearForUser: async (userId: string): Promise<void> => {
+            if (!userId.trim()) return;
+            clearedUsers.add(userId);
+            await Promise.all(Array.from(pendingWrites.get(userId) ?? []));
+            await Promise.all(['encrypt', 'decrypt'].map(slot => clear(userId, slot)));
+        },
+    };
+};
 
 export type DraftService = ReturnType<typeof createDraftService>;
 
@@ -97,6 +129,7 @@ export function useComposeDraft({
     useEffect(() => {
         setRestored(false);
         if (!userId) return;
+        serviceRef.current.allowUser(userId);
         let cancelled = false;
         void serviceRef.current.load(userId, slot).then(draft => {
             if (cancelled) return;

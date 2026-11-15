@@ -33,6 +33,11 @@ const store = {
 
 export const draftService = createDraftService(store);
 
+/** Clear Purrivacy's two compose drafts for one user during account cleanup. */
+export const clearDraftsForUser = async (userId: string): Promise<void> => {
+    await draftService.clearForUser(userId);
+};
+
 type EncryptedComposeDraftParams = Omit<
     Parameters<typeof useComposeDraft>[0],
     'service'
