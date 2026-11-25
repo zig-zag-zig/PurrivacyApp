@@ -156,6 +156,7 @@ export const MfaModal: React.FC<MfaModalProps> = ({
             <View style={styles.modalContainer}>
                 <ScreenContainer
                     testID="purrivacy.mfa.modal"
+                    hideScrollAffordance
                     showsHorizontalScrollIndicator={false}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={[
