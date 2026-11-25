@@ -10,6 +10,11 @@ import { KeyPair } from '../../../types/types';
 import { KeyDetailRow, KeyList } from './KeyList';
 import { KeySelectionDetails } from './keySelectionModal/KeySelectionDetails';
 import { useKeySelectionList } from './keySelectionModal/useKeySelectionList';
+import ScrollButtons, {
+    useScrollAffordance,
+    useScrollRailContentInset,
+} from '../../../components/ScrollAffordance';
+import { OverlayDockIsolation } from '../../../components/overlayDock';
 
 interface KeySelectionModalProps {
     visible: boolean;
@@ -37,6 +42,10 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
     popularityMap,
 }) => {
     const insets = useSafeAreaInsets();
+    const searchListRef = React.useRef<FlatList<KeyPair> | null>(null);
+    const cloudScrollRef = React.useRef<ScrollView | null>(null);
+    const scroll = useScrollAffordance();
+    const railInset = useScrollRailContentInset(insets.bottom + theme.spacing.md);
     const {
         searchQuery,
         setSearchQuery,
@@ -64,6 +73,7 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
             animationType="slide"
             onRequestClose={resetAndClose}
         >
+            <OverlayDockIsolation>
             <View style={styles.modalOverlay}>
                 <View
                     style={[
@@ -177,9 +187,14 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                     {searchQuery.trim() ? (
                         // Searching renders full-width detail rows; virtualize them.
                         <FlatList
+                            ref={searchListRef}
                             style={styles.keyListContainer}
-                            contentContainerStyle={styles.keyListContent}
+                            contentContainerStyle={[styles.keyListContent, { paddingBottom: railInset }]}
                             keyboardShouldPersistTaps="always"
+                            onScroll={scroll.onScroll}
+                            onContentSizeChange={scroll.onContentSizeChange}
+                            onLayout={scroll.onViewportLayout}
+                            scrollEventThrottle={scroll.scrollEventThrottle}
                             data={displayKeys}
                             keyExtractor={(key) => key.fingerprint}
                             ListEmptyComponent={
@@ -208,9 +223,14 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                         // ScrollView is required since flexWrap is not FlatList-
                         // compatible. Capped by the picker's view-more flow.
                         <ScrollView
+                            ref={cloudScrollRef}
                             style={styles.keyListContainer}
-                            contentContainerStyle={styles.keyListContent}
+                            contentContainerStyle={[styles.keyListContent, { paddingBottom: railInset }]}
                             keyboardShouldPersistTaps="always"
+                            onScroll={scroll.onScroll}
+                            onContentSizeChange={scroll.onContentSizeChange}
+                            onLayout={scroll.onViewportLayout}
+                            scrollEventThrottle={scroll.scrollEventThrottle}
                         >
                             {displayKeys.length === 0 ? (
                                 <View style={styles.noResultsContainer}>
@@ -226,9 +246,31 @@ export const KeySelectionModal: React.FC<KeySelectionModalProps> = ({
                             )}
                         </ScrollView>
                     )}
+
+                    <ScrollButtons
+                        showScrollToTop={scroll.showScrollToTop}
+                        showScrollToBottom={scroll.showScrollToBottom}
+                        onScrollToTop={() => {
+                            if (searchQuery.trim()) {
+                                searchListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                            } else {
+                                cloudScrollRef.current?.scrollTo({ y: 0, animated: true });
+                            }
+                        }}
+                        onScrollToBottom={() => {
+                            if (searchQuery.trim()) {
+                                searchListRef.current?.scrollToEnd({ animated: true });
+                            } else {
+                                cloudScrollRef.current?.scrollToEnd({ animated: true });
+                            }
+                        }}
+                        bottomOffset={insets.bottom + theme.spacing.md}
+                        testIDPrefix="purrivacy.key.selection.scroll"
+                    />
                 </View>
             </View>
             <ModalToastHost />
+            </OverlayDockIsolation>
         </Modal>
     );
 };

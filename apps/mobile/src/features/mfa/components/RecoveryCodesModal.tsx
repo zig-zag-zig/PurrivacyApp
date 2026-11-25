@@ -79,6 +79,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
             <View style={styles.modalFullscreen}>
                 <ScreenContainer
                     testID="purrivacy.mfa.recovery.codes"
+                    hideScrollAffordance
                     contentContainerStyle={{
                         paddingTop: Math.max(theme.spacing.xl, insets.top + theme.spacing.md),
                     }}

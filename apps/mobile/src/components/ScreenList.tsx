@@ -14,6 +14,15 @@ import {
     ScreenScrollHandle,
     useScreenScrollEngine,
 } from './useScreenScrollEngine';
+import ScrollButtons, {
+    useScrollAffordance,
+    useScrollRailContentInset,
+} from './ScrollAffordance';
+import {
+    composeContentSizeHandlers,
+    composeLayoutHandlers,
+    composeScrollHandlers,
+} from './composeScrollEventHandlers';
 
 interface ScreenListProps<T> extends Omit<FlatListProps<T>, 'renderItem' | 'data' | 'keyExtractor'> {
     data: T[];
@@ -24,6 +33,8 @@ interface ScreenListProps<T> extends Omit<FlatListProps<T>, 'renderItem' | 'data
     /** Optional content rendered below the list, inside the scroll region. */
     footer?: FlatListProps<T>['ListFooterComponent'];
     contentContainerStyle?: FlatListProps<T>['contentContainerStyle'];
+    /** Hide the floating scroll affordances for this list. Default: shown. */
+    hideScrollAffordance?: boolean;
 }
 
 /**
@@ -52,6 +63,7 @@ function ScreenListInner<T>(
         onTouchMove,
         onTouchEnd,
         scrollEventThrottle,
+        hideScrollAffordance = false,
         ...props
     }: ScreenListProps<T>,
     ref: React.Ref<FlatList<T>>,
@@ -64,8 +76,12 @@ function ScreenListInner<T>(
         onTouchMove,
         onTouchEnd,
     });
+    const scroll = useScrollAffordance();
+    const railInset = useScrollRailContentInset();
+    const listRef = React.useRef<FlatList<T> | null>(null);
 
     const assignListRef = React.useCallback((node: FlatList<T> | null) => {
+        listRef.current = node;
         const handle: ScreenScrollHandle | null = node
             ? {
                 scrollToY: (y, animated) => node.scrollToOffset({ offset: y, animated }),
@@ -79,6 +95,19 @@ function ScreenListInner<T>(
             ref.current = node;
         }
     }, [engine, ref]);
+
+    // The engine owns onScroll/onLayout/onContentSizeChange; the affordance hook
+    // observes the same events. Compose instead of spreading one over the other.
+    const scrollProps = engine.scrollProps;
+    const mergedScrollProps = {
+        ...scrollProps,
+        onScroll: composeScrollHandlers(scrollProps.onScroll, scroll.onScroll),
+        onLayout: composeLayoutHandlers(scrollProps.onLayout, scroll.onViewportLayout),
+        onContentSizeChange: composeContentSizeHandlers(
+            scrollProps.onContentSizeChange,
+            scroll.onContentSizeChange,
+        ),
+    };
 
     return (
         <View style={commonStyles.container}>
@@ -100,12 +129,33 @@ function ScreenListInner<T>(
                             engine.keyboardBottomSpacer > 0 && {
                                 paddingBottom: engine.keyboardBottomSpacer + theme.spacing.xxl,
                             },
+                            // Reserved unconditionally: rows appended without any
+                            // scroll (load more, a restored list) must not have their
+                            // last row trapped under a button that only then appears.
+                            // `max`, not a later entry, so a keyboard spacer is never
+                            // shrunk back to the rail's own reservation.
+                            !hideScrollAffordance && {
+                                paddingBottom: Math.max(
+                                    railInset,
+                                    engine.keyboardBottomSpacer > 0
+                                        ? engine.keyboardBottomSpacer + theme.spacing.xxl
+                                        : 0,
+                                ),
+                            },
                         ]}
                         keyboardShouldPersistTaps={keyboardShouldPersistTaps ?? 'handled'}
                         keyboardDismissMode={props.keyboardDismissMode ?? 'none'}
                         scrollEventThrottle={scrollEventThrottle ?? 16}
-                        {...engine.scrollProps}
+                        {...mergedScrollProps}
                     />
+                    {!hideScrollAffordance && (
+                        <ScrollButtons
+                            showScrollToTop={scroll.showScrollToTop}
+                            showScrollToBottom={scroll.showScrollToBottom}
+                            onScrollToTop={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+                            onScrollToBottom={() => listRef.current?.scrollToEnd({ animated: true })}
+                        />
+                    )}
                 </View>
             </KeyboardAwareScrollContext.Provider>
         </View>

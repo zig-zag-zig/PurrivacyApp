@@ -9,6 +9,7 @@ import { EncryptScreen } from '../../features/encrypt/pages/EncryptScreen';
 import { KeyScreen } from '../../features/keys/pages/KeyScreen';
 import { NotesScreen } from '../../features/notes/pages/NotesScreen';
 import { SettingsScreen } from '../../features/settings/pages/SettingsScreen';
+import { ScreenBottomChromeContext } from '../../components/overlayDock';
 import { theme } from '../../styles/theme';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -25,8 +26,14 @@ const tabIcons: Record<keyof TabParamList, React.ComponentProps<typeof Icon>['na
 
 export const TabNavigator = () => {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
 
   return (
+    // Tab screens lay out above the bar, so anything positioned in window
+    // coordinates (e.g. the operation button) has to subtract this height to
+    // land in the right place inside the screen. The scroll affordances read
+    // it through useOverlayDockClearance.
+    <ScreenBottomChromeContext.Provider value={tabBarHeight}>
     <Tab.Navigator
       screenListeners={{
         tabPress: () => {
@@ -36,7 +43,7 @@ export const TabNavigator = () => {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+          height: tabBarHeight,
           marginHorizontal: theme.spacing.sm,
           paddingHorizontal: theme.spacing.xs,
           paddingTop: 2,
@@ -85,6 +92,7 @@ export const TabNavigator = () => {
         options={{ tabBarButtonTestID: 'purrivacy.tab.settings', title: 'Settings' }}
       />
     </Tab.Navigator>
+    </ScreenBottomChromeContext.Provider>
   );
 };
 

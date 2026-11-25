@@ -9,6 +9,7 @@ import { useOperationCenter } from '../state/OperationCenterContext';
 import { formatBytes, type OperationRecord } from '../state/operationCenterState';
 import { openResultFile, showResultsInFolder } from '../../services/downloadsSaver';
 import { OperationResultDetail } from './OperationResultDetail';
+import { useOverlayDockPublisher } from '../../components/overlayDock';
 import { theme } from '../../styles/theme';
 
 /**
@@ -28,6 +29,17 @@ import { theme } from '../../styles/theme';
  */
 
 const FAB_SIZE = 56;
+
+/**
+ * The dock slot reserved for the activity button. Exported so the scroll
+ * affordances can lift themselves above it: `bottom` is measured from the
+ * window bottom (the FAB is rendered above the navigator), `height` includes
+ * the spinning ring and badge padding around the button itself.
+ */
+export const OPERATION_FAB_DOCK = {
+    bottom: 92,
+    height: FAB_SIZE + 12,
+} as const;
 
 const OperationFab: React.FC<{
     runningCount: number;
@@ -315,6 +327,21 @@ export const OperationCenterUI: React.FC = () => {
         return () => clearTimeout(timeout);
     }, [listOpen, hasOperations, detailOp, closeList]);
 
+    // Publish the dock the button occupies so screen-level scroll affordances
+    // lift above it instead of covering it. Screens cannot lay out around this
+    // button: it renders above the navigator on purpose, so the button stays
+    // reachable from every tab.
+    const publishDock = useOverlayDockPublisher();
+    const fabVisible = hasOperations && !listOpen;
+
+    // The cleanup runs on every `fabVisible` change, but React batches it with
+    // the effect body, so the dock never renders as absent in between.
+    useEffect(() => {
+        if (!publishDock) return undefined;
+        publishDock(fabVisible ? OPERATION_FAB_DOCK : null);
+        return () => publishDock(null);
+    }, [fabVisible, publishDock]);
+
     // Stay mounted while the list is open, even if the last operation settles
     // and is marked seen — otherwise finishing a task would slam the modal shut
     // in the middle of reading it.
@@ -426,9 +453,9 @@ const styles = StyleSheet.create({
     fabHost: {
         position: 'absolute',
         right: 16,
-        bottom: 92,
-        width: FAB_SIZE + 12,
-        height: FAB_SIZE + 12,
+        bottom: OPERATION_FAB_DOCK.bottom,
+        width: OPERATION_FAB_DOCK.height,
+        height: OPERATION_FAB_DOCK.height,
         alignItems: 'center',
         justifyContent: 'center',
     },

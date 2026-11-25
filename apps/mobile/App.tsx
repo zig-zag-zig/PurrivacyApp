@@ -30,6 +30,7 @@ import { PassphraseBannerOverlayProvider } from './src/features/keys/components/
 import { GlobalSpinnerProvider, useGlobalSpinner } from './src/app/state/GlobalSpinnerContext';
 import { OperationCenterProvider, useOperationCenter } from './src/app/state/OperationCenterContext';
 import { OperationCenterUI } from './src/app/components/OperationCenterUI';
+import { OverlayDockProvider } from './src/components/overlayDock';
 import { purgeFileCryptoCaches } from './src/services/fileCacheCleanup';
 import { clearLastEncryptedFile } from './src/services/fileCryptoService';
 import { usePassphraseStorageAutoSync } from './src/features/security/hooks/usePassphraseStorageAutoSync';
@@ -143,7 +144,9 @@ function App() {
                                         <UpdateProvider>
                                             <PassphraseBannerOverlayProvider>
                                                 <NavigationContainer theme={navigationTheme}>
+                                                    <OverlayDockProvider>
                                                     <AppContent />
+                                                    </OverlayDockProvider>
                                                 </NavigationContainer>
                                             </PassphraseBannerOverlayProvider>
                                         </UpdateProvider>
